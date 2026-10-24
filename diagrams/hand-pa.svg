@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+<title>Hand — PA</title>
+<style>.t{fill:#e7e9ea;font-size:16px;font-weight:700}.c{fill:#8b98a5;font-size:13px}.m{fill:#8b98a5;font-size:13px}.g{fill:#ffd700;font-size:13px;font-weight:700}.r{fill:#f4212e;font-size:13px;font-weight:700}.b{fill:#1d9bf0;font-size:13px;font-weight:700}.an{fill:#2a3341;stroke:#e7e9ea;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.bn{fill:none;stroke:#8b98a5;stroke-width:1.2;opacity:.6;stroke-linecap:round}.ir{fill:rgba(139,152,165,.1);stroke:#8b98a5;stroke-width:1.5}.bx{fill:none;stroke:#8b98a5;stroke-width:1;stroke-dasharray:4 3}.cr{stroke:#f4212e;stroke-width:4;fill:none;stroke-linecap:round}</style>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f4212e"/></marker><marker id="ab" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1d9bf0"/></marker><marker id="ag" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#00ba7c"/></marker></defs>
+<rect width="400" height="300" rx="12" fill="#1a2332"/>
+<text class="t" x="200" y="25" text-anchor="middle">Hand — PA</text>
+<rect class="ir" x="22" y="38" width="222" height="230" rx="3"/><text class="m" x="30" y="56">IR</text>
+<path class="an" d="M100 266C96 250 92 236 90 222L53.1 174.5A9.7 9.7 0 0 1 66.1 160.1L104 180Q106 164 97 153L88.6 93.5A7.6 7.6 0 0 1 103.5 91.1L114 151Q115 156 116 149L116.2 78.7A7.6 7.6 0 0 1 131.3 78.4L134 149Q135 155 136 150L145.2 86.7A7.1 7.1 0 0 1 159.4 88.5L153 152Q154 161 155 156L169.9 109.5A6.3 6.3 0 0 1 182 112.9L170 160C178 178 182 205 176 232C172 246 168 256 166 266"/>
+<path class="bn" d="M112 236L105.5 160M105.5 154L97.9 104.2M124 236L125 157M125 151L124 92.7M136 236L144.5 159M144.5 153L150.7 100.3M150 238L162.5 166M162.5 160L173.2 120.5M106 232L97 201"/>
+<g stroke="#f4212e" stroke-width="2" fill="none"><circle cx="125" cy="159" r="9"/><path d="M110 159h8M132 159h8M125 144v8M125 166v8"/></g><circle cx="125" cy="159" r="3.5" fill="#ffd700"/>
+<text class="g" x="140" y="197" text-anchor="middle">3rd MCP</text>
+<g stroke="#f4212e" stroke-width="1.5" fill="none"><circle cx="176" cy="54" r="5"/><path d="M168 54h16M176 46v16"/></g><text class="r" x="188" y="58.5">CR ⊥ IR</text>
+<rect class="bx" x="254" y="38" width="136" height="230" rx="8"/><text class="m" x="322" y="56" text-anchor="middle">Side view</text>
+<rect x="298" y="64" width="48" height="20" rx="4" fill="#0f1419" stroke="#8b98a5" stroke-width="1.5"/><text class="m" x="322" y="79" text-anchor="middle">Tube</text>
+<line x1="264" y1="232" x2="380" y2="232" stroke="#8b98a5" stroke-width="1.5"/><rect class="ir" x="268" y="218" width="108" height="10" rx="2"/>
+<path class="an" d="M268 217V199C284 196 298 198 312 204L362 209Q373 210 373 214V217"/>
+<line class="cr" x1="322" y1="88" x2="322" y2="198" marker-end="url(#ar)"/><circle cx="322" cy="205" r="3.5" fill="#ffd700"/><text class="r" x="330" y="146">0°</text>
+<text class="m" x="270" y="252">IR</text><text class="m" x="378" y="252" text-anchor="end">Table</text>
+<text class="c" x="200" y="289" text-anchor="middle">CR ⊥ (0°) to 3rd MCP joint · palm flat · no rotation</text>
+</svg>

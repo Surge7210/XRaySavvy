@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+<title>Ankle — AP Oblique (Mortise)</title>
+<style>.t{fill:#e7e9ea;font-size:16px;font-weight:700}.c{fill:#8b98a5;font-size:13px}.m{fill:#8b98a5;font-size:13px}.g{fill:#ffd700;font-size:13px;font-weight:700}.r{fill:#f4212e;font-size:13px;font-weight:700}.b{fill:#1d9bf0;font-size:13px;font-weight:700}.an{fill:#2a3341;stroke:#e7e9ea;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.bn{fill:none;stroke:#8b98a5;stroke-width:1.2;opacity:.6;stroke-linecap:round}.ir{fill:rgba(139,152,165,.1);stroke:#8b98a5;stroke-width:1.5}.bx{fill:none;stroke:#8b98a5;stroke-width:1;stroke-dasharray:4 3}.cr{stroke:#f4212e;stroke-width:4;fill:none;stroke-linecap:round}</style>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f4212e"/></marker><marker id="ab" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1d9bf0"/></marker><marker id="ag" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#00ba7c"/></marker></defs>
+<rect width="400" height="300" rx="12" fill="#1a2332"/>
+<text class="t" x="200" y="25" text-anchor="middle">Ankle — AP Oblique (Mortise)</text>
+<rect class="ir" x="22" y="38" width="222" height="230" rx="3"/><text class="m" x="30" y="56">IR</text>
+<g transform="translate(14 0)"><path class="an" d="M86 40C84 82 92 124 102 160C105 172 100 182 98 194C96 204 102 210 106 213C100 226 98 242 104 254Q105 261 114 257Q120 265 130 259Q137 267 146 260Q154 269 165 261Q178 270 181 252C183 234 174 218 164 210C170 204 168 196 162 186C160 176 162 168 164 160C172 122 176 80 172 40"/>
+<path class="bn" d="M106 44C104 100 106 150 102 196M122 44C120 100 124 150 116 184M156 44C158 100 152 150 160 184M116 184Q138 178 160 184"/>
+<line x1="101" y1="198" x2="161" y2="188" stroke="#8b98a5" stroke-width="1.2" stroke-dasharray="3 3"/><circle cx="101" cy="198" r="2.5" fill="#8b98a5"/><circle cx="161" cy="188" r="2.5" fill="#8b98a5"/><text class="m" x="88" y="194" text-anchor="end">L</text><text class="m" x="174" y="186">M</text>
+<path d="M84 98Q130 132 176 98" fill="none" stroke="#1d9bf0" stroke-width="2.5" marker-end="url(#ab)"/>
+<g stroke="#f4212e" stroke-width="2" fill="none"><circle cx="131" cy="193" r="9"/><path d="M116 193h8M138 193h8M131 178v8M131 200v8"/></g><circle cx="131" cy="193" r="3.5" fill="#ffd700"/>
+</g><text class="b" x="194" y="112">15–20°</text><text class="b" x="194" y="128">medial</text>
+<path d="M78 232L130 200" stroke="#ffd700" stroke-width="1.2"/><text class="g" x="28" y="248">Midway</text><text class="g" x="28" y="263">between mall.</text>
+<g stroke="#f4212e" stroke-width="1.5" fill="none"><circle cx="176" cy="54" r="5"/><path d="M168 54h16M176 46v16"/></g><text class="r" x="188" y="58.5">CR ⊥ IR</text>
+<rect class="bx" x="254" y="38" width="136" height="230" rx="8"/><text class="m" x="322" y="56" text-anchor="middle">View from feet</text>
+<rect x="298" y="64" width="48" height="20" rx="4" fill="#0f1419" stroke="#8b98a5" stroke-width="1.5"/><text class="m" x="322" y="79" text-anchor="middle">Tube</text>
+<line x1="264" y1="256" x2="380" y2="256" stroke="#8b98a5" stroke-width="1.5"/><rect class="ir" x="286" y="242" width="90" height="10" rx="2"/><text class="m" x="262" y="252">IR</text>
+<rect class="an" x="309" y="124" width="26" height="72" rx="13" transform="rotate(18 322 196)"/><circle class="an" cx="322" cy="196" r="22"/>
+<line x1="300" y1="196" x2="344" y2="196" stroke="#e7e9ea" stroke-width="1.5"/><circle cx="300" cy="196" r="3" fill="#8b98a5"/><circle cx="344" cy="196" r="3" fill="#8b98a5"/><text class="m" x="290" y="200" text-anchor="end">L</text><text class="m" x="354" y="200">M</text>
+<path d="M322 150A46 46 0 0 1 336.2 152.3" fill="none" stroke="#1d9bf0" stroke-width="2"/><line x1="322" y1="196" x2="347.3" y2="118" stroke="#1d9bf0" stroke-width="1.5" stroke-dasharray="4 3"/><text class="b" x="316" y="140" text-anchor="end">15–20°</text>
+<line class="cr" x1="322" y1="88" x2="322" y2="186" marker-end="url(#ar)"/><circle cx="322" cy="196" r="3.5" fill="#ffd700"/><text class="r" x="300" y="106" text-anchor="end">0°</text>
+<text class="m" x="322" y="234" text-anchor="middle">IM line ∥ IR</text>
+<text class="c" x="200" y="289" text-anchor="middle">Leg 15–20° medial · CR ⊥ (0°) midway between malleoli</text>
+</svg>
