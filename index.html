@@ -1109,54 +1109,75 @@ function launchFireworks() {
   const ctx = canvas.getContext('2d');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  const cx = canvas.width / 2, cy = canvas.height / 2;
-  const colors = ['#1d9bf0','#00ba7c','#ffd700','#f4212e','#ff7ad9','#ffffff'];
-  const particles = [];
-  const scale = Math.min(canvas.width, canvas.height) / 400;
-  const bursts = [
-    { x: cx, y: cy, delay: 0 },
-    { x: cx - 70 * scale, y: cy - 50 * scale, delay: 14 },
-    { x: cx + 70 * scale, y: cy - 30 * scale, delay: 26 }
+  const W = canvas.width, H = canvas.height;
+  const reach = Math.max(W, H) * 0.5;
+  const palettes = [
+    ['#ff3b30','#ff9500','#ffcc00'],
+    ['#34c759','#00e5ff','#1d9bf0'],
+    ['#af52de','#ff2d92','#ff7ad9'],
+    ['#ffd700','#ffffff','#ff9500'],
+    ['#00ba7c','#5ac8fa','#bf5af2']
   ];
-  function burst(b) {
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    const count = 40;
+  const bursts = [
+    { x: W * 0.5,  y: H * 0.45, delay: 0 },
+    { x: W * 0.25, y: H * 0.25, delay: 14 },
+    { x: W * 0.75, y: H * 0.3,  delay: 28 },
+    { x: W * 0.3,  y: H * 0.65, delay: 42 },
+    { x: W * 0.7,  y: H * 0.7,  delay: 56 }
+  ];
+  const particles = [];
+  function burst(b, idx) {
+    const pal = palettes[idx % palettes.length];
+    const count = 110;
     for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.15;
-      const speed = (2 + Math.random() * 2.5) * scale;
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.1;
+      const speed = (reach / 33) * (0.55 + Math.random() * 0.5);
+      const rainbow = Math.random() < 0.35;
       particles.push({
-        x: b.x, y: b.y, px: b.x, py: b.y,
+        x: b.x, y: b.y,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        life: 1, decay: 0.012 + Math.random() * 0.01,
-        color: Math.random() < 0.8 ? color : '#ffffff'
+        life: 1, decay: 0.007 + Math.random() * 0.006,
+        color: rainbow ? 'hsl(' + Math.floor(Math.random() * 360) + ',100%,65%)' : pal[Math.floor(Math.random() * pal.length)],
+        sparkle: Math.random() < 0.3
       });
     }
+    // bright flash at the burst center
+    particles.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 1, decay: 0.08, color: '#ffffff', flash: true });
   }
-  bursts.forEach((b, i) => playPop(b.delay / 60, i === 0 ? 0.5 : 0.35));
+  bursts.forEach((b, i) => playPop(b.delay / 60, i === 0 ? 0.55 : 0.4));
   let frame = 0;
   function draw() {
-    bursts.forEach(b => { if (b.delay === frame) burst(b); });
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bursts.forEach((b, i) => { if (b.delay === frame) burst(b, i); });
+    ctx.clearRect(0, 0, W, H);
     ctx.lineCap = 'round';
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
-      p.px = p.x; p.py = p.y;
-      p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.04 * scale;
-      p.x += p.vx; p.y += p.vy;
       p.life -= p.decay;
       if (p.life <= 0) { particles.splice(i, 1); continue; }
-      ctx.globalAlpha = p.life;
+      if (p.flash) {
+        ctx.globalAlpha = p.life;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 60);
+        g.addColorStop(0, 'rgba(255,255,255,0.9)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(p.x - 60, p.y - 60, 120, 120);
+        continue;
+      }
+      const ox = p.x, oy = p.y;
+      p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.05;
+      p.x += p.vx; p.y += p.vy;
+      ctx.globalAlpha = p.sparkle ? p.life * (0.5 + Math.random() * 0.5) : p.life;
       ctx.strokeStyle = p.color;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(p.px - p.vx * 2, p.py - p.vy * 2);
+      ctx.moveTo(ox - p.vx * 2.5, oy - p.vy * 2.5);
       ctx.lineTo(p.x, p.y);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
     frame++;
-    if (frame < 40 || particles.length) requestAnimationFrame(draw);
-    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (frame < 60 || particles.length) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, W, H);
   }
   draw();
 }
