@@ -1088,18 +1088,6 @@ function playPop(delay, volume) {
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
   src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
   src.start(t);
-  // little crackles after the pop
-  for (let k = 0; k < 5; k++) {
-    const ct = t + 0.12 + Math.random() * 0.35;
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 2500 + Math.random() * 2500;
-    g.gain.setValueAtTime(volume * 0.08, ct);
-    g.gain.exponentialRampToValueAtTime(0.0001, ct + 0.03);
-    osc.connect(g); g.connect(ac.destination);
-    osc.start(ct); osc.stop(ct + 0.04);
-  }
 }
 
 const CELEBRATION = 'confetti'; // 'confetti' or 'fireworks'
