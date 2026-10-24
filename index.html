@@ -411,26 +411,26 @@
   {
     "extremity": "Knee",
     "projection": "AP",
-    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crDegree": "Perpendicular (7.5\u20139.5 in. ASIS tabletop)",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": null,
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+    "crDegreeFull": "ASIS tabletop measurement: <7.5 in. = 3\u20135\u00b0 caudal, 7.5\u20139.5 in. = perpendicular, >9.5 in. = 3\u20135\u00b0 cephalic"
   },
   {
     "extremity": "Knee",
     "projection": "AP Oblique (Medial Rotation)",
-    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crDegree": "Perpendicular (7.5\u20139.5 in. ASIS tabletop)",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45\u00b0 medial",
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+    "crDegreeFull": "ASIS tabletop measurement: <7.5 in. = 3\u20135\u00b0 caudal, 7.5\u20139.5 in. = perpendicular, >9.5 in. = 3\u20135\u00b0 cephalic"
   },
   {
     "extremity": "Knee",
     "projection": "AP Oblique (Lateral Rotation)",
-    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crDegree": "Perpendicular (7.5\u20139.5 in. ASIS tabletop)",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45\u00b0 lateral",
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+    "crDegreeFull": "ASIS tabletop measurement: <7.5 in. = 3\u20135\u00b0 caudal, 7.5\u20139.5 in. = perpendicular, >9.5 in. = 3\u20135\u00b0 cephalic"
   },
   {
     "extremity": "Knee",
@@ -902,7 +902,7 @@
     "extremity": "Small Bowel",
     "projection": "AP or PA (Modified KUB)",
     "crDegree": "Perpendicular",
-    "crLocation": "Immediate/up to 30 min: 1\u20132 in. (5 cm) above lower rib margin on MSP (include stomach); Delayed: iliac crests on MSP",
+    "crLocation": "Immediate/up to 30 min: 1\u20132 in. above lower rib margin on MSP (include stomach); Delayed: iliac crests on MSP",
     "rotation": "None (supine without rotation)"
   },
   {
@@ -930,14 +930,14 @@
     "extremity": "Barium Enema",
     "projection": "AP Oblique (RPO or LAO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Level of iliac crests, 1\u20132 in. (2.5\u20135 cm) lateral to the elevated side from midline",
+    "crLocation": "Level of iliac crests, 1\u20132 in. lateral to the elevated side from midline",
     "rotation": "35\u201345\u00b0 RPO or LAO"
   },
   {
     "extremity": "Barium Enema",
     "projection": "AP Oblique (LPO or RAO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Level of iliac crests, 1\u20132 in. (2.5\u20135 cm) lateral to the elevated side from midline",
+    "crLocation": "Level of iliac crests, 1\u20132 in. lateral to the elevated side from midline",
     "rotation": "35\u201345\u00b0 LPO or RAO"
   },
   {
@@ -951,14 +951,14 @@
     "extremity": "Barium Enema",
     "projection": "AP/PA Right Lateral Decubitus (Air-Contrast)",
     "crDegree": "Horizontal and perpendicular",
-    "crLocation": "Iliac crests on MSP (include pubic symphysis); 2 in. (5 cm) above iliac crest on MSP to include flexures",
+    "crLocation": "Iliac crests on MSP (include pubic symphysis); 2 in. above iliac crest on MSP to include flexures",
     "rotation": "Right lateral"
   },
   {
     "extremity": "Barium Enema",
     "projection": "AP/PA Left Lateral Decubitus (Air-Contrast)",
     "crDegree": "Horizontal and perpendicular",
-    "crLocation": "Iliac crests on MSP (include pubic symphysis); 2 in. (5 cm) above iliac crest on MSP to include flexures",
+    "crLocation": "Iliac crests on MSP (include pubic symphysis); 2 in. above iliac crest on MSP to include flexures",
     "rotation": "Left lateral"
   },
   {
@@ -1043,7 +1043,7 @@ function render() {
       <h3>${p.projection}</h3>
       <div class="detail"><strong>CR Degree & Direction:</strong> ${p.crDegree}</div>
       <div class="detail"><strong>CR Location:</strong> ${p.crLocation}</div>
-      ${p.rotation ? `<div class="detail"><strong>Body Part Rotation:</strong> ${p.rotation}</div>` : ''}
+      ${hasRotation(p) ? `<div class="detail"><strong>Body Part Rotation:</strong> ${p.rotation}</div>` : ''}
     </div>
   `).join('');
 }
@@ -1370,6 +1370,11 @@ function updateProgressDisplay() {
   }
 }
 
+function hasRotation(p) {
+  const r = (p && p.rotation ? String(p.rotation) : '').trim().toLowerCase();
+  return !!r && !['—','-','none','n/a','na'].includes(r);
+}
+
 function loadQuiz() {
   if (quizMode === 'focus') {
     if (focusIndex >= focusQueue.length) {
@@ -1386,7 +1391,7 @@ function loadQuiz() {
     }
     currentQuiz = pool[Math.floor(Math.random() * pool.length)];
   }
-  const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+  const hasRot = hasRotation(currentQuiz);
   quizQuestionEl.textContent = hasRot
     ? `What is the CR Degree and Direction, CR Location, and Body Part Rotation for a ${currentQuiz.projection} ${currentQuiz.extremity}?`
     : `What is the CR Degree and Direction, and CR Location for a ${currentQuiz.projection} ${currentQuiz.extremity}?`;
@@ -1459,7 +1464,7 @@ function checkAnswer() {
   if (!currentQuiz) return;
   const degreeResult = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree);
   const locResult = scoreMatch(quizLocationEl.value, currentQuiz.crLocation);
-  const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+  const hasRot = hasRotation(currentQuiz);
   const rotResult = hasRot ? scoreMatch(quizRotationEl.value, currentQuiz.rotation) : null;
 
   const labels = { correct: 'Correct', close: 'Pretty close', wrong: 'Wrong' };
@@ -1484,7 +1489,7 @@ function checkAnswer() {
   if (quizMode === 'focus' && currentQuiz) {
     const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree) === 'correct';
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
-    const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+    const hasRot = hasRotation(currentQuiz);
     const rotOk = !hasRot || scoreMatch(quizRotationEl.value, currentQuiz.rotation) === 'correct';
     if (degreeOk && locOk && rotOk) {
       focusCorrect++;
@@ -1496,7 +1501,7 @@ function checkAnswer() {
     // Random Quiz confetti
     const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree) === 'correct';
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
-    const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+    const hasRot = hasRotation(currentQuiz);
     const rotOk = !hasRot || scoreMatch(quizRotationEl.value, currentQuiz.rotation) === 'correct';
     if (degreeOk && locOk && rotOk) launchConfetti();
   }
