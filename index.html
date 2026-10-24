@@ -1413,15 +1413,6 @@ restartBtn.onclick = () => {
 
 searchEl.addEventListener('input', render);
 checkBtn.onclick = checkAnswer;
-tabAbdomen.onclick = () => {
-  setActiveTab(tabAbdomen);
-  abdomenView.classList.remove('hidden');
-  mcView.classList.add('hidden');
-  quizView.classList.add('hidden');
-  refView.classList.add('hidden');
-  refControls.classList.add('hidden');
-  focusControls.classList.add('hidden');
-};
 
 mcNextBtn.onclick = loadMC;
 
