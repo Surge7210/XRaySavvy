@@ -1420,11 +1420,26 @@ function coreWords(str) {
     .filter(w => w.length > 1 && !stop.has(w));
 }
 
-function scoreMatch(user, correct) {
+function scoreRotation(user, correct) {
+  if (!user || !String(user).trim()) return 'wrong';
+  const nums = s => (String(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  // turn ranges like 15–20 into [15, 20]
+  const ranges = [];
+  String(correct).replace(/(\d+(?:\.\d+)?)\s*[\u2013\-–to]+\s*(\d+(?:\.\d+)?)/g, (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
+  const cNums = nums(correct);
+  if (cNums.length === 0) return scoreMatch(user, correct); // no number (e.g. "Right lateral"): compare words
+  const uNums = nums(user);
+  if (uNums.length === 0) return 'wrong';
+  // only the number matters; medial/lateral/RPO/LPO wording is optional
+  const ok = uNums.every(n => cNums.includes(n) || ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b)));
+  return ok ? 'correct' : 'wrong';
+}
+
+function scoreMatch(user, correct, field) {
   if (!user) return 'wrong';
 
-  // Special case: Knee ASIS tabletop projections
-  if (currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
+  // Special case: Knee ASIS tabletop projections (CR degree only)
+  if (field === 'degree' && currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
     const u = normalize(user);
     const isPerp = /perpendicular|perp/.test(u);
     const isCaudal = /3.?5.*caudal|caudal.*3.?5/.test(u);
@@ -1462,10 +1477,10 @@ function scoreMatch(user, correct) {
 
 function checkAnswer() {
   if (!currentQuiz) return;
-  const degreeResult = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree);
+  const degreeResult = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree');
   const locResult = scoreMatch(quizLocationEl.value, currentQuiz.crLocation);
   const hasRot = hasRotation(currentQuiz);
-  const rotResult = hasRot ? scoreMatch(quizRotationEl.value, currentQuiz.rotation) : null;
+  const rotResult = hasRot ? scoreRotation(quizRotationEl.value, currentQuiz.rotation) : null;
 
   const labels = { correct: 'Correct', close: 'Pretty close', wrong: 'Wrong' };
   const classes = { correct: 'good', close: 'close', wrong: 'bad' };
@@ -1487,10 +1502,10 @@ function checkAnswer() {
   quizFeedback.innerHTML = html;
 
   if (quizMode === 'focus' && currentQuiz) {
-    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree) === 'correct';
+    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct';
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
     const hasRot = hasRotation(currentQuiz);
-    const rotOk = !hasRot || scoreMatch(quizRotationEl.value, currentQuiz.rotation) === 'correct';
+    const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
     if (degreeOk && locOk && rotOk) {
       focusCorrect++;
       launchConfetti();
@@ -1499,10 +1514,10 @@ function checkAnswer() {
     updateProgressDisplay();
   } else if (currentQuiz) {
     // Random Quiz confetti
-    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree) === 'correct';
+    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct';
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
     const hasRot = hasRotation(currentQuiz);
-    const rotOk = !hasRot || scoreMatch(quizRotationEl.value, currentQuiz.rotation) === 'correct';
+    const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
     if (degreeOk && locOk && rotOk) launchConfetti();
   }
 }
