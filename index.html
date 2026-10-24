@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X-Ray Projections</title>
+<style>
+  :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+  header { padding:1rem 1rem 0.5rem; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:10; }
+  h1 { margin:0 0 0.6rem 0; font-size:1.35rem; }
+  .tabs { display:flex; gap:0.4rem; margin-bottom:0.6rem; }
+  .tabs button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.9rem; border-radius:999px; cursor:pointer; font-size:0.9rem; }
+  .tabs button.active { background:var(--accent); border-color:var(--accent); color:white; }
+  input[type="search"], input[type="text"] { width:100%; padding:0.7rem 1rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; margin-bottom:0.5rem; }
+  .filters { display:flex; gap:0.5rem; overflow-x:auto; padding:0.4rem 0 0.6rem; }
+  .filters button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.3rem 0.75rem; border-radius:999px; white-space:nowrap; cursor:pointer; font-size:0.8rem; }
+  .filters button.active { background:var(--accent); border-color:var(--accent); color:white; }
+  main { padding:1rem; max-width:800px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1rem; margin-bottom:0.8rem; }
+  .card h3 { margin:0 0 0.3rem 0; font-size:1.05rem; }
+  .card .extremity { color:var(--accent); font-size:0.85rem; font-weight:600; }
+  .detail { margin:0.25rem 0; font-size:0.95rem; }
+  .detail strong { color:var(--muted); font-weight:500; }
+  .count { color:var(--muted); font-size:0.85rem; margin:0.3rem 0 0.8rem; }
+  .empty { text-align:center; color:var(--muted); padding:3rem 1rem; }
+  .quiz-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1.2rem; }
+  .quiz-question { font-size:1.1rem; margin-bottom:1rem; }
+  .quiz-label { display:block; margin:0.8rem 0 0.3rem; font-size:0.9rem; color:var(--muted); }
+  .quiz-actions { display:flex; gap:0.6rem; margin-top:1rem; }
+  .quiz-actions button { padding:0.6rem 1rem; border-radius:8px; border:none; cursor:pointer; font-size:0.95rem; }
+  .btn-primary { background:var(--accent); color:white; }
+  .btn-secondary { background:#38444d; color:white; }
+  .feedback { margin-top:1rem; padding:0.8rem; border-radius:8px; font-size:0.95rem; }
+  .feedback.good { background:#0d3d2e; color:#00ba7c; }
+  .feedback.bad { background:#3d1a1c; color:#f4212e; }
+  .feedback.close { background:#3d331a; color:#ffd700; }
+  .hidden { display:none; }
+
+  #confetti-canvas { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:9999; }
+
+  .qa-item { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem; margin-bottom:0.8rem; }
+  .qa-item p { margin:0 0 0.6rem 0; }
+  .answer { margin-top:0.6rem; padding:0.7rem; background:#1e2a3a; border-radius:6px; font-size:0.95rem; }
+</style>
+</head>
+<body>
+<canvas id="confetti-canvas"></canvas>
+
+<header>
+  <h1>X-Ray Projections</h1>
+  <div class="tabs">
+    <button id="tab-ref" class="active">Reference</button>
+    <button id="tab-random">Random Quiz</button>
+    <button id="tab-focus">Focused Quiz</button>
+    <button id="tab-mc">Multiple Choice</button>
+  </div>
+  <div id="ref-controls">
+    <input type="search" id="search" placeholder="Search projections, extremities, or CR locations..." autocomplete="off">
+    <div class="filters" id="filters"></div>
+  </div>
+</header>
+<main>
+  <div id="ref-view">
+    <div class="count" id="count"></div>
+    <div id="results"></div>
+  </div>
+  <div id="quiz-view" class="hidden">
+    <div id="focus-controls" class="hidden" style="margin-bottom:1rem;">
+      <label class="quiz-label">Choose extremity</label>
+      <select id="focus-select" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem;">
+      </select>
+    </div>
+    <div class="quiz-box">
+      <div class="quiz-question" id="quiz-question">Loading quiz...</div>
+      <label class="quiz-label">CR Degree and Direction</label>
+      <input type="text" id="quiz-degree" placeholder="Type your answer..." autocomplete="off">
+      <label class="quiz-label">CR Location</label>
+      <input type="text" id="quiz-location" placeholder="Type your answer..." autocomplete="off">
+      <div id="rotation-section" class="hidden">
+        <label class="quiz-label">Body Part Rotation</label>
+        <input type="text" id="quiz-rotation" placeholder="Type your answer..." autocomplete="off">
+      </div>
+      <div class="quiz-actions">
+        <button class="btn-primary" id="check-btn">Check Answer</button>
+        <button class="btn-secondary" id="next-btn">Next Question</button>
+        <button class="btn-secondary" id="restart-btn" style="display:none;">Start Over</button>
+      </div>
+      <div id="progress" style="margin-top:0.8rem; color:var(--muted); font-size:0.9rem;"></div>
+      <div id="quiz-feedback"></div>
+    </div>
+  </div>
+
+  <div id="mc-view" class="hidden">
+    <div class="quiz-box">
+      <div class="quiz-question" id="mc-question">Loading...</div>
+      <div id="mc-options" style="display:flex; flex-direction:column; gap:0.6rem; margin:1rem 0;"></div>
+      <div class="quiz-actions">
+        <button class="btn-secondary" id="mc-next">Next Question</button>
+      </div>
+      <div id="mc-feedback"></div>
+    </div>
+  </div>
+
+
+</main>
+<script id="data" type="application/json">
+[
+  {
+    "extremity": "Hand",
+    "projection": "PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "3rd MCP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Hand",
+    "projection": "PA Oblique",
+    "crDegree": "Perpendicular",
+    "crLocation": "3rd MCP joint",
+    "rotation": "45\u00b0"
+  },
+  {
+    "extremity": "Hand",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "2nd MCP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Wrist",
+    "projection": "PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midcarpal area",
+    "rotation": null
+  },
+  {
+    "extremity": "Wrist",
+    "projection": "PA Oblique",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midcarpal area",
+    "rotation": "45\u00b0"
+  },
+  {
+    "extremity": "Wrist",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "Wrist joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Wrist",
+    "projection": "PA Ulnar Deviation",
+    "crDegree": "Perpendicular",
+    "crLocation": "Scaphoid",
+    "rotation": null
+  },
+  {
+    "extremity": "Fingers",
+    "projection": "PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "PIP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Fingers",
+    "projection": "PA Oblique",
+    "crDegree": "Perpendicular",
+    "crLocation": "PIP joint",
+    "rotation": "45\u00b0"
+  },
+  {
+    "extremity": "Fingers",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "PIP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Thumb",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "1st MCP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Thumb",
+    "projection": "PA Oblique",
+    "crDegree": "Perpendicular",
+    "crLocation": "1st MCP joint",
+    "rotation": "45\u00b0"
+  },
+  {
+    "extremity": "Thumb",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "1st MCP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Forearm",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-forearm",
+    "rotation": null
+  },
+  {
+    "extremity": "Forearm",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-forearm",
+    "rotation": null
+  },
+  {
+    "extremity": "Elbow",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Elbow joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Elbow",
+    "projection": "AP Oblique (Medial Rotation)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Elbow joint",
+    "rotation": "45\u00b0 medial"
+  },
+  {
+    "extremity": "Elbow",
+    "projection": "AP Oblique (Lateral Rotation)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Elbow joint",
+    "rotation": "45\u00b0 lateral"
+  },
+  {
+    "extremity": "Elbow",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "Elbow joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Humerus",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-humerus",
+    "rotation": null
+  },
+  {
+    "extremity": "Humerus",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-humerus",
+    "rotation": null
+  },
+  {
+    "extremity": "Shoulder",
+    "projection": "AP (External Rotation)",
+    "crDegree": "Perpendicular",
+    "crLocation": "1 inch inferior to coracoid process",
+    "rotation": null
+  },
+  {
+    "extremity": "Shoulder",
+    "projection": "AP Oblique (Grashey Method)",
+    "crDegree": "Perpendicular",
+    "crLocation": "2 inches medial and 2 inches inferior to the superolateral border",
+    "rotation": "35\u201345\u00b0"
+  },
+  {
+    "extremity": "Shoulder",
+    "projection": "Inferosuperior Axial",
+    "crDegree": "15\u201330\u00b0 cephalic",
+    "crLocation": "Through the axilla to the AC joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Scapula",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-scapula (2 inches inferior to coracoid process)",
+    "rotation": null
+  },
+  {
+    "extremity": "Scapula",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-medial scapular border",
+    "rotation": "45\u201360\u00b0"
+  },
+  {
+    "extremity": "Clavicle",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midshaft",
+    "rotation": null
+  },
+  {
+    "extremity": "Clavicle",
+    "projection": "AP Axial",
+    "crDegree": "15\u201330\u00b0 cephalic",
+    "crLocation": "Midshaft",
+    "rotation": null
+  },
+  {
+    "extremity": "AC Joint",
+    "projection": "AP (Pearson Method)",
+    "crDegree": "Perpendicular",
+    "crLocation": "MSP at the level of the AC joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Toes",
+    "projection": "AP Axial",
+    "crDegree": "15\u00b0 posteriorly (toward the heel)",
+    "crLocation": "3rd MTP joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Toes",
+    "projection": "AP Oblique (Medial Rotation)",
+    "crDegree": "Perpendicular",
+    "crLocation": "3rd MTP joint",
+    "rotation": "30\u201345\u00b0"
+  },
+  {
+    "extremity": "Toes",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "IP joint of the great toe / PIP joint of the lesser toes",
+    "rotation": null
+  },
+  {
+    "extremity": "Foot",
+    "projection": "AP Axial",
+    "crDegree": "10\u00b0 toward the heel (posteriorly)",
+    "crLocation": "Base of the third metatarsal",
+    "rotation": null
+  },
+  {
+    "extremity": "Foot",
+    "projection": "AP Oblique (Medial Rotation)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Base of the third metatarsal",
+    "rotation": "30\u00b0"
+  },
+  {
+    "extremity": "Foot",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Base of the first metatarsal",
+    "rotation": null
+  },
+  {
+    "extremity": "Calcaneus",
+    "projection": "Axial (Plantodorsal)",
+    "crDegree": "40\u00b0 cephalic (toward the heel)",
+    "crLocation": "Entering the base of the third metatarsal",
+    "rotation": null
+  },
+  {
+    "extremity": "Calcaneus",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "1 inch distal to the medial malleolus",
+    "rotation": null
+  },
+  {
+    "extremity": "Ankle",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Ankle joint, midway between the malleoli",
+    "rotation": null
+  },
+  {
+    "extremity": "Ankle",
+    "projection": "AP Oblique (Medial Rotation) Mortise",
+    "crDegree": "Perpendicular",
+    "crLocation": "Ankle joint, midway between the malleoli",
+    "rotation": "15\u201320\u00b0 internal"
+  },
+  {
+    "extremity": "Ankle",
+    "projection": "AP Oblique (Lateral Rotation)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Ankle joint, midway between the malleoli",
+    "rotation": "45\u00b0 lateral"
+  },
+  {
+    "extremity": "Ankle",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Medial malleolus",
+    "rotation": null
+  },
+  {
+    "extremity": "Lower Leg",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midpoint of lower leg/tib/fib",
+    "rotation": null
+  },
+  {
+    "extremity": "Lower Leg",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midpoint of lower leg/tib/fib",
+    "rotation": null
+  },
+  {
+    "extremity": "Knee",
+    "projection": "AP",
+    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crLocation": "1/2 inch inferior to the patellar apex",
+    "rotation": null,
+    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+  },
+  {
+    "extremity": "Knee",
+    "projection": "AP Oblique (Medial Rotation)",
+    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crLocation": "1/2 inch inferior to the patellar apex",
+    "rotation": "45\u00b0 medial",
+    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+  },
+  {
+    "extremity": "Knee",
+    "projection": "AP Oblique (Lateral Rotation)",
+    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crLocation": "1/2 inch inferior to the patellar apex",
+    "rotation": "45\u00b0 lateral",
+    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+  },
+  {
+    "extremity": "Knee",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "5\u20137\u00b0 cephalic",
+    "crLocation": "1 inch distal to the medial femoral epicondyle",
+    "rotation": null
+  },
+  {
+    "extremity": "Knee",
+    "projection": "Tangential (Settegast/Sunrise Method)",
+    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15\u201320\u00b0",
+    "crLocation": "Patellofemoral joint space",
+    "rotation": null
+  },
+  {
+    "extremity": "Patella",
+    "projection": "PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-popliteal area, exiting the patella",
+    "rotation": "Usually 5\u201310\u00b0 lateral rotation of the heel"
+  },
+  {
+    "extremity": "Patella",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering the knee at the mid-patellofemoral joint",
+    "rotation": null
+  },
+  {
+    "extremity": "Patella",
+    "projection": "Tangential (Settegast/Sunrise Method)",
+    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15\u201320\u00b0",
+    "crLocation": "Patellofemoral joint space",
+    "rotation": null
+  },
+  {
+    "extremity": "Femur",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-femur and center of IR",
+    "rotation": null
+  },
+  {
+    "extremity": "Femur",
+    "projection": "Lateral (Mediolateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Mid-femur and center of IR",
+    "rotation": null
+  },
+  {
+    "extremity": "Pelvis",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midway between the ASIS and pubic symphysis (2 inches inferior to ASIS and 2 inches superior to pubic symphysis) on the midsagittal plane",
+    "rotation": "Medially rotate feet and lower limbs 15\u201320\u00b0"
+  },
+  {
+    "extremity": "Pelvis",
+    "projection": "AP Oblique (Modified Cleaves Method / Bilateral Frog Leg) \u2014 Non-Routine",
+    "crDegree": "Perpendicular",
+    "crLocation": "on the midsagittal plane, 1 inch superior to the pubic symphysis",
+    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "note": "Bilateral"
+  },
+  {
+    "extremity": "Pelvis",
+    "projection": "AP Oblique (Modified Cleaves Method / Unilateral Frog Leg) \u2014 Non-Routine",
+    "crDegree": "Perpendicular",
+    "crLocation": "femoral neck of the affected side",
+    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "note": "Unilateral"
+  },
+  {
+    "extremity": "Hip",
+    "projection": "AP Pelvis",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midway between the ASIS and pubic symphysis (2 inches inferior to ASIS and 2 inches superior to pubic symphysis) on the midsagittal plane",
+    "rotation": "Medially rotate feet and lower limbs 15\u201320\u00b0"
+  },
+  {
+    "extremity": "Hip",
+    "projection": "AP Oblique (Modified Cleaves Method / Frog Leg)",
+    "crDegree": "Perpendicular",
+    "crLocation": "on the midsagittal plane, 1 inch superior to the pubic symphysis",
+    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "note": "Bilateral"
+  },
+  {
+    "extremity": "Hip",
+    "projection": "AP Oblique (Modified Cleaves Method / Frog Leg)",
+    "crDegree": "Perpendicular",
+    "crLocation": "femoral neck of the affected side",
+    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "note": "Unilateral"
+  },
+  {
+    "extremity": "Hip",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "2.5 inches distal on a line drawn perpendicular to the midpoint of a line between the ASIS and pubic symphysis (the femoral neck)",
+    "rotation": "Medially rotate the foot and lower limb 15\u201320\u00b0"
+  },
+  {
+    "extremity": "Hip",
+    "projection": "Lateral (Lauenstein Method)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Through the hip joint, midway between the ASIS and the pubic symphysis",
+    "rotation": null
+  },
+  {
+    "extremity": "Hip",
+    "projection": "Axiolateral (Danelius-Miller Method / X-table Lateral / Surgical) \u2014 Trauma",
+    "crDegree": "Horizontal; perpendicular to the long axis of the femoral neck",
+    "crLocation": "Enters groin area midway between anterior and posterior upper thigh and passes through the femoral neck (2.5 inches below the point of intersection of the localization lines)",
+    "rotation": null
+  },
+  {
+    "extremity": "Hip",
+    "projection": "Modified Axiolateral (Clements-Nakayama Modification Method) \u2014 Trauma",
+    "crDegree": "15\u00b0 posteriorly",
+    "crLocation": "Perpendicular to the femoral neck",
+    "rotation": "Keep affected limb in neutral or external rotation (do not internally rotate)"
+  },
+  {
+    "extremity": "Soft Tissue Neck",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering MSP at the level of the laryngeal prominence (C4) for upper airway, or manubrium for larynx and superior mediastinum",
+    "rotation": null
+  },
+  {
+    "extremity": "Soft Tissue Neck",
+    "projection": "Lateral",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "Entering MCP at the level of the laryngeal prominence (C4) for upper airway, or at the level of the jugular notch on a coronal plane midway between the jugular notch and MCP for trachea and superior mediastinum",
+    "rotation": null
+  },
+  {
+    "extremity": "Chest",
+    "projection": "PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering on the MSP at the level of T7 (inferior angle of the scapula)",
+    "rotation": null
+  },
+  {
+    "extremity": "Chest",
+    "projection": "Lateral (Left position preferred)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering on the MCP at the level of T7 (inferior angle of the scapula)",
+    "rotation": null
+  },
+  {
+    "extremity": "Chest (Portable)",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering on the MSP at the level of T7 (3 inches below the jugular notch)",
+    "rotation": null
+  },
+  {
+    "extremity": "Sternum",
+    "projection": "PA Oblique (RAO position)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering the elevated side of the posterior thorax at the level of T7 and approximately 1 inch lateral to the MSP",
+    "rotation": "RAO 15\u201320\u00b0"
+  },
+  {
+    "extremity": "Sternum",
+    "projection": "Lateral (R or L position)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering the lateral border of the mid-sternum",
+    "rotation": null
+  },
+  {
+    "extremity": "Sternoclavicular Articulations",
+    "projection": "PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering MSP at the level of T3",
+    "rotation": null
+  },
+  {
+    "extremity": "Sternoclavicular Articulations",
+    "projection": "PA Oblique (RAO or LAO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering at the level of T2\u2013T3 (about 3 inches distal to the vertebral prominens) and 1 to 2 inches lateral to the MSP toward the side up",
+    "rotation": "RAO or LAO 10\u201315\u00b0 toward the affected side"
+  },
+  {
+    "extremity": "Ribs",
+    "projection": "PA Chest",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering on the MSP at the level of T7 (inferior angle of the scapula)",
+    "rotation": null
+  },
+  {
+    "extremity": "Ribs",
+    "projection": "AP/PA (Ribs above diaphragm)",
+    "crDegree": "Perpendicular",
+    "crLocation": "MSP at approximately T7",
+    "rotation": null
+  },
+  {
+    "extremity": "Ribs",
+    "projection": "AP/PA (Ribs below diaphragm)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering MSP halfway between the xiphoid process and lower rib margin",
+    "rotation": null
+  },
+  {
+    "extremity": "Ribs",
+    "projection": "AP Oblique (RPO or LPO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering a longitudinal plane halfway between the MSP and the lateral surface of the body side up; T7 for upper ribs or halfway between the xiphoid process and lower rib margin for lower ribs",
+    "rotation": "45\u00b0 (RPO or LPO)"
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "Lateral (Grandy Method)",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "Entering the coronal plane that passes through the mastoid tip at the level of C4",
+    "rotation": null
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "AP Axial",
+    "crDegree": "15\u201320\u00b0 cephalad",
+    "crLocation": "MSP, directed through C4 (enters at or slightly inferior to the most prominent point of the thyroid cartilage)",
+    "rotation": null
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "AP (Atlas and Axis) Open Mouth",
+    "crDegree": "Perpendicular",
+    "crLocation": "MSP at the level of the axis, entering the midpoint of the open mouth",
+    "rotation": null
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "AP Axial Oblique (RPO and LPO)",
+    "crDegree": "15\u201320\u00b0 cephalic",
+    "crLocation": "Directed to C4",
+    "rotation": "45\u00b0 RPO or LPO"
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "Lateral (Swimmer\u2019s Technique) \u2014 Cervicothoracic Region",
+    "crDegree": "Perpendicular (or 3\u20135\u00b0 caudal if unable to depress shoulder)",
+    "crLocation": "MCP, entering C7\u2013T1 intervertebral disk space",
+    "rotation": null
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "AP (Dens) Fuchs Method",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering the neck on the MSP at the level of the mastoid tips just distal to the tip of the chin",
+    "rotation": null
+  },
+  {
+    "extremity": "Cervical Spine",
+    "projection": "Lateral Hyperflexion and Hyperextension",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "To C4",
+    "rotation": null
+  },
+  {
+    "extremity": "Thoracic Spine",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering MSP halfway between the jugular notch and xiphoid process (approximately T7)",
+    "rotation": null
+  },
+  {
+    "extremity": "Thoracic Spine",
+    "projection": "Lateral (Right or Left)",
+    "crDegree": "Perpendicular (or angled perpendicular to the long axis of the thoracic column if not horizontal: average 10\u00b0 cephalic for females, 15\u00b0 cephalic for males)",
+    "crLocation": "Entering the posterior half of the thorax at the level of T7",
+    "rotation": null
+  },
+  {
+    "extremity": "Thoracic Spine",
+    "projection": "Lateral (Swimmer\u2019s Technique) \u2014 Cervicothoracic Region",
+    "crDegree": "Perpendicular (or 3\u20135\u00b0 caudal if unable to depress shoulder)",
+    "crLocation": "MCP, entering C7\u2013T1 intervertebral disk space",
+    "rotation": null
+  },
+  {
+    "extremity": "Thoracic Spine",
+    "projection": "AP Oblique (RPO and LPO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Exiting T7",
+    "rotation": "20\u00b0 posterior (coronal plane forms 70\u00b0 angle from IR)"
+  },
+  {
+    "extremity": "Thoracolumbar Spine",
+    "projection": "PA (Scoliosis Series)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Midpoint of the IR",
+    "rotation": null
+  },
+  {
+    "extremity": "Lumbar Spine",
+    "projection": "AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "MSP at the iliac crest (for lumbosacral spine) or 1.5 inches above the iliac crest (for lumbar spine only)",
+    "rotation": null
+  },
+  {
+    "extremity": "Lumbar Spine",
+    "projection": "Left Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "MCP at the iliac crest (for lumbosacral spine) or 1.5 inches above the iliac crest (for lumbar spine only)",
+    "rotation": null
+  },
+  {
+    "extremity": "Lumbar Spine",
+    "projection": "Lateral L5-S1 Spot (Lumbosacral Junction)",
+    "crDegree": "Perpendicular if the spine is horizontal; if not horizontal, 8\u00b0 caudal for women or 5\u00b0 caudal for men",
+    "crLocation": "Entering a coronal plane 2 inches posterior to the ASIS and 1.5 inches inferior to the iliac crest",
+    "rotation": null
+  },
+  {
+    "extremity": "Lumbar Spine",
+    "projection": "AP Oblique (RPO and LPO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Lumbar: 2 inches medial to the elevated ASIS and 1.5 inches above the iliac crest (L3); Zygapophyseal joint (L5-S1): 2 inches medial to the elevated ASIS and midway between the iliac crest and ASIS",
+    "rotation": "45\u00b0 RPO or LPO"
+  },
+  {
+    "extremity": "SI Joints",
+    "projection": "AP Axial (Bilateral) Ferguson Method",
+    "crDegree": "30\u00b0 cephalic for males or 35\u00b0 cephalic for females",
+    "crLocation": "MSP, 2\u20132.5 inches inferior to the ASIS",
+    "rotation": null
+  },
+  {
+    "extremity": "SI Joints",
+    "projection": "AP Oblique",
+    "crDegree": "Perpendicular",
+    "crLocation": "1 inch medial to the elevated ASIS",
+    "rotation": "RPO or LPO 25\u201330\u00b0"
+  },
+  {
+    "extremity": "Sacrum",
+    "projection": "AP Axial (Supine)",
+    "crDegree": "15\u00b0 cephalic",
+    "crLocation": "Enters MSP at 2 inches superior to the pubic symphysis",
+    "rotation": null
+  },
+  {
+    "extremity": "Sacrum",
+    "projection": "AP Axial (Prone)",
+    "crDegree": "15\u00b0 caudal",
+    "crLocation": "Enters MSP at the level of the sacral curve",
+    "rotation": null
+  },
+  {
+    "extremity": "Coccyx",
+    "projection": "AP Axial (Supine)",
+    "crDegree": "10\u00b0 caudal",
+    "crLocation": "Enters MSP at 2 inches superior to the pubic symphysis",
+    "rotation": null
+  },
+  {
+    "extremity": "Coccyx",
+    "projection": "AP Axial (Prone)",
+    "crDegree": "10\u00b0 cephalic",
+    "crLocation": "Enters MSP at the level of the palpable coccyx",
+    "rotation": null
+  },
+  {
+    "extremity": "Sacrum",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "A point 3.5 inches posterior to the level of the ASIS",
+    "rotation": null
+  },
+  {
+    "extremity": "Coccyx",
+    "projection": "Lateral",
+    "crDegree": "Perpendicular",
+    "crLocation": "A point 3.5 inches posterior and 2 inches inferior to the level of the ASIS",
+    "rotation": null
+  },
+  {
+    "extremity": "Sacrum and Coccyx",
+    "projection": "Lateral (Both)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Centered 3.5 inches posterior to the ASIS and 1 inch inferior",
+    "rotation": null
+  },
+  {
+    "extremity": "Abdomen",
+    "projection": "PA Chest",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering on the MSP at the level of T7 (inferior angle of the scapula)",
+    "rotation": null
+  },
+  {
+    "extremity": "Abdomen",
+    "projection": "AP (Upright)",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "2 inches above the iliac crest on the MSP (or high enough to include the diaphragm)",
+    "rotation": null
+  },
+  {
+    "extremity": "Abdomen",
+    "projection": "AP (Supine KUB)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Iliac crest on the MSP (include pubic symphysis)",
+    "rotation": null
+  },
+  {
+    "extremity": "Abdomen",
+    "projection": "PA/AP High Transverse",
+    "crDegree": "Perpendicular",
+    "crLocation": "Approximately halfway between the xiphoid process and lower rib margin on the MSP",
+    "rotation": null
+  },
+  {
+    "extremity": "Esophagus",
+    "projection": "PA Oblique or AP Oblique Swallow (RAO or LPO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering the elevated side through a plane approximately 2 inches lateral to the MSP at the level of T5\u2013T6",
+    "rotation": "RAO or LPO 35\u201340\u00b0"
+  },
+  {
+    "extremity": "Esophagus",
+    "projection": "Lateral Swallow (Right Lateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering MCP at the level of T5\u2013T6",
+    "rotation": null
+  },
+  {
+    "extremity": "Esophagus",
+    "projection": "AP or PA Swallow \u2014 Non-Routine",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering MSP at the level of T5\u2013T6",
+    "rotation": null
+  },
+  {
+    "extremity": "Stomach / UGI",
+    "projection": "PA/AP",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering 1\u20132 inches above the lower rib margin, midway between the vertebral column and the left lateral border of the abdomen",
+    "rotation": null
+  },
+  {
+    "extremity": "Stomach / UGI",
+    "projection": "Lateral (Right Lateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering 1\u20132 inches above the lower rib margin, midway between the MCP and the anterior surface of the abdomen",
+    "rotation": null
+  },
+  {
+    "extremity": "Stomach / UGI",
+    "projection": "PA Oblique (RAO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering 1\u20132 inches above the lower rib margin, midway between the vertebral column and the left lateral border of the elevated side",
+    "rotation": "RAO 40\u201370\u00b0 (based on body habitus)"
+  },
+  {
+    "extremity": "Stomach / UGI",
+    "projection": "AP Oblique (LPO) \u2014 Non-Routine",
+    "crDegree": "Perpendicular",
+    "crLocation": "Entering midway between the xiphoid process and the lower rib margin, midway between the vertebral column and the left lateral border of the elevated side",
+    "rotation": "LPO 30\u201360\u00b0"
+  },
+  {
+    "extremity": "Small Bowel",
+    "projection": "AP or PA (Modified KUB)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Immediate/up to 30 min: 1\u20132 in. (5 cm) above lower rib margin on MSP (include stomach); Delayed: iliac crests on MSP",
+    "rotation": "None (supine without rotation)"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "AP/PA",
+    "crDegree": "Perpendicular",
+    "crLocation": "Iliac crest on MSP (include pubic symphysis)",
+    "rotation": "None (supine or prone without rotation)"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "PA/AP High Transverse",
+    "crDegree": "Perpendicular",
+    "crLocation": "Halfway between xiphoid process and lower rib margin on MSP",
+    "rotation": "None"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "PA/AP Axial (Angled Rectum)",
+    "crDegree": "30\u201340\u00b0 caudal (PA) or 30\u201340\u00b0 cephalic (AP)",
+    "crLocation": "MSP at level of ASIS (PA) or 2 in. below ASIS (AP)",
+    "rotation": "None (supine or prone)"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "AP Oblique (RPO or LAO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Level of iliac crests, 1\u20132 in. (2.5\u20135 cm) lateral to the elevated side from midline",
+    "rotation": "35\u201345\u00b0 RPO or LAO"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "AP Oblique (LPO or RAO)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Level of iliac crests, 1\u20132 in. (2.5\u20135 cm) lateral to the elevated side from midline",
+    "rotation": "35\u201345\u00b0 LPO or RAO"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "Lateral Rectum (Left Lateral)",
+    "crDegree": "Perpendicular",
+    "crLocation": "Level of the ASIS on the MCP",
+    "rotation": "Left lateral recumbent"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "AP/PA Right Lateral Decubitus (Air-Contrast)",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "Iliac crests on MSP (include pubic symphysis); 2 in. (5 cm) above iliac crest on MSP to include flexures",
+    "rotation": "Right lateral"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "AP/PA Left Lateral Decubitus (Air-Contrast)",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "Iliac crests on MSP (include pubic symphysis); 2 in. (5 cm) above iliac crest on MSP to include flexures",
+    "rotation": "Left lateral"
+  },
+  {
+    "extremity": "Barium Enema",
+    "projection": "Ventral Decubitus (Cross-Table Lateral Rectum)",
+    "crDegree": "Horizontal and perpendicular",
+    "crLocation": "MCP at level of iliac crests or centered to the ASIS (rectum only)",
+    "rotation": "Prone, either side against IR"
+  }
+]
+</script>
+<script>
+const data = JSON.parse(document.getElementById('data').textContent);
+const resultsEl = document.getElementById('results');
+const countEl = document.getElementById('count');
+const searchEl = document.getElementById('search');
+const filtersEl = document.getElementById('filters');
+const refView = document.getElementById('ref-view');
+const quizView = document.getElementById('quiz-view');
+const refControls = document.getElementById('ref-controls');
+const tabRef = document.getElementById('tab-ref');
+const tabRandom = document.getElementById('tab-random');
+const tabFocus = document.getElementById('tab-focus');
+const focusControls = document.getElementById('focus-controls');
+const focusSelect = document.getElementById('focus-select');
+const progressEl = document.getElementById('progress');
+const restartBtn = document.getElementById('restart-btn');
+const tabMC = document.getElementById('tab-mc');
+const mcView = document.getElementById('mc-view');
+const mcQuestionEl = document.getElementById('mc-question');
+const mcOptionsEl = document.getElementById('mc-options');
+const mcNextBtn = document.getElementById('mc-next');
+const mcFeedback = document.getElementById('mc-feedback');
+const quizQuestionEl = document.getElementById('quiz-question');
+const quizDegreeEl = document.getElementById('quiz-degree');
+const quizLocationEl = document.getElementById('quiz-location');
+const quizRotationEl = document.getElementById('quiz-rotation');
+const rotationSection = document.getElementById('rotation-section');
+const checkBtn = document.getElementById('check-btn');
+const nextBtn = document.getElementById('next-btn');
+const quizFeedback = document.getElementById('quiz-feedback');
+
+const extremities = [...new Set(data.map(p => p.extremity))].sort();
+let activeFilter = 'All';
+let currentQuiz = null;
+
+function renderFilters() {
+  filtersEl.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.textContent = 'All';
+  allBtn.className = activeFilter === 'All' ? 'active' : '';
+  allBtn.onclick = () => { activeFilter = 'All'; render(); };
+  filtersEl.appendChild(allBtn);
+  extremities.forEach(ext => {
+    const btn = document.createElement('button');
+    btn.textContent = ext;
+    btn.className = activeFilter === ext ? 'active' : '';
+    btn.onclick = () => { activeFilter = ext; render(); };
+    filtersEl.appendChild(btn);
+  });
+}
+
+function matches(p, q) {
+  if (!q) return true;
+  const s = q.toLowerCase();
+  const fields = [p.extremity, p.projection, p.crDegree, p.crLocation, p.rotation || ''];
+  return fields.some(f => String(f).toLowerCase().includes(s));
+}
+
+function render() {
+  const q = searchEl.value.trim();
+  let filtered = data.filter(p => matches(p, q));
+  if (activeFilter !== 'All') filtered = filtered.filter(p => p.extremity === activeFilter);
+  countEl.textContent = filtered.length + ' projection' + (filtered.length === 1 ? '' : 's');
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>';
+    return;
+  }
+  resultsEl.innerHTML = filtered.map(p => `
+    <div class="card">
+      <div class="extremity">${p.extremity}</div>
+      <h3>${p.projection}</h3>
+      <div class="detail"><strong>CR Degree & Direction:</strong> ${p.crDegree}</div>
+      <div class="detail"><strong>CR Location:</strong> ${p.crLocation}</div>
+      ${p.rotation ? `<div class="detail"><strong>Body Part Rotation:</strong> ${p.rotation}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+let quizMode = 'random';
+let focusQueue = [];
+let focusIndex = 0;
+let focusCorrect = 0;
+
+function getQuizPool() {
+  if (quizMode === 'focus' && focusSelect.value) {
+    return data.filter(p => p.extremity === focusSelect.value);
+  }
+  return data;
+}
+
+
+function launchConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const pieces = [];
+  const colors = ['#1d9bf0','#00ba7c','#ffd700','#f4212e','#ffffff'];
+  for (let i = 0; i < 80; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: -10 - Math.random() * 100,
+      r: 4 + Math.random() * 4,
+      d: 2 + Math.random() * 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      tilt: Math.random() * 10,
+      tiltAngle: 0
+    });
+  }
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      ctx.beginPath();
+      ctx.lineWidth = p.r;
+      ctx.strokeStyle = p.color;
+      ctx.moveTo(p.x + p.tilt + p.r/2, p.y);
+      ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+      ctx.stroke();
+      p.y += p.d;
+      p.tiltAngle += 0.1;
+      p.tilt = Math.sin(p.tiltAngle) * 8;
+      if (p.y > canvas.height) p.y = -10;
+    });
+    frame++;
+    if (frame < 180) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  draw();
+}
+
+
+let currentMC = null;
+
+function generateDistractors(correct, pool) {
+  const distractors = new Set();
+  // 1. One correct answer from a different projection
+  const others = pool.filter(p => p.crLocation !== correct.crLocation);
+  if (others.length) {
+    const other = others[Math.floor(Math.random() * others.length)];
+    distractors.add(other.crLocation);
+  }
+  // 2. Two close distractors
+  const loc = correct.crLocation;
+  // Try inch variations
+  const inchVariants = [
+    loc.replace(/(\d+(?:\/\d+)?|\d+–\d+)\s*inch/gi, (m, n) => {
+      const num = parseFloat(n.split('/')[0]) || 1;
+      return (num + 1) + ' inch';
+    }),
+    loc.replace(/(\d+(?:\/\d+)?|\d+–\d+)\s*inch/gi, (m, n) => {
+      const num = parseFloat(n.split('/')[0]) || 1;
+      return Math.max(0.5, num - 0.5) + ' inch';
+    }),
+    loc.replace(/midway|mid/gi, '1 inch medial to'),
+    loc.replace(/MSP/gi, '2 inches lateral to MSP'),
+    loc.replace(/T7/gi, 'T6'),
+    loc.replace(/C4/gi, 'C5'),
+    loc.replace(/iliac crest/gi, '2 inches above the iliac crest'),
+    loc.replace(/patellar apex/gi, 'patellar base'),
+  ];
+  for (const v of inchVariants) {
+    if (v && v !== loc && !distractors.has(v)) distractors.add(v);
+    if (distractors.size >= 3) break;
+  }
+  // Fill remaining with random other locations
+  while (distractors.size < 3 && others.length) {
+    const o = others[Math.floor(Math.random() * others.length)];
+    if (o.crLocation !== loc) distractors.add(o.crLocation);
+    if (distractors.size >= 3) break;
+  }
+  return Array.from(distractors).slice(0, 3);
+}
+
+function loadMC() {
+  currentMC = data[Math.floor(Math.random() * data.length)];
+  mcQuestionEl.textContent = `What is the CR Location for a ${currentMC.projection} ${currentMC.extremity}?`;
+  const wrongs = generateDistractors(currentMC, data);
+  const options = [currentMC.crLocation, ...wrongs];
+  // Shuffle
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+  mcOptionsEl.innerHTML = '';
+  mcFeedback.innerHTML = '';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.textContent = opt;
+    btn.style.cssText = 'text-align:left; padding:0.7rem 1rem; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font-size:0.95rem;';
+    btn.onclick = () => selectMC(btn, opt);
+    mcOptionsEl.appendChild(btn);
+  });
+}
+
+function selectMC(btn, selected) {
+  const buttons = mcOptionsEl.querySelectorAll('button');
+  buttons.forEach(b => b.disabled = true);
+  const isCorrect = selected === currentMC.crLocation;
+  btn.style.borderColor = isCorrect ? '#00ba7c' : '#f4212e';
+  btn.style.background = isCorrect ? '#0d3d2e' : '#3d1a1c';
+  if (!isCorrect) {
+    buttons.forEach(b => {
+      if (b.textContent === currentMC.crLocation) {
+        b.style.borderColor = '#00ba7c';
+        b.style.background = '#0d3d2e';
+      }
+    });
+  }
+  mcFeedback.innerHTML = isCorrect
+    ? '<div class="feedback good">Correct!</div>'
+    : `<div class="feedback bad">Wrong. Correct answer: ${currentMC.crLocation}</div>`;
+  if (isCorrect) launchConfetti();
+}
+
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function resetFocusProgress() {
+  const pool = getQuizPool();
+  focusQueue = shuffle(pool);
+  focusIndex = 0;
+  focusCorrect = 0;
+  updateProgressDisplay();
+}
+
+function updateProgressDisplay() {
+  if (quizMode !== 'focus') {
+    progressEl.textContent = '';
+    restartBtn.style.display = 'none';
+    return;
+  }
+  const total = focusQueue.length;
+  if (focusIndex >= total && total > 0) {
+    progressEl.innerHTML = '<strong>Final score: ' + focusCorrect + ' out of ' + total + '</strong>';
+    restartBtn.style.display = 'inline-block';
+  } else {
+    progressEl.textContent = focusCorrect + ' out of ' + total;
+    restartBtn.style.display = 'none';
+  }
+}
+
+function loadQuiz() {
+  if (quizMode === 'focus') {
+    if (focusIndex >= focusQueue.length) {
+      quizQuestionEl.textContent = 'You have finished all projections for this extremity.';
+      updateProgressDisplay();
+      return;
+    }
+    currentQuiz = focusQueue[focusIndex];
+  } else {
+    const pool = getQuizPool();
+    if (pool.length === 0) {
+      quizQuestionEl.textContent = 'No projections available.';
+      return;
+    }
+    currentQuiz = pool[Math.floor(Math.random() * pool.length)];
+  }
+  const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+  quizQuestionEl.textContent = hasRot
+    ? `What is the CR Degree and Direction, CR Location, and Body Part Rotation for a ${currentQuiz.projection} ${currentQuiz.extremity}?`
+    : `What is the CR Degree and Direction, and CR Location for a ${currentQuiz.projection} ${currentQuiz.extremity}?`;
+  quizDegreeEl.value = '';
+  quizLocationEl.value = '';
+  quizRotationEl.value = '';
+  quizFeedback.innerHTML = '';
+  rotationSection.classList.toggle('hidden', !hasRot);
+  quizDegreeEl.focus();
+}
+
+function normalize(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/°|degrees?|deg\b/g, ' degree ')  // treat °, degree, degrees, deg the same
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function coreWords(str) {
+  const stop = new Set(['entering','enters','enter','at','the','of','on','a','an','to','and','or','for','level','approximately','approx','degree','degrees']);
+  return normalize(str)
+    .replace(/\([^)]*\)/g, '') // remove parenthetical notes
+    .split(' ')
+    .filter(w => w.length > 1 && !stop.has(w));
+}
+
+function scoreMatch(user, correct) {
+  if (!user) return 'wrong';
+
+  // Special case: Knee ASIS tabletop projections
+  if (currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
+    const u = normalize(user);
+    const isPerp = /perpendicular|perp/.test(u);
+    const isCaudal = /3.?5.*caudal|caudal.*3.?5/.test(u);
+    const isCephalic = /3.?5.*cephalic|cephalic.*3.?5|3.?5.*cephalad/.test(u);
+    if (isPerp || isCaudal || isCephalic) return 'correct';
+    return 'wrong';
+  }
+
+  const uNorm = normalize(user);
+  const cNorm = normalize(correct);
+  const u = coreWords(user);
+  const c = coreWords(correct);
+  if (u.length === 0 || c.length === 0) return 'wrong';
+
+  const uNums = uNorm.match(/\d+/g) || [];
+  const cNums = cNorm.match(/\d+/g) || [];
+  const numMatch = uNums.length > 0 && cNums.some(n => uNums.includes(n));
+
+  const hits = u.filter(w => c.some(cw => cw.includes(w) || w.includes(cw))).length;
+  const ratio = hits / Math.max(u.length, Math.min(c.length, 4));
+
+  // Exact or very clear single-word match (e.g. "perpendicular")
+  if (u.length === 1 && c.some(cw => cw.includes(u[0]) || u[0].includes(cw))) return 'correct';
+  if (uNorm === cNorm || cNorm.includes(uNorm) || uNorm.includes(cNorm)) return 'correct';
+
+  // Strong overlap
+  if (numMatch && hits >= 2 && ratio >= 0.45) return 'correct';
+  if (ratio >= 0.65 && hits >= 2) return 'correct';
+  if (hits >= Math.min(c.length, 3) && hits >= 2) return 'correct';
+
+  // Partial / similar but not solid enough → Pretty close
+  if (ratio >= 0.25 || hits >= 1 || numMatch) return 'close';
+  return 'wrong';
+}
+
+function checkAnswer() {
+  if (!currentQuiz) return;
+  const degreeResult = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree);
+  const locResult = scoreMatch(quizLocationEl.value, currentQuiz.crLocation);
+  const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+  const rotResult = hasRot ? scoreMatch(quizRotationEl.value, currentQuiz.rotation) : null;
+
+  const labels = { correct: 'Correct', close: 'Pretty close', wrong: 'Wrong' };
+  const classes = { correct: 'good', close: 'close', wrong: 'bad' };
+
+  let html = '';
+  html += `<div class="feedback ${classes[degreeResult]}">CR Degree and Direction: ${labels[degreeResult]}</div>`;
+  html += `<div class="feedback ${classes[locResult]}">CR Location: ${labels[locResult]}</div>`;
+  if (hasRot) {
+    html += `<div class="feedback ${classes[rotResult]}">Body Part Rotation: ${labels[rotResult]}</div>`;
+  }
+  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;">
+    <strong>Correct answers:</strong><br>
+    CR Degree & Direction: ${currentQuiz.crDegreeFull || currentQuiz.crDegree}<br>
+    CR Location: ${currentQuiz.crLocation}`;
+  if (hasRot) {
+    html += `<br>Body Part Rotation: ${currentQuiz.rotation}`;
+  }
+  html += `</div>`;
+  quizFeedback.innerHTML = html;
+
+  if (quizMode === 'focus' && currentQuiz) {
+    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree) === 'correct';
+    const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
+    const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+    const rotOk = !hasRot || scoreMatch(quizRotationEl.value, currentQuiz.rotation) === 'correct';
+    if (degreeOk && locOk && rotOk) {
+      focusCorrect++;
+      launchConfetti();
+    }
+    focusIndex++;
+    updateProgressDisplay();
+  } else if (currentQuiz) {
+    // Random Quiz confetti
+    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree) === 'correct';
+    const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
+    const hasRot = currentQuiz.rotation && currentQuiz.rotation !== '—';
+    const rotOk = !hasRot || scoreMatch(quizRotationEl.value, currentQuiz.rotation) === 'correct';
+    if (degreeOk && locOk && rotOk) launchConfetti();
+  }
+}
+
+function setActiveTab(active) {
+  [tabRef, tabRandom, tabFocus, tabMC].forEach(t => t.classList.remove('active'));
+  active.classList.add('active');
+}
+
+tabRef.onclick = () => {
+  setActiveTab(tabRef);
+  refView.classList.remove('hidden');
+  quizView.classList.add('hidden');
+  mcView.classList.add('hidden');
+  refControls.classList.remove('hidden');
+  focusControls.classList.add('hidden');
+};
+
+tabRandom.onclick = () => {
+  setActiveTab(tabRandom);
+  quizMode = 'random';
+  quizView.classList.remove('hidden');
+  refView.classList.add('hidden');
+  mcView.classList.add('hidden');
+  refControls.classList.add('hidden');
+  focusControls.classList.add('hidden');
+  loadQuiz();
+};
+
+tabFocus.onclick = () => {
+  setActiveTab(tabFocus);
+  quizMode = 'focus';
+  quizView.classList.remove('hidden');
+  refView.classList.add('hidden');
+  mcView.classList.add('hidden');
+  refControls.classList.add('hidden');
+  focusControls.classList.remove('hidden');
+  resetFocusProgress();
+  loadQuiz();
+};
+
+focusSelect.onchange = () => {
+  if (quizMode === 'focus') {
+    resetFocusProgress();
+    loadQuiz();
+  }
+};
+
+tabMC.onclick = () => {
+  setActiveTab(tabMC);
+  quizMode = 'mc';
+  mcView.classList.remove('hidden');
+  quizView.classList.add('hidden');
+  refView.classList.add('hidden');
+  refControls.classList.add('hidden');
+  focusControls.classList.add('hidden');
+  loadMC();
+};
+
+restartBtn.onclick = () => {
+  resetFocusProgress();
+  loadQuiz();
+};
+
+searchEl.addEventListener('input', render);
+checkBtn.onclick = checkAnswer;
+tabAbdomen.onclick = () => {
+  setActiveTab(tabAbdomen);
+  abdomenView.classList.remove('hidden');
+  mcView.classList.add('hidden');
+  quizView.classList.add('hidden');
+  refView.classList.add('hidden');
+  refControls.classList.add('hidden');
+  focusControls.classList.add('hidden');
+};
+
+mcNextBtn.onclick = loadMC;
+
+nextBtn.onclick = () => {
+  if (quizMode === 'focus' && focusIndex < focusQueue.length) {
+    loadQuiz();
+  } else if (quizMode !== 'focus') {
+    loadQuiz();
+  }
+};
+quizDegreeEl.addEventListener('keydown', e => { if (e.key === 'Enter') quizLocationEl.focus(); });
+quizLocationEl.addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
+
+// Populate focused quiz dropdown
+extremities.forEach(ext => {
+  const opt = document.createElement('option');
+  opt.value = ext;
+  opt.textContent = ext;
+  focusSelect.appendChild(opt);
+});
+
+renderFilters();
+render();
+
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('show-answer')) {
+    const ans = e.target.nextElementSibling;
+    if (ans && ans.classList.contains('answer')) {
+      ans.classList.toggle('hidden');
+      e.target.textContent = ans.classList.contains('hidden') ? 'Show Answer' : 'Hide Answer';
+    }
+  }
+});
+</script>
+</body>
+</html>
