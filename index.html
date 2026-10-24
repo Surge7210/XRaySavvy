@@ -1090,8 +1090,152 @@ function playPop(delay, volume) {
   src.start(t);
 }
 
-const CELEBRATION = 'confetti'; // 'confetti' or 'fireworks'
-function launchConfetti() { if (CELEBRATION === 'fireworks') launchFireworks(); else launchConfettiPop(); }
+const CELEBRATION = 'bats'; // 'bats', 'confetti' or 'fireworks'
+function launchConfetti() {
+  if (CELEBRATION === 'bats') launchBats();
+  else if (CELEBRATION === 'fireworks') launchFireworks();
+  else launchConfettiPop();
+}
+// Soft fluttery "whoosh": band-passed noise with a quick swell and a sweeping, wobbling filter (no crackle)
+function playWhoosh(delay, volume) {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const t = ac.currentTime + delay;
+  const dur = 0.55;
+  const len = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const p = i / len;
+    const env = Math.sin(Math.PI * Math.min(1, p * 1.6)) * Math.pow(1 - p, 1.5);
+    const flutter = 0.6 + 0.4 * Math.sin(2 * Math.PI * 22 * (i / ac.sampleRate)); // wing-beat tremolo
+    d[i] = (Math.random() * 2 - 1) * env * flutter;
+  }
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const filter = ac.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 0.9;
+  filter.frequency.setValueAtTime(500, t);
+  filter.frequency.exponentialRampToValueAtTime(1800, t + dur * 0.5);
+  filter.frequency.exponentialRampToValueAtTime(900, t + dur);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+  src.start(t);
+}
+
+// One bat silhouette, front view, centered at 0,0, wingspan ~2 units. flap: -1 (wings down) .. 1 (wings up)
+function traceBat(ctx, flap) {
+  ctx.beginPath();
+  for (const side of [1, -1]) {
+    const a = flap * 0.75;                         // wing elevation angle
+    const fold = 0.72 + 0.28 * Math.cos(flap * 1.4); // foreshortening as wings sweep
+    const ca = Math.cos(a), sa = Math.sin(a);
+    // wing points in wing space (x out from shoulder), rotated by elevation and folded
+    const P = (x, y) => {
+      const wx = x * fold, wy = y;
+      return [side * (0.12 + wx * ca + wy * sa * 0.6), -0.08 - wx * sa + wy * ca];
+    };
+    const lead = [[0, 0], [0.35, -0.16], [0.7, -0.2], [0.98, -0.06]]; // leading edge to tip
+    const tips = [[0.98, -0.06], [0.72, 0.22], [0.45, 0.28], [0.18, 0.3]]; // finger tips along trailing edge
+    let p = P(lead[0][0], lead[0][1]);
+    ctx.moveTo(p[0], p[1]);
+    p = P(lead[1][0], lead[1][1]); const q = P(lead[2][0], lead[2][1]); const r = P(lead[3][0], lead[3][1]);
+    ctx.bezierCurveTo(p[0], p[1], q[0], q[1], r[0], r[1]);
+    // scalloped trailing edge: each membrane bows inward between finger tips
+    for (let i = 1; i < tips.length; i++) {
+      const [x0, y0] = tips[i - 1], [x1, y1] = tips[i];
+      const c = P((x0 + x1) / 2 - 0.02, (y0 + y1) / 2 - 0.13);
+      const e = P(x1, y1);
+      ctx.quadraticCurveTo(c[0], c[1], e[0], e[1]);
+    }
+    const back = P(0, 0.22);
+    ctx.quadraticCurveTo(side * 0.16, 0.18, back[0], back[1]);
+    ctx.closePath();
+  }
+  // body
+  ctx.moveTo(0.13, 0.02);
+  ctx.ellipse(0, 0.02, 0.13, 0.26, 0, 0, Math.PI * 2);
+  // head with pointed ears
+  ctx.moveTo(0.11, -0.27);
+  ctx.arc(0, -0.27, 0.11, 0, Math.PI * 2);
+  ctx.moveTo(-0.1, -0.31); ctx.lineTo(-0.1, -0.49); ctx.lineTo(-0.02, -0.35); ctx.closePath();
+  ctx.moveTo(0.1, -0.31); ctx.lineTo(0.1, -0.49); ctx.lineTo(0.02, -0.35); ctx.closePath();
+}
+
+function launchBats(testTimeMs) {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W * 0.5, cy = H * 0.55;
+  const reach = Math.hypot(W, H);
+  const count = 28 + Math.floor(Math.random() * 10);
+  const bats = [];
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3; // outward, mostly upward
+    const size = 14 + Math.pow(Math.random(), 1.6) * 30;                // half-wingspan in px
+    const dur = 1700 + Math.random() * 1100;                             // ms to reach the edge
+    bats.push({
+      angle, size,
+      dist: reach * (0.75 + Math.random() * 0.25) + size * 2,            // far enough to be fully off-screen
+      dur, delay: Math.random() * 550,
+      flapRate: 0.016 + Math.random() * 0.012 + (30 - size) * 0.0003,    // small bats flap faster
+      phase: Math.random() * Math.PI * 2,
+      wobF: 0.004 + Math.random() * 0.005, wobA: 8 + Math.random() * 22, wobP: Math.random() * 6.28,
+      glow: Math.random() < 0.55 ? 'rgba(191,90,242,0.85)' : 'rgba(255,149,0,0.85)'
+    });
+  }
+  playWhoosh(0, 0.35);
+  playWhoosh(0.22, 0.22);
+  const total = 3400;
+  function render(t) {
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for (const b of bats) {
+      const lt = t - b.delay;
+      if (lt < 0) { alive++; continue; }
+      const p = lt / b.dur;
+      if (p > 1.15) continue;
+      alive++;
+      const e = p * p * (0.6 + 0.4 * p) + p * 0.35;                    // accelerate out of the "cave"
+      const dx = Math.cos(b.angle), dy = Math.sin(b.angle);
+      const wob = Math.sin(lt * b.wobF + b.wobP) * b.wobA * Math.min(1, p * 3);
+      const x = cx + dx * b.dist * e - dy * wob;
+      const y = cy + dy * b.dist * e + dx * wob - Math.sin(lt * b.wobF * 2.3) * 4;
+      const s = b.size * (0.35 + 0.65 * Math.min(1, p * 2.5));         // grow as they emerge
+      const flap = Math.sin(lt * b.flapRate * 2 + b.phase);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(dx * 0.35 + Math.sin(lt * b.wobF + b.wobP) * 0.2);
+      ctx.scale(s, s);
+      ctx.globalAlpha = Math.min(1, lt / 120);
+      traceBat(ctx, flap);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 3.2 / s;
+      ctx.strokeStyle = b.glow;
+      ctx.stroke();
+      ctx.fillStyle = '#07040c';
+      ctx.fill();
+      ctx.restore();
+    }
+    return alive;
+  }
+  if (testTimeMs != null) { render(testTimeMs); return; }
+  const start = performance.now();
+  function draw(now) {
+    const t = now - start;
+    const alive = render(t);
+    if (alive && t < total + 1000) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, W, H);
+  }
+  requestAnimationFrame(draw);
+}
+
 
 function launchConfettiPop() {
   const canvas = document.getElementById('confetti-canvas');
