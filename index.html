@@ -1397,6 +1397,104 @@ function launchFireworks() {
 }
 
 
+// ---- Wrong-answer effect: playful ghost jump scare ----
+const WRONG_EFFECT = 'ghost'; // 'ghost' or 'none'
+function wrongAnswerEffect() { if (WRONG_EFFECT === 'ghost') ghostJumpScare(); }
+
+// "BOO" sting: falling detuned saw stab through a closing lowpass + low sine thump + short airy whoosh (no crackle)
+function playBoo() {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const t = ac.currentTime + 0.01;
+  const out = ac.createGain();
+  out.gain.value = 0.5;
+  out.connect(ac.destination);
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass'; lp.Q.value = 6;
+  lp.frequency.setValueAtTime(2400, t);
+  lp.frequency.exponentialRampToValueAtTime(300, t + 0.55);
+  const stab = ac.createGain();
+  stab.gain.setValueAtTime(0.0001, t);
+  stab.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+  stab.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+  lp.connect(stab); stab.connect(out);
+  [0, 7, -12].forEach(cents => {               // slight detune for a "boo-oo" wobble
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(330, t);
+    o.frequency.exponentialRampToValueAtTime(110, t + 0.55);
+    o.detune.value = cents * 3;
+    o.connect(lp); o.start(t); o.stop(t + 0.62);
+  });
+  const sub = ac.createOscillator();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(120, t);
+  sub.frequency.exponentialRampToValueAtTime(45, t + 0.4);
+  const sg = ac.createGain();
+  sg.gain.setValueAtTime(0.0001, t);
+  sg.gain.exponentialRampToValueAtTime(0.6, t + 0.015);
+  sg.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+  sub.connect(sg); sg.connect(out); sub.start(t); sub.stop(t + 0.5);
+  playWhoosh(0, 0.18);
+}
+
+let ghostEl = null;
+function ghostJumpScare() {
+  if (!ghostEl) {
+    ghostEl = document.createElement('div');
+    ghostEl.id = 'ghost-scare';
+    ghostEl.setAttribute('aria-hidden', 'true');
+    ghostEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:10000;display:none;align-items:center;justify-content:center;overflow:hidden;';
+    ghostEl.innerHTML =
+      '<div class="gs-vig" style="position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.75) 100%);opacity:0;"></div>' +
+      '<svg class="gs-ghost" viewBox="0 0 200 230" style="position:relative;width:min(82vw,62vh);height:auto;overflow:visible;opacity:0;will-change:transform,opacity;">' +
+        '<defs>' +
+          '<radialGradient id="gs-body" cx="45%" cy="35%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="75%" stop-color="#f1f3fb"/><stop offset="100%" stop-color="#d6dcef"/></radialGradient>' +
+          '<filter id="gs-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+        '</defs>' +
+        '<g filter="url(#gs-glow)">' +
+          // body: domed head, little arms out to the sides, wavy hem
+          '<path d="M100 8 C52 8 30 46 30 92 L30 120 C18 118 6 108 4 98 C2 116 14 136 30 140 L30 196 ' +
+            'Q42 222 56 200 Q70 178 84 204 Q100 230 116 204 Q130 178 144 200 Q158 222 170 196 L170 140 ' +
+            'C186 136 198 116 196 98 C194 108 182 118 170 120 L170 92 C170 46 148 8 100 8 Z" fill="url(#gs-body)"/>' +
+        '</g>' +
+        '<ellipse cx="76" cy="84" rx="14" ry="21" fill="#111"/>' +
+        '<ellipse cx="124" cy="84" rx="14" ry="21" fill="#111"/>' +
+        '<ellipse cx="80" cy="76" rx="4.5" ry="6" fill="#fff"/>' +
+        '<ellipse cx="128" cy="76" rx="4.5" ry="6" fill="#fff"/>' +
+        '<ellipse cx="100" cy="136" rx="17" ry="23" fill="#111"/>' +
+        '<ellipse cx="100" cy="142" rx="10" ry="11" fill="#5a1f2e"/>' +
+        '<ellipse cx="58" cy="112" rx="10" ry="6" fill="#ffb3c7" opacity="0.6"/>' +
+        '<ellipse cx="142" cy="112" rx="10" ry="6" fill="#ffb3c7" opacity="0.6"/>' +
+      '</svg>';
+    document.body.appendChild(ghostEl);
+  }
+  const vig = ghostEl.querySelector('.gs-vig');
+  const g = ghostEl.querySelector('.gs-ghost');
+  ghostEl.style.display = 'flex';
+  playBoo();
+  if (!g.animate) { setTimeout(() => { ghostEl.style.display = 'none'; }, 1300); return; }
+  vig.getAnimations().forEach(a => a.cancel());
+  g.getAnimations().forEach(a => a.cancel());
+  const total = 1300;
+  vig.animate([
+    { opacity: 0, offset: 0 }, { opacity: 1, offset: 0.08 },
+    { opacity: 0.8, offset: 0.55 }, { opacity: 0, offset: 1 }
+  ], { duration: total, easing: 'ease-out', fill: 'forwards' });
+  const anim = g.animate([
+    { transform: 'translate(0,0) scale(0.08) rotate(-10deg)', opacity: 0, offset: 0 },
+    { transform: 'translate(0,0) scale(1.12) rotate(4deg)', opacity: 1, offset: 0.115 },  // ~150ms zoom
+    { transform: 'translate(-14px,6px) scale(1) rotate(-5deg)', opacity: 1, offset: 0.16 }, // shake
+    { transform: 'translate(12px,-6px) scale(1.04) rotate(4deg)', opacity: 1, offset: 0.21 },
+    { transform: 'translate(-8px,4px) scale(1) rotate(-3deg)', opacity: 1, offset: 0.26 },
+    { transform: 'translate(5px,-2px) scale(1.02) rotate(2deg)', opacity: 1, offset: 0.31 },
+    { transform: 'translate(0,0) scale(1) rotate(0deg)', opacity: 1, offset: 0.58 },       // hold until ~750ms
+    { transform: 'translate(30px,-38vh) scale(0.6) rotate(8deg)', opacity: 0, offset: 1 } // float away
+  ], { duration: total, easing: 'linear', fill: 'forwards' });
+  anim.onfinish = () => { ghostEl.style.display = 'none'; };
+}
+
+
 let currentMC = null;
 
 function generateDistractors(correct, pool) {
@@ -1477,7 +1575,7 @@ function selectMC(btn, selected) {
   mcFeedback.innerHTML = isCorrect
     ? '<div class="feedback good">Correct!</div>'
     : `<div class="feedback bad">Wrong. Correct answer: ${currentMC.crLocation}</div>`;
-  if (isCorrect) launchConfetti();
+  if (isCorrect) launchConfetti(); else wrongAnswerEffect();
 }
 
 
@@ -1653,6 +1751,8 @@ function checkAnswer() {
     if (degreeOk && locOk && rotOk) {
       focusCorrect++;
       launchConfetti();
+    } else {
+      wrongAnswerEffect();
     }
     focusIndex++;
     updateProgressDisplay();
@@ -1662,7 +1762,7 @@ function checkAnswer() {
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
     const hasRot = hasRotation(currentQuiz);
     const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
-    if (degreeOk && locOk && rotOk) launchConfetti();
+    if (degreeOk && locOk && rotOk) launchConfetti(); else wrongAnswerEffect();
   }
 }
 
