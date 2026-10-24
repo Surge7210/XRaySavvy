@@ -1061,41 +1061,101 @@ function getQuizPool() {
 }
 
 
-function launchConfetti() {
+let fwAudioCtx = null;
+function getAudioCtx() {
+  try {
+    if (!fwAudioCtx) fwAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (fwAudioCtx.state === 'suspended') fwAudioCtx.resume();
+  } catch (e) { fwAudioCtx = null; }
+  return fwAudioCtx;
+}
+
+function playPop(delay, volume) {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const t = ac.currentTime + delay;
+  const len = Math.floor(ac.sampleRate * 0.25);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const filter = ac.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 1800 + Math.random() * 1200;
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+  src.start(t);
+  // little crackles after the pop
+  for (let k = 0; k < 5; k++) {
+    const ct = t + 0.12 + Math.random() * 0.35;
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 2500 + Math.random() * 2500;
+    g.gain.setValueAtTime(volume * 0.08, ct);
+    g.gain.exponentialRampToValueAtTime(0.0001, ct + 0.03);
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(ct); osc.stop(ct + 0.04);
+  }
+}
+
+function launchConfetti() { launchFireworks(); }
+
+function launchFireworks() {
   const canvas = document.getElementById('confetti-canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  const pieces = [];
-  const colors = ['#1d9bf0','#00ba7c','#ffd700','#f4212e','#ffffff'];
-  for (let i = 0; i < 80; i++) {
-    pieces.push({
-      x: Math.random() * canvas.width,
-      y: -10 - Math.random() * 100,
-      r: 4 + Math.random() * 4,
-      d: 2 + Math.random() * 3,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      tilt: Math.random() * 10,
-      tiltAngle: 0
-    });
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const colors = ['#1d9bf0','#00ba7c','#ffd700','#f4212e','#ff7ad9','#ffffff'];
+  const particles = [];
+  const scale = Math.min(canvas.width, canvas.height) / 400;
+  const bursts = [
+    { x: cx, y: cy, delay: 0 },
+    { x: cx - 70 * scale, y: cy - 50 * scale, delay: 14 },
+    { x: cx + 70 * scale, y: cy - 30 * scale, delay: 26 }
+  ];
+  function burst(b) {
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const count = 40;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.15;
+      const speed = (2 + Math.random() * 2.5) * scale;
+      particles.push({
+        x: b.x, y: b.y, px: b.x, py: b.y,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1, decay: 0.012 + Math.random() * 0.01,
+        color: Math.random() < 0.8 ? color : '#ffffff'
+      });
+    }
   }
+  bursts.forEach((b, i) => playPop(b.delay / 60, i === 0 ? 0.5 : 0.35));
   let frame = 0;
   function draw() {
+    bursts.forEach(b => { if (b.delay === frame) burst(b); });
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    pieces.forEach(p => {
-      ctx.beginPath();
-      ctx.lineWidth = p.r;
+    ctx.lineCap = 'round';
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.px = p.x; p.py = p.y;
+      p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.04 * scale;
+      p.x += p.vx; p.y += p.vy;
+      p.life -= p.decay;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      ctx.globalAlpha = p.life;
       ctx.strokeStyle = p.color;
-      ctx.moveTo(p.x + p.tilt + p.r/2, p.y);
-      ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(p.px - p.vx * 2, p.py - p.vy * 2);
+      ctx.lineTo(p.x, p.y);
       ctx.stroke();
-      p.y += p.d;
-      p.tiltAngle += 0.1;
-      p.tilt = Math.sin(p.tiltAngle) * 8;
-      if (p.y > canvas.height) p.y = -10;
-    });
+    }
+    ctx.globalAlpha = 1;
     frame++;
-    if (frame < 180) requestAnimationFrame(draw);
+    if (frame < 40 || particles.length) requestAnimationFrame(draw);
     else ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
   draw();
