@@ -1499,11 +1499,14 @@ let currentMC = null;
 
 function generateDistractors(correct, pool) {
   const distractors = new Set();
+  // Keys by normalized meaning, so "15° cephalic" and "15 degrees cephalad" count as the same option.
+  const seen = new Set([normalize(correct.crLocation)]);
+  const addOpt = v => { const k = normalize(v); if (v && !seen.has(k)) { seen.add(k); distractors.add(v); } };
   // 1. One correct answer from a different projection
-  const others = pool.filter(p => p.crLocation !== correct.crLocation);
+  const others = pool.filter(p => normalize(p.crLocation) !== normalize(correct.crLocation));
   if (others.length) {
     const other = others[Math.floor(Math.random() * others.length)];
-    distractors.add(other.crLocation);
+    addOpt(other.crLocation);
   }
   // 2. Two close distractors
   const loc = correct.crLocation;
@@ -1525,14 +1528,15 @@ function generateDistractors(correct, pool) {
     loc.replace(/patellar apex/gi, 'patellar base'),
   ];
   for (const v of inchVariants) {
-    if (v && v !== loc && !distractors.has(v)) distractors.add(v);
+    addOpt(v);
     if (distractors.size >= 3) break;
   }
   // Fill remaining with random other locations
+  let guard = 0;
   while (distractors.size < 3 && others.length) {
     const o = others[Math.floor(Math.random() * others.length)];
-    if (o.crLocation !== loc) distractors.add(o.crLocation);
-    if (distractors.size >= 3) break;
+    addOpt(o.crLocation);
+    if (distractors.size >= 3 || ++guard > 200) break;
   }
   return Array.from(distractors).slice(0, 3);
 }
@@ -1650,6 +1654,8 @@ function normalize(str) {
     .toLowerCase()
     .replace(/°|degrees?|deg\b/g, ' degree ')  // treat °, degree, degrees, deg the same
     .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\bceph(?:alic(?:ally)?|alad|alically)?\b/g, 'cephalad') // cephalic = cephalad
+    .replace(/\bcaud(?:al(?:ly)?|ad)?\b/g, 'caudad')                   // caudal = caudad
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1677,6 +1683,30 @@ function scoreRotation(user, correct) {
   return ok ? 'correct' : 'wrong';
 }
 
+// Pull numbers and ranges (e.g. 15–20°, 15 to 20 degrees) out of a raw string.
+function degreeNumbers(str) {
+  const s = String(str || '').toLowerCase();
+  const ranges = [];
+  s.replace(/(\d+(?:\.\d+)?)\s*(?:°|degrees?|deg)?\s*(?:-|\u2013|\u2014|to)\s*(\d+(?:\.\d+)?)/g, (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
+  const nums = (s.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  return { nums, ranges };
+}
+function directionTokens(str) {
+  const n = ' ' + normalize(str) + ' ';
+  return ['cephalad', 'caudad'].filter(d => n.includes(' ' + d + ' '));
+}
+// Number + cephalad/caudad answers. Returns 'correct' / 'close' / 'wrong', or null to use the general matcher.
+function scoreDegreeDirection(user, correct) {
+  const c = degreeNumbers(correct), u = degreeNumbers(user);
+  const cDirs = directionTokens(correct), uDirs = directionTokens(user);
+  if (!c.nums.length || !u.nums.length || !cDirs.length) return null;
+  if (uDirs.some(d => !cDirs.includes(d))) return 'wrong'; // e.g. caudal when the answer is cephalad
+  const inRange = n => c.nums.includes(n) || c.ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b));
+  const numsOk = u.nums.every(inRange);
+  if (numsOk && uDirs.length) return 'correct';
+  return null; // leave other cases (e.g. number only) to the general matcher, as before
+}
+
 function scoreMatch(user, correct, field) {
   if (!user) return 'wrong';
 
@@ -1684,10 +1714,15 @@ function scoreMatch(user, correct, field) {
   if (field === 'degree' && currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
     const u = normalize(user);
     const isPerp = /perpendicular|perp/.test(u);
-    const isCaudal = /3.?5.*caudal|caudal.*3.?5/.test(u);
-    const isCephalic = /3.?5.*cephalic|cephalic.*3.?5|3.?5.*cephalad/.test(u);
+    const isCaudal = /3.?5.*caudad|caudad.*3.?5/.test(u);       // normalize() turns caudal -> caudad
+    const isCephalic = /3.?5.*cephalad|cephalad.*3.?5/.test(u); // and cephalic -> cephalad
     if (isPerp || isCaudal || isCephalic) return 'correct';
     return 'wrong';
+  }
+
+  if (field === 'degree') {
+    const d = scoreDegreeDirection(user, correct);
+    if (d) return d;
   }
 
   const uNorm = normalize(user);

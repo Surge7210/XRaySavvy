@@ -1142,7 +1142,11 @@ function startDemo() {
 
 // ===================== GRADING =====================
 const STOP = new Set('a an the of and or to in on at for by with is are was be as it its this that from into than then per'.split(' '));
-const norm = s => String(s || '').toLowerCase().replace(/°/g, ' degrees ').replace(/[^a-z0-9.\s/-]/g, ' ').replace(/[\/-]/g, ' ').replace(/\.(?!\d)/g, ' ').replace(/\s+/g, ' ').trim();
+const norm = s => String(s || '').toLowerCase().replace(/°/g, ' degrees ').replace(/[^a-z0-9.\s/-]/g, ' ').replace(/[\/-]/g, ' ').replace(/\.(?!\d)/g, ' ')
+  .replace(/\b(?:degrees?|deg)\b/g, 'degrees')                       // °, deg, degree, degrees are the same
+  .replace(/\bceph(?:alic(?:ally)?|alad|alically)?\b/g, 'cephalad') // cephalic = cephalad
+  .replace(/\bcaud(?:al(?:ly)?|ad)?\b/g, 'caudad')                   // caudal = caudad
+  .replace(/\s+/g, ' ').trim();
 const stem = w => w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '');
 const words = s => norm(s).split(' ').filter(w => w && !STOP.has(w)).map(stem).filter(Boolean);
 function lev(a, b) {
@@ -1155,11 +1159,26 @@ function lev(a, b) {
   }
   return d[a.length][b.length];
 }
+// Angle answers like "15–20° cephalad": a number inside the range plus the same direction is right;
+// the opposite direction is wrong. Returns null when the answer isn't an angle + direction.
+function gradeAngle(user, answer) {
+  const nums = s => (String(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  const ranges = [];
+  String(answer).toLowerCase().replace(/(\d+(?:\.\d+)?)\s*(?:°|degrees?|deg)?\s*(?:-|\u2013|\u2014|to)\s*(\d+(?:\.\d+)?)/g, (m, x, y) => { ranges.push([Number(x), Number(y)]); return m; });
+  const dirs = s => ['cephalad', 'caudad'].filter(d => (' ' + norm(s) + ' ').includes(' ' + d + ' '));
+  const an = nums(answer), un = nums(user), ad = dirs(answer), ud = dirs(user);
+  if (!an.length || !un.length || !ad.length || !ud.length) return null;
+  if (ud.some(d => !ad.includes(d))) return 'wrong';
+  const ok = un.every(n => an.includes(n) || ranges.some(([x, y]) => n >= Math.min(x, y) && n <= Math.max(x, y)));
+  return ok ? 'right' : null;
+}
 // Returns 'right', 'close' or 'wrong'. Lenient: exact, containment, or keyword overlap (typos OK).
 function gradeShort(user, answer) {
   const u = norm(user), a = norm(answer);
   if (!u) return 'wrong';
   if (u === a) return 'right';
+  const angle = gradeAngle(user, answer);
+  if (angle) return angle;
   const aw = words(answer), uw = words(user);
   if (!aw.length) return u.includes(a) ? 'right' : 'wrong';
   if (aw.length === 1 && /\d/.test(aw[0])) return uw.includes(aw[0]) ? 'right' : 'wrong'; // numbers must match exactly
@@ -1199,7 +1218,12 @@ function renderQuestion() {
   if (q.type === 'mc') {
     $('checkBtn').classList.add('hidden');
     const box = el('div', { class: 'mc-options' });
-    shuffle(q.choices.map((c, idx) => ({ c, idx }))).forEach(o => {
+    const seen = new Map(); // normalized text -> option
+    q.choices.forEach((c, idx) => {
+      const k = norm(c), prev = seen.get(k);
+      if (!prev || idx === q.answerIndex) seen.set(k, { c, idx });
+    });
+    shuffle([...seen.values()]).forEach(o => {
       box.append(el('button', { class: 'mc-opt', 'data-idx': o.idx, onclick: () => answerMC(o.idx) }, o.c));
     });
     body.append(box);
