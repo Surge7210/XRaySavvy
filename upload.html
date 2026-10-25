@@ -202,6 +202,35 @@ const MIN_PER_REQUEST = 2;
 const GAP_MS = 4500;          // pause between calls to stay under the free per-minute limit
 const MAX_TOTAL = 200;
 
+// ===================== COMPATIBILITY (older iPhone Safari) =====================
+function installCompatPolyfills() {
+  if (typeof Promise.withResolvers !== 'function') {
+    Promise.withResolvers = function () { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
+  }
+  // ReadableStream async iteration (`for await (const x of stream)`) is missing in older Safari.
+  if (typeof ReadableStream !== 'undefined' && typeof Symbol !== 'undefined' && Symbol.asyncIterator && !ReadableStream.prototype[Symbol.asyncIterator]) {
+    const values = function (opts) {
+      const reader = this.getReader();
+      const preventCancel = !!(opts && opts.preventCancel);
+      return {
+        next() { return reader.read(); },
+        async return(value) {
+          if (!preventCancel) { try { await reader.cancel(value); } catch (e) { /* ignore */ } }
+          try { reader.releaseLock(); } catch (e) { /* ignore */ }
+          return { done: true, value };
+        },
+        [Symbol.asyncIterator]() { return this; }
+      };
+    };
+    if (typeof ReadableStream.prototype.values !== 'function') ReadableStream.prototype.values = values;
+    ReadableStream.prototype[Symbol.asyncIterator] = ReadableStream.prototype.values;
+  }
+  if (!Array.prototype.at) Array.prototype.at = function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return this[n]; };
+  if (!Array.prototype.findLast) Array.prototype.findLast = function (f, t) { for (let i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; return undefined; };
+  if (!Object.hasOwn) Object.hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+}
+installCompatPolyfills();
+
 // ===================== CELEBRATION + WRONG EFFECTS (copied from index.html) =====================
 let fwAudioCtx = null;
 function getAudioCtx() {
@@ -808,26 +837,78 @@ async function extractDocx(buf) {
   return { units: pages, unitName: 'pages', parts: paras, paragraphs: paras.length };
 }
 
+// ---- PDF (pdf.js) ----
+// iPhone Safari note: pdf.js's getTextContent() uses `for await` over a ReadableStream,
+// which older Safari can't iterate ("undefined is not a function near '...t of e...'").
+// Fix: (1) polyfill stream async-iteration (installCompatPolyfills), (2) run pdf.js on the
+// main thread so that polyfill covers its parser too, (3) read text with a plain reader loop.
 let pdfjsLibPromise = null;
-async function extractPdf(buf) {
-  if (!pdfjsLibPromise) pdfjsLibPromise = import(PDFJS_URL).then(m => { m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; return m; });
-  const pdfjsLib = await pdfjsLibPromise;
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-  const parts = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const tc = await page.getTextContent();
-    let s = '';
-    for (const it of tc.items) { s += it.str || ''; s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : ''); }
-    s = s.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
-    parts.push('--- Page ' + i + ' ---\n' + (s || '(no text)'));
-    if (i % 10 === 0) setStatus('Reading PDF… page ' + i + ' of ' + pdf.numPages);
+function loadPdfjs() {
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = (async () => {
+      const lib = await import(PDFJS_URL);
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+      try {
+        // Main-thread mode: pdf.js uses globalThis.pdfjsWorker instead of a Web Worker.
+        if (!globalThis.pdfjsWorker) globalThis.pdfjsWorker = await import(PDFJS_WORKER_URL);
+      } catch (e) { console.warn('pdf.js main-thread worker failed to load; using Web Worker', e); }
+      return lib;
+    })();
+    pdfjsLibPromise.catch(() => { pdfjsLibPromise = null; });
   }
+  return pdfjsLibPromise;
+}
+async function pageText(page) {
+  let items = [];
+  if (typeof page.streamTextContent === 'function') {
+    const reader = page.streamTextContent().getReader();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value && value.items) for (let k = 0; k < value.items.length; k++) items.push(value.items[k]);
+    }
+  } else {
+    items = (await page.getTextContent()).items;
+  }
+  let s = '';
+  for (let k = 0; k < items.length; k++) {
+    const it = items[k];
+    s += it.str || '';
+    s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : '');
+  }
+  return s.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+}
+async function extractPdf(buf) {
+  const pdfjsLib = await loadPdfjs();
+  const task = pdfjsLib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false });
+  const pdf = await task.promise;
+  const parts = [];
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const s = await pageText(page);
+      page.cleanup();
+      parts.push('--- Page ' + i + ' ---\n' + (s || '(no text)'));
+      if (i % 5 === 0) setInfo('Reading PDF… page ' + i + ' of ' + pdf.numPages);
+    }
+  } finally { try { task.destroy(); } catch (e) { /* ignore */ } }
   return { units: pdf.numPages, unitName: 'pages', parts };
 }
 
+// File.text()/arrayBuffer() with a FileReader fallback for older browsers.
+function readFile(file, asText) {
+  if (asText && typeof file.text === 'function') return file.text();
+  if (!asText && typeof file.arrayBuffer === 'function') return file.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error || new Error('Could not read the file.'));
+    asText ? fr.readAsText(file) : fr.readAsArrayBuffer(file);
+  });
+}
+
 async function extractTxt(file) {
-  const text = await file.text();
+  const text = await readFile(file, true);
   return { units: null, unitName: '', parts: text.split(/\n{2,}/).map(s => s.trim()).filter(Boolean) };
 }
 
@@ -835,7 +916,7 @@ async function extractFile(file) {
   const name = file.name.toLowerCase();
   const ext = name.slice(name.lastIndexOf('.') + 1);
   if (ext === 'txt') return Object.assign({ kind: 'txt' }, await extractTxt(file));
-  const buf = await file.arrayBuffer();
+  const buf = await readFile(file, false);
   if (ext === 'pptx') return Object.assign({ kind: 'pptx' }, await extractPptx(buf));
   if (ext === 'docx') return Object.assign({ kind: 'docx' }, await extractDocx(buf));
   if (ext === 'pdf') return Object.assign({ kind: 'pdf' }, await extractPdf(buf));
@@ -899,6 +980,7 @@ let genOpts = { count: 25, type: 'mix' };
 let cancelGen = false;
 
 function setStatus(msg) { $('genMsg').textContent = msg; }
+function setInfo(msg) { const i = $('fileInfo'); if (i) i.textContent = msg; }
 function showError(msg) { const e = $('genError'); e.textContent = msg; e.classList.toggle('hidden', !msg); }
 
 function chipGroup(id, onPick) {
