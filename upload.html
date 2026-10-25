@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upload &amp; Quiz (Test) – X-Ray Projections</title>
+<style>
+:root{--bg:#0f1419;--card:#1a2332;--text:#e7e9ea;--muted:#8b98a5;--accent:#1d9bf0;--border:#38444d;--good:#00ba7c;--bad:#f4212e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border);padding:0.8rem 1rem}
+header .top{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;max-width:800px;margin:0 auto}
+h1{font-size:1.35rem;margin:0}
+.badge{font-size:0.7rem;background:#3d331a;color:#ffd700;border-radius:999px;padding:0.1rem 0.5rem;vertical-align:middle;margin-left:0.3rem}
+.back{color:var(--accent);text-decoration:none;font-size:0.9rem;white-space:nowrap}
+.tabs{display:flex;gap:0.5rem;max-width:800px;margin:0.7rem auto 0;overflow-x:auto}
+.tabs button{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:999px;padding:0.45rem 1rem;font-size:0.9rem;cursor:pointer;white-space:nowrap}
+.tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:800px;margin:0 auto;padding:1rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.card h2{font-size:1.05rem;margin:0 0 0.6rem}
+.muted{color:var(--muted);font-size:0.9rem}
+.small{font-size:0.8rem}
+.hidden{display:none!important}
+.btn{padding:0.6rem 1rem;border-radius:8px;border:none;font-size:0.95rem;cursor:pointer;font-family:inherit}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-secondary{background:#38444d;color:var(--text)}
+.btn-danger{background:#3d1a1c;color:#f4212e}
+.btn-block{width:100%}
+.row{display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=number],textarea,select{width:100%;padding:0.7rem 1rem;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:16px;font-family:inherit}
+label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35rem}
+.drop{display:block;border:2px dashed var(--border);border-radius:12px;padding:1.4rem 1rem;text-align:center;cursor:pointer;background:var(--bg)}
+.drop.drag{border-color:var(--accent)}
+.drop .big{font-size:1.05rem;font-weight:600}
+.drop input{display:none}
+.fileinfo{margin-top:0.8rem;padding:0.7rem 0.9rem;border-radius:10px;background:#1e2a3a;font-size:0.9rem}
+.fileinfo b{word-break:break-all}
+.chips{display:flex;flex-wrap:wrap;gap:0.4rem}
+.chip{border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:999px;padding:0.4rem 0.9rem;font-size:0.9rem;cursor:pointer}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.notice{border-radius:10px;padding:0.8rem 0.9rem;font-size:0.9rem;margin-bottom:0.8rem}
+.notice.warn{background:#3d331a;color:#ffd700}
+.notice.info{background:#1e2a3a;color:var(--text)}
+.notice.err{background:#3d1a1c;color:#ff8a92}
+.progress{height:10px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--border);margin:0.6rem 0}
+.progress>div{height:100%;width:0;background:var(--accent);transition:width .3s}
+.quiz-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.2rem}
+.quiz-label{color:var(--muted);font-size:0.9rem;display:flex;justify-content:space-between;gap:0.5rem}
+.quiz-question{font-size:1.1rem;font-weight:600;margin:0.5rem 0 1rem}
+.mc-options{display:flex;flex-direction:column;gap:0.5rem}
+.mc-opt{text-align:left;padding:0.7rem 1rem;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.95rem;cursor:pointer;font-family:inherit}
+.mc-opt.right{border-color:#00ba7c;background:#0d3d2e}
+.mc-opt.wrong{border-color:#f4212e;background:#3d1a1c}
+.quiz-actions{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:1rem}
+.feedback{margin-top:1rem;padding:0.8rem 1rem;border-radius:8px;font-size:0.95rem}
+.feedback.good{background:#0d3d2e;color:#00ba7c}
+.feedback.bad{background:#3d1a1c;color:#f4212e}
+.feedback.close{background:#3d331a;color:#ffd700}
+.answer{background:#1e2a3a;border-radius:8px;padding:0.7rem 0.9rem;margin-top:0.6rem;font-size:0.92rem;color:var(--text)}
+.answer .src{color:var(--muted);font-size:0.8rem;margin-top:0.3rem}
+.score-big{font-size:2.4rem;font-weight:700;text-align:center;margin:0.3rem 0}
+.miss{border-top:1px solid var(--border);padding:0.7rem 0}
+.miss:first-child{border-top:none}
+.deck{border-top:1px solid var(--border);padding:0.8rem 0}
+.deck:first-child{border-top:none}
+.deck .name{font-weight:600;word-break:break-word}
+.deck .row{margin-top:0.5rem}
+.deck .btn{padding:0.45rem 0.8rem;font-size:0.85rem}
+#confetti-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999}
+</style>
+</head>
+<body>
+<canvas id="confetti-canvas"></canvas>
+<header>
+  <div class="top">
+    <h1>Upload &amp; Quiz <span class="badge">TEST</span></h1>
+    <a class="back" href="./index.html">&larr; Back to main app</a>
+  </div>
+  <nav class="tabs">
+    <button data-tab="upload" class="active">Upload</button>
+    <button data-tab="decks">My Decks</button>
+  </nav>
+</header>
+
+<main>
+<!-- ============ UPLOAD SCREEN ============ -->
+<section id="screen-upload">
+  <div id="notConnected" class="notice warn hidden">
+    <b>Not connected yet.</b> The AI question maker isn't hooked up (the Worker link still needs to be added). You can still read a file below, or <a href="#" id="demoLink" style="color:#ffd700">try the demo quiz</a>.
+  </div>
+
+  <div class="card">
+    <h2>1. Pick your notes</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" accept=".pptx,.docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      <div class="big">Tap to choose a file</div>
+      <div class="muted small">PowerPoint (.pptx), Word (.docx), PDF or .txt</div>
+    </label>
+    <div id="fileInfo" class="fileinfo hidden"></div>
+    <p class="muted small" style="margin:0.6rem 0 0">Your file is read on your phone. Only the text is sent to Google Gemini (free tier, which Google may use to improve its products) &mdash; <b>never upload patient info.</b></p>
+  </div>
+
+  <div class="card">
+    <h2>2. Quiz options</h2>
+    <label class="lbl">How many questions?</label>
+    <div class="chips" id="countChips">
+      <button class="chip" data-v="10">10</button><button class="chip active" data-v="25">25</button><button class="chip" data-v="50">50</button><button class="chip" data-v="100">100</button><button class="chip" data-v="custom">Custom</button>
+    </div>
+    <input type="number" id="customCount" class="hidden" min="1" max="200" placeholder="1 to 200" style="margin-top:0.5rem" inputmode="numeric">
+    <label class="lbl">Question type</label>
+    <div class="chips" id="typeChips">
+      <button class="chip active" data-v="mix">Mix</button><button class="chip" data-v="mc">Multiple choice</button><button class="chip" data-v="short">Short answer</button>
+    </div>
+    <label class="lbl" for="focus">Focus on (optional)</label>
+    <input type="text" id="focus" maxlength="300" placeholder="e.g. positioning of the elbow, CR angles">
+  </div>
+
+  <div class="card">
+    <h2>3. Make my quiz</h2>
+    <button class="btn btn-primary btn-block" id="genBtn" disabled>Choose a file first</button>
+    <div id="genStatus" class="hidden" style="margin-top:0.8rem">
+      <div class="muted" id="genMsg">Starting…</div>
+      <div class="progress"><div id="genBar"></div></div>
+      <div class="row"><button class="btn btn-secondary" id="cancelBtn">Stop</button></div>
+    </div>
+    <div id="genError" class="notice err hidden" style="margin-top:0.8rem;margin-bottom:0"></div>
+    <div style="margin-top:0.8rem"><button class="btn btn-secondary btn-block" id="demoBtn">Try the demo quiz (8 sample questions)</button></div>
+  </div>
+</section>
+
+<!-- ============ QUIZ SCREEN ============ -->
+<section id="screen-quiz" class="hidden">
+  <div class="quiz-box">
+    <div class="quiz-label"><span id="qProgress"></span><span id="qScore"></span></div>
+    <div class="progress"><div id="qBar"></div></div>
+    <div class="quiz-label"><span id="qDeckName"></span><span id="qType"></span></div>
+    <div class="quiz-question" id="qText"></div>
+    <div id="qBody"></div>
+    <div id="qFeedback" class="hidden"></div>
+    <div class="quiz-actions">
+      <button class="btn btn-primary hidden" id="checkBtn">Check</button>
+      <button class="btn btn-primary hidden" id="nextBtn">Next</button>
+      <button class="btn btn-secondary hidden" id="overrideBtn">I was right</button>
+      <button class="btn btn-secondary" id="quitBtn">End quiz</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RESULTS SCREEN ============ -->
+<section id="screen-results" class="hidden">
+  <div class="card">
+    <div class="muted" style="text-align:center" id="rDeck"></div>
+    <div class="score-big" id="rScore"></div>
+    <div class="muted" style="text-align:center" id="rPct"></div>
+    <div class="quiz-actions" style="justify-content:center">
+      <button class="btn btn-primary" id="retryMissedBtn">Retry missed</button>
+      <button class="btn btn-secondary" id="retakeBtn">Retake all</button>
+      <button class="btn btn-secondary" id="saveDemoBtn">Save to My Decks</button>
+      <button class="btn btn-secondary" id="doneBtn">Done</button>
+    </div>
+  </div>
+  <div class="card" id="missedCard">
+    <h2>Review what you missed</h2>
+    <div id="missedList"></div>
+  </div>
+</section>
+
+<!-- ============ MY DECKS ============ -->
+<section id="screen-decks" class="hidden">
+  <div class="card">
+    <h2>My Decks</h2>
+    <p class="muted small" style="margin-top:0">Saved on this phone/browser only. Use Export to back them up.</p>
+    <div id="deckList"></div>
+  </div>
+  <div class="card">
+    <h2>Backup</h2>
+    <div class="row">
+      <button class="btn btn-secondary" id="exportBtn">Export (JSON)</button>
+      <label class="btn btn-secondary" style="display:inline-block">Import (JSON)<input type="file" id="importInput" accept=".json,application/json" class="hidden"></label>
+    </div>
+    <div id="deckMsg" class="muted small" style="margin-top:0.6rem"></div>
+  </div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
+<script>
+// ===================== CONNECTION =====================
+// Paste your Cloudflare Worker URL here (see worker/SETUP.md). It is NOT a secret.
+const WORKER_URL = 'PASTE_WORKER_URL_HERE';
+const IS_CONNECTED = /^https:\/\//.test(WORKER_URL);
+
+const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/legacy/build/pdf.min.mjs';
+const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/legacy/build/pdf.worker.min.mjs';
+const CHUNK_TARGET = 30000;   // characters per request (25-40k)
+const CHUNK_MAX = 40000;
+const PER_REQUEST_MAX = 50;   // questions per Worker call (matches worker MAX_COUNT)
+const MIN_PER_REQUEST = 2;
+const GAP_MS = 4500;          // pause between calls to stay under the free per-minute limit
+const MAX_TOTAL = 200;
+
+// ===================== CELEBRATION + WRONG EFFECTS (copied from index.html) =====================
+let fwAudioCtx = null;
+function getAudioCtx() {
+  try {
+    if (!fwAudioCtx) fwAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (fwAudioCtx.state === 'suspended') fwAudioCtx.resume();
+  } catch (e) { fwAudioCtx = null; }
+  return fwAudioCtx;
+}
+
+function playPop(delay, volume) {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const t = ac.currentTime + delay;
+  const len = Math.floor(ac.sampleRate * 0.25);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const filter = ac.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 1800 + Math.random() * 1200;
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+  src.start(t);
+}
+
+const CELEBRATION = 'bats'; // 'bats', 'confetti' or 'fireworks'
+function launchConfetti() {
+  if (CELEBRATION === 'bats') launchBats();
+  else if (CELEBRATION === 'fireworks') launchFireworks();
+  else launchConfettiPop();
+}
+// Soft fluttery "whoosh": band-passed noise with a quick swell and a sweeping, wobbling filter (no crackle)
+function playWhoosh(delay, volume) {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const t = ac.currentTime + delay;
+  const dur = 0.55;
+  const len = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const p = i / len;
+    const env = Math.sin(Math.PI * Math.min(1, p * 1.6)) * Math.pow(1 - p, 1.5);
+    const flutter = 0.6 + 0.4 * Math.sin(2 * Math.PI * 22 * (i / ac.sampleRate)); // wing-beat tremolo
+    d[i] = (Math.random() * 2 - 1) * env * flutter;
+  }
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const filter = ac.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 0.9;
+  filter.frequency.setValueAtTime(500, t);
+  filter.frequency.exponentialRampToValueAtTime(1800, t + dur * 0.5);
+  filter.frequency.exponentialRampToValueAtTime(900, t + dur);
+  const gain = ac.createGain();
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+  src.start(t);
+}
+
+// One bat silhouette, front view, centered at 0,0, wingspan ~2 units. flap: -1 (wings down) .. 1 (wings up)
+function traceBat(ctx, flap) {
+  ctx.beginPath();
+  for (const side of [1, -1]) {
+    const a = flap * 0.75;                         // wing elevation angle
+    const fold = 0.72 + 0.28 * Math.cos(flap * 1.4); // foreshortening as wings sweep
+    const ca = Math.cos(a), sa = Math.sin(a);
+    // wing points in wing space (x out from shoulder), rotated by elevation and folded
+    const P = (x, y) => {
+      const wx = x * fold, wy = y;
+      return [side * (0.12 + wx * ca + wy * sa * 0.6), -0.08 - wx * sa + wy * ca];
+    };
+    const lead = [[0, 0], [0.35, -0.16], [0.7, -0.2], [0.98, -0.06]]; // leading edge to tip
+    const tips = [[0.98, -0.06], [0.72, 0.22], [0.45, 0.28], [0.18, 0.3]]; // finger tips along trailing edge
+    let p = P(lead[0][0], lead[0][1]);
+    ctx.moveTo(p[0], p[1]);
+    p = P(lead[1][0], lead[1][1]); const q = P(lead[2][0], lead[2][1]); const r = P(lead[3][0], lead[3][1]);
+    ctx.bezierCurveTo(p[0], p[1], q[0], q[1], r[0], r[1]);
+    // scalloped trailing edge: each membrane bows inward between finger tips
+    for (let i = 1; i < tips.length; i++) {
+      const [x0, y0] = tips[i - 1], [x1, y1] = tips[i];
+      const c = P((x0 + x1) / 2 - 0.02, (y0 + y1) / 2 - 0.13);
+      const e = P(x1, y1);
+      ctx.quadraticCurveTo(c[0], c[1], e[0], e[1]);
+    }
+    const back = P(0, 0.22);
+    ctx.quadraticCurveTo(side * 0.16, 0.18, back[0], back[1]);
+    ctx.closePath();
+  }
+  // body
+  ctx.moveTo(0.13, 0.02);
+  ctx.ellipse(0, 0.02, 0.13, 0.26, 0, 0, Math.PI * 2);
+  // head with pointed ears
+  ctx.moveTo(0.11, -0.27);
+  ctx.arc(0, -0.27, 0.11, 0, Math.PI * 2);
+  ctx.moveTo(-0.1, -0.31); ctx.lineTo(-0.1, -0.49); ctx.lineTo(-0.02, -0.35); ctx.closePath();
+  ctx.moveTo(0.1, -0.31); ctx.lineTo(0.1, -0.49); ctx.lineTo(0.02, -0.35); ctx.closePath();
+}
+
+function launchBats(testTimeMs) {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = W * 0.5, cy = H * 0.55;
+  const reach = Math.hypot(W, H);
+  const count = 28 + Math.floor(Math.random() * 10);
+  const bats = [];
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3; // outward, mostly upward
+    const size = 14 + Math.pow(Math.random(), 1.6) * 30;                // half-wingspan in px
+    const dur = 1700 + Math.random() * 1100;                             // ms to reach the edge
+    bats.push({
+      angle, size,
+      dist: reach * (0.75 + Math.random() * 0.25) + size * 2,            // far enough to be fully off-screen
+      dur, delay: Math.random() * 550,
+      flapRate: 0.016 + Math.random() * 0.012 + (30 - size) * 0.0003,    // small bats flap faster
+      phase: Math.random() * Math.PI * 2,
+      wobF: 0.004 + Math.random() * 0.005, wobA: 8 + Math.random() * 22, wobP: Math.random() * 6.28,
+      glow: Math.random() < 0.55 ? 'rgba(191,90,242,0.85)' : 'rgba(255,149,0,0.85)'
+    });
+  }
+  playWhoosh(0, 0.35);
+  playWhoosh(0.22, 0.22);
+  const total = 3400;
+  function render(t) {
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for (const b of bats) {
+      const lt = t - b.delay;
+      if (lt < 0) { alive++; continue; }
+      const p = lt / b.dur;
+      if (p > 1.15) continue;
+      alive++;
+      const e = p * p * (0.6 + 0.4 * p) + p * 0.35;                    // accelerate out of the "cave"
+      const dx = Math.cos(b.angle), dy = Math.sin(b.angle);
+      const wob = Math.sin(lt * b.wobF + b.wobP) * b.wobA * Math.min(1, p * 3);
+      const x = cx + dx * b.dist * e - dy * wob;
+      const y = cy + dy * b.dist * e + dx * wob - Math.sin(lt * b.wobF * 2.3) * 4;
+      const s = b.size * (0.35 + 0.65 * Math.min(1, p * 2.5));         // grow as they emerge
+      const flap = Math.sin(lt * b.flapRate * 2 + b.phase);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(dx * 0.35 + Math.sin(lt * b.wobF + b.wobP) * 0.2);
+      ctx.scale(s, s);
+      ctx.globalAlpha = Math.min(1, lt / 120);
+      traceBat(ctx, flap);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 3.2 / s;
+      ctx.strokeStyle = b.glow;
+      ctx.stroke();
+      ctx.fillStyle = '#07040c';
+      ctx.fill();
+      ctx.restore();
+    }
+    return alive;
+  }
+  if (testTimeMs != null) { render(testTimeMs); return; }
+  const start = performance.now();
+  function draw(now) {
+    const t = now - start;
+    const alive = render(t);
+    if (alive && t < total + 1000) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, W, H);
+  }
+  requestAnimationFrame(draw);
+}
+
+
+function launchConfettiPop() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const reach = Math.max(W, H) * 0.5;
+  // front color + slightly darker back side, like real foil/paper confetti
+  const colors = [
+    ['#ff3b30','#c62a22'], ['#ff9500','#c77400'], ['#ffd60a','#c9a800'],
+    ['#34c759','#24923f'], ['#00c7be','#00918b'], ['#1d9bf0','#1572b0'],
+    ['#5e5ce6','#4442a8'], ['#bf5af2','#8c3fb3'], ['#ff2d92','#c0206d'],
+    ['#ffffff','#cfd4da']
+  ];
+  const pops = [
+    { x: W * 0.5,  y: H * 0.5,  delay: 0 },
+    { x: W * 0.22, y: H * 0.35, delay: 16 },
+    { x: W * 0.78, y: H * 0.35, delay: 32 }
+  ];
+  const pieces = [];
+  function pop(b) {
+    for (let i = 0; i < 160; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.9; // mostly upward and outward
+      const speed = (reach / 22) * (0.25 + Math.random() * 0.75);
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      const kind = Math.random();
+      pieces.push({
+        x: b.x, y: b.y,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        w: kind < 0.15 ? 3 + Math.random() * 2 : 7 + Math.random() * 5,   // thin strips vs squares
+        h: kind < 0.15 ? 14 + Math.random() * 8 : 5 + Math.random() * 5,
+        round: kind > 0.9,
+        rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 0.2,
+        tiltX: Math.random() * Math.PI * 2, vtX: 0.05 + Math.random() * 0.12,
+        tiltY: Math.random() * Math.PI * 2, vtY: 0.04 + Math.random() * 0.1,
+        sway: Math.random() * Math.PI * 2, vs: 0.02 + Math.random() * 0.03,
+        swayAmt: 0.4 + Math.random() * 0.9,
+        fall: 1.4 + Math.random() * 1.4,   // terminal fall speed (paper drifts, not drops)
+        front: c[0], back: c[1]
+      });
+    }
+  }
+  pops.forEach((b, i) => playPop(b.delay / 60, i === 0 ? 0.6 : 0.45));
+  let frame = 0;
+  function draw() {
+    pops.forEach(b => { if (b.delay === frame) pop(b); });
+    ctx.clearRect(0, 0, W, H);
+    for (let i = pieces.length - 1; i >= 0; i--) {
+      const p = pieces[i];
+      // air drag slows the blast, gravity pulls down, flat paper hits terminal speed quickly
+      p.vx *= 0.93;
+      p.vy = p.vy * 0.93 + 0.18;
+      if (p.vy > p.fall) p.vy = p.vy * 0.9 + p.fall * 0.1;
+      p.sway += p.vs;
+      p.x += p.vx + Math.sin(p.sway) * p.swayAmt;
+      p.y += p.vy;
+      p.rot += p.vr;
+      p.tiltX += p.vtX; p.tiltY += p.vtY;
+      if (p.y > H + 30) { pieces.splice(i, 1); continue; }
+      const sx = Math.cos(p.tiltX), sy = Math.cos(p.tiltY);
+      const facing = sx * sy >= 0;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.scale(sx, sy);
+      ctx.fillStyle = facing ? p.front : p.back;
+      if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); }
+      else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      // subtle highlight as the piece catches the light
+      const shine = Math.abs(sx * sy);
+      if (shine > 0.85) { ctx.fillStyle = 'rgba(255,255,255,' + ((shine - 0.85) * 2).toFixed(2) + ')'; if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); }
+      ctx.restore();
+    }
+    frame++;
+    if ((frame < 40 || pieces.length) && frame < 1500) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, W, H);
+  }
+  draw();
+}
+
+function launchFireworks() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const W = canvas.width, H = canvas.height;
+  const reach = Math.max(W, H) * 0.5;
+  const palettes = [
+    ['#ff3b30','#ff9500','#ffcc00'],
+    ['#34c759','#00e5ff','#1d9bf0'],
+    ['#af52de','#ff2d92','#ff7ad9'],
+    ['#ffd700','#ffffff','#ff9500'],
+    ['#00ba7c','#5ac8fa','#bf5af2']
+  ];
+  const bursts = [
+    { x: W * 0.5,  y: H * 0.45, delay: 0 },
+    { x: W * 0.25, y: H * 0.25, delay: 14 },
+    { x: W * 0.75, y: H * 0.3,  delay: 28 },
+    { x: W * 0.3,  y: H * 0.65, delay: 42 },
+    { x: W * 0.7,  y: H * 0.7,  delay: 56 }
+  ];
+  const particles = [];
+  function burst(b, idx) {
+    const pal = palettes[idx % palettes.length];
+    const count = 110;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.1;
+      const speed = (reach / 33) * (0.55 + Math.random() * 0.5);
+      const rainbow = Math.random() < 0.35;
+      particles.push({
+        x: b.x, y: b.y,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1, decay: 0.007 + Math.random() * 0.006,
+        color: rainbow ? 'hsl(' + Math.floor(Math.random() * 360) + ',100%,65%)' : pal[Math.floor(Math.random() * pal.length)],
+        sparkle: Math.random() < 0.3
+      });
+    }
+    // bright flash at the burst center
+    particles.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 1, decay: 0.08, color: '#ffffff', flash: true });
+  }
+  bursts.forEach((b, i) => playPop(b.delay / 60, i === 0 ? 0.55 : 0.4));
+  let frame = 0;
+  function draw() {
+    bursts.forEach((b, i) => { if (b.delay === frame) burst(b, i); });
+    ctx.clearRect(0, 0, W, H);
+    ctx.lineCap = 'round';
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= p.decay;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      if (p.flash) {
+        ctx.globalAlpha = p.life;
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 60);
+        g.addColorStop(0, 'rgba(255,255,255,0.9)');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(p.x - 60, p.y - 60, 120, 120);
+        continue;
+      }
+      const ox = p.x, oy = p.y;
+      p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.05;
+      p.x += p.vx; p.y += p.vy;
+      ctx.globalAlpha = p.sparkle ? p.life * (0.5 + Math.random() * 0.5) : p.life;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(ox - p.vx * 2.5, oy - p.vy * 2.5);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    frame++;
+    if (frame < 60 || particles.length) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, W, H);
+  }
+  draw();
+}
+
+
+// ---- Wrong-answer effect: playful ghost jump scare ----
+const WRONG_EFFECT = 'ghost'; // 'ghost' or 'none'
+function wrongAnswerEffect() { if (WRONG_EFFECT === 'ghost') ghostJumpScare(); }
+
+// "BOO" sting: falling detuned saw stab through a closing lowpass + low sine thump + short airy whoosh (no crackle)
+function playBoo() {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const t = ac.currentTime + 0.01;
+  const out = ac.createGain();
+  out.gain.value = 0.5;
+  out.connect(ac.destination);
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass'; lp.Q.value = 6;
+  lp.frequency.setValueAtTime(2400, t);
+  lp.frequency.exponentialRampToValueAtTime(300, t + 0.55);
+  const stab = ac.createGain();
+  stab.gain.setValueAtTime(0.0001, t);
+  stab.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+  stab.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+  lp.connect(stab); stab.connect(out);
+  [0, 7, -12].forEach(cents => {               // slight detune for a "boo-oo" wobble
+    const o = ac.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(330, t);
+    o.frequency.exponentialRampToValueAtTime(110, t + 0.55);
+    o.detune.value = cents * 3;
+    o.connect(lp); o.start(t); o.stop(t + 0.62);
+  });
+  const sub = ac.createOscillator();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(120, t);
+  sub.frequency.exponentialRampToValueAtTime(45, t + 0.4);
+  const sg = ac.createGain();
+  sg.gain.setValueAtTime(0.0001, t);
+  sg.gain.exponentialRampToValueAtTime(0.6, t + 0.015);
+  sg.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+  sub.connect(sg); sg.connect(out); sub.start(t); sub.stop(t + 0.5);
+  playWhoosh(0, 0.18);
+}
+
+let ghostEl = null;
+function ghostJumpScare() {
+  if (!ghostEl) {
+    ghostEl = document.createElement('div');
+    ghostEl.id = 'ghost-scare';
+    ghostEl.setAttribute('aria-hidden', 'true');
+    ghostEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:10000;display:none;align-items:center;justify-content:center;overflow:hidden;';
+    ghostEl.innerHTML =
+      '<div class="gs-vig" style="position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.75) 100%);opacity:0;"></div>' +
+      '<svg class="gs-ghost" viewBox="0 0 200 230" style="position:relative;width:min(82vw,62vh);height:auto;overflow:visible;opacity:0;will-change:transform,opacity;">' +
+        '<defs>' +
+          '<radialGradient id="gs-body" cx="45%" cy="35%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="75%" stop-color="#f1f3fb"/><stop offset="100%" stop-color="#d6dcef"/></radialGradient>' +
+          '<filter id="gs-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+        '</defs>' +
+        '<g filter="url(#gs-glow)">' +
+          // body: domed head, little arms out to the sides, wavy hem
+          '<path d="M100 8 C52 8 30 46 30 92 L30 120 C18 118 6 108 4 98 C2 116 14 136 30 140 L30 196 ' +
+            'Q42 222 56 200 Q70 178 84 204 Q100 230 116 204 Q130 178 144 200 Q158 222 170 196 L170 140 ' +
+            'C186 136 198 116 196 98 C194 108 182 118 170 120 L170 92 C170 46 148 8 100 8 Z" fill="url(#gs-body)"/>' +
+        '</g>' +
+        '<ellipse cx="76" cy="84" rx="14" ry="21" fill="#111"/>' +
+        '<ellipse cx="124" cy="84" rx="14" ry="21" fill="#111"/>' +
+        '<ellipse cx="80" cy="76" rx="4.5" ry="6" fill="#fff"/>' +
+        '<ellipse cx="128" cy="76" rx="4.5" ry="6" fill="#fff"/>' +
+        '<ellipse cx="100" cy="136" rx="17" ry="23" fill="#111"/>' +
+        '<ellipse cx="100" cy="142" rx="10" ry="11" fill="#5a1f2e"/>' +
+        '<ellipse cx="58" cy="112" rx="10" ry="6" fill="#ffb3c7" opacity="0.6"/>' +
+        '<ellipse cx="142" cy="112" rx="10" ry="6" fill="#ffb3c7" opacity="0.6"/>' +
+      '</svg>';
+    document.body.appendChild(ghostEl);
+  }
+  const vig = ghostEl.querySelector('.gs-vig');
+  const g = ghostEl.querySelector('.gs-ghost');
+  ghostEl.style.display = 'flex';
+  playBoo();
+  if (!g.animate) { setTimeout(() => { ghostEl.style.display = 'none'; }, 1300); return; }
+  vig.getAnimations().forEach(a => a.cancel());
+  g.getAnimations().forEach(a => a.cancel());
+  const total = 1300;
+  vig.animate([
+    { opacity: 0, offset: 0 }, { opacity: 1, offset: 0.08 },
+    { opacity: 0.8, offset: 0.55 }, { opacity: 0, offset: 1 }
+  ], { duration: total, easing: 'ease-out', fill: 'forwards' });
+  const anim = g.animate([
+    { transform: 'translate(0,0) scale(0.08) rotate(-10deg)', opacity: 0, offset: 0 },
+    { transform: 'translate(0,0) scale(1.12) rotate(4deg)', opacity: 1, offset: 0.115 },  // ~150ms zoom
+    { transform: 'translate(-14px,6px) scale(1) rotate(-5deg)', opacity: 1, offset: 0.16 }, // shake
+    { transform: 'translate(12px,-6px) scale(1.04) rotate(4deg)', opacity: 1, offset: 0.21 },
+    { transform: 'translate(-8px,4px) scale(1) rotate(-3deg)', opacity: 1, offset: 0.26 },
+    { transform: 'translate(5px,-2px) scale(1.02) rotate(2deg)', opacity: 1, offset: 0.31 },
+    { transform: 'translate(0,0) scale(1) rotate(0deg)', opacity: 1, offset: 0.58 },       // hold until ~750ms
+    { transform: 'translate(30px,-38vh) scale(0.6) rotate(8deg)', opacity: 0, offset: 1 } // float away
+  ], { duration: total, easing: 'linear', fill: 'forwards' });
+  anim.onfinish = () => { ghostEl.style.display = 'none'; };
+}
+
+// ===================== STORAGE MODULE =====================
+// All deck storage goes through DeckStore. Every method returns a Promise, so a
+// cloud backend (Firebase, Supabase, etc.) can replace localStorage later
+// without changing the rest of the page.
+const DeckStore = (() => {
+  const KEY = 'xraysavvy.decks.v1';
+  function readAll() {
+    try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function writeAll(decks) {
+    try { localStorage.setItem(KEY, JSON.stringify(decks)); }
+    catch (e) { throw new Error('Could not save — this browser\'s storage is full. Delete or export some decks.'); }
+  }
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  function normalizeDeck(d) {
+    if (!d || typeof d !== 'object' || !Array.isArray(d.questions)) return null;
+    const deck = Object.assign({ id: uid(), name: 'Untitled deck', createdAt: new Date().toISOString(), missed: [], attempts: [] }, d);
+    deck.questions = deck.questions.filter(q => q && q.question).map(q => Object.assign({ id: uid(), stats: { right: 0, wrong: 0 } }, q));
+    if (!Array.isArray(deck.missed)) deck.missed = [];
+    if (!Array.isArray(deck.attempts)) deck.attempts = [];
+    return deck;
+  }
+  return {
+    newId: uid,
+    async list() { return readAll().sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt)); },
+    async get(id) { return readAll().find(d => d.id === id) || null; },
+    async save(deck) {
+      const all = readAll(); const d = normalizeDeck(deck);
+      d.updatedAt = new Date().toISOString();
+      const i = all.findIndex(x => x.id === d.id);
+      if (i >= 0) all[i] = d; else all.push(d);
+      writeAll(all); return d;
+    },
+    async rename(id, name) {
+      const all = readAll(); const d = all.find(x => x.id === id); if (!d) return null;
+      d.name = String(name).slice(0, 120); d.updatedAt = new Date().toISOString(); writeAll(all); return d;
+    },
+    async remove(id) { writeAll(readAll().filter(d => d.id !== id)); },
+    // Record one answer: updates per-question stats and the deck's missed list.
+    async recordAnswer(id, qid, correct) {
+      const all = readAll(); const d = all.find(x => x.id === id); if (!d) return;
+      const q = d.questions.find(x => x.id === qid); if (!q) return;
+      q.stats = q.stats || { right: 0, wrong: 0 };
+      if (correct) { q.stats.right++; d.missed = d.missed.filter(x => x !== qid); }
+      else { q.stats.wrong++; q.stats.lastMissed = new Date().toISOString(); if (!d.missed.includes(qid)) d.missed.push(qid); }
+      writeAll(all);
+    },
+    async recordAttempt(id, score, total, mode) {
+      const all = readAll(); const d = all.find(x => x.id === id); if (!d) return;
+      d.attempts.push({ date: new Date().toISOString(), score, total, mode });
+      d.attempts = d.attempts.slice(-50); d.updatedAt = new Date().toISOString(); writeAll(all);
+    },
+    async exportJSON() { return JSON.stringify({ app: 'XRaySavvy', version: 1, exportedAt: new Date().toISOString(), decks: readAll() }, null, 2); },
+    async importJSON(text) {
+      const data = JSON.parse(text);
+      const incoming = Array.isArray(data) ? data : (data && data.decks) || (data && data.questions ? [data] : []);
+      const all = readAll(); let n = 0;
+      for (const raw of incoming) {
+        const d = normalizeDeck(raw); if (!d) continue;
+        const i = all.findIndex(x => x.id === d.id);
+        if (i >= 0) all[i] = d; else all.push(d);
+        n++;
+      }
+      writeAll(all); return n;
+    }
+  };
+})();
+
+// ===================== HELPERS =====================
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    if (k === 'class') e.className = attrs[k];
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  for (const c of kids) if (c != null) e.append(c);
+  return e;
+}
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const fmtNum = n => n.toLocaleString('en-US');
+function fmtDate(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } }
+
+function showScreen(name) {
+  for (const s of ['upload', 'quiz', 'results', 'decks']) $('screen-' + s).classList.toggle('hidden', s !== name);
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name || (name !== 'decks' && b.dataset.tab === 'upload' && name === 'upload')));
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.tab === 'decks') { renderDecks(); showScreen('decks'); } else showScreen('upload');
+}));
+
+// ===================== TEXT EXTRACTION =====================
+const xmlParser = new DOMParser();
+function xmlText(xml) {
+  // Text of every paragraph (<a:p>), skipping slide-number fields.
+  const doc = xmlParser.parseFromString(xml, 'application/xml');
+  const out = [];
+  for (const p of Array.from(doc.getElementsByTagName('a:p'))) {
+    let line = '';
+    for (const t of Array.from(p.getElementsByTagName('a:t'))) {
+      const fld = t.parentNode && t.parentNode.parentNode;
+      if (fld && fld.nodeName === 'a:fld' && /slidenum/i.test(fld.getAttribute('type') || '')) continue;
+      line += t.textContent;
+    }
+    line = line.replace(/\s+/g, ' ').trim();
+    if (line) out.push(line);
+  }
+  return out.join('\n');
+}
+function relTargets(relsXml) {
+  const map = {};
+  if (!relsXml) return map;
+  const doc = xmlParser.parseFromString(relsXml, 'application/xml');
+  for (const r of Array.from(doc.getElementsByTagName('Relationship'))) map[r.getAttribute('Id')] = { target: r.getAttribute('Target'), type: r.getAttribute('Type') || '' };
+  return map;
+}
+function resolvePath(base, rel) {
+  const parts = base.split('/'); parts.pop();
+  for (const seg of rel.split('/')) { if (seg === '..') parts.pop(); else if (seg && seg !== '.') parts.push(seg); }
+  return parts.join('/');
+}
+
+async function extractPptx(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  const slideRe = /^ppt\/slides\/slide(\d+)\.xml$/;
+  let slidePaths = Object.keys(zip.files).filter(p => slideRe.test(p))
+    .sort((a, b) => parseInt(a.match(slideRe)[1], 10) - parseInt(b.match(slideRe)[1], 10));
+  // Prefer the real presentation order (sldIdLst) when available.
+  try {
+    const pres = await zip.file('ppt/presentation.xml').async('string');
+    const rels = relTargets(await zip.file('ppt/_rels/presentation.xml.rels').async('string'));
+    const doc = xmlParser.parseFromString(pres, 'application/xml');
+    const ordered = Array.from(doc.getElementsByTagName('p:sldId'))
+      .map(s => rels[s.getAttribute('r:id')]).filter(Boolean)
+      .map(r => resolvePath('ppt/presentation.xml', r.target)).filter(p => zip.file(p));
+    if (ordered.length) slidePaths = ordered;
+  } catch (e) { /* fall back to numeric order */ }
+  const parts = [];
+  for (let i = 0; i < slidePaths.length; i++) {
+    const path = slidePaths[i];
+    const body = xmlText(await zip.file(path).async('string'));
+    let notes = '';
+    const relsFile = zip.file(path.replace(/slides\/(slide\d+\.xml)$/, 'slides/_rels/$1.rels'));
+    if (relsFile) {
+      const rels = relTargets(await relsFile.async('string'));
+      const n = Object.values(rels).find(r => /\/notesSlide$/.test(r.type));
+      if (n) { const nf = zip.file(resolvePath(path, n.target)); if (nf) notes = xmlText(await nf.async('string')); }
+    }
+    let s = '--- Slide ' + (i + 1) + ' ---\n' + (body || '(no text)');
+    if (notes) s += '\n[Notes] ' + notes;
+    parts.push(s);
+  }
+  return { units: slidePaths.length, unitName: 'slides', parts };
+}
+
+async function extractDocx(buf) {
+  if (!window.mammoth) throw new Error('Word reader failed to load. Check your internet and reload.');
+  const res = await mammoth.extractRawText({ arrayBuffer: buf });
+  let pages = null;
+  try {
+    const zip = await JSZip.loadAsync(buf);
+    const app = zip.file('docProps/app.xml');
+    if (app) { const m = (await app.async('string')).match(/<Pages>(\d+)<\/Pages>/); if (m) pages = parseInt(m[1], 10); }
+  } catch (e) { /* page count is optional */ }
+  const paras = res.value.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  return { units: pages, unitName: 'pages', parts: paras, paragraphs: paras.length };
+}
+
+let pdfjsLibPromise = null;
+async function extractPdf(buf) {
+  if (!pdfjsLibPromise) pdfjsLibPromise = import(PDFJS_URL).then(m => { m.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; return m; });
+  const pdfjsLib = await pdfjsLibPromise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const parts = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    let s = '';
+    for (const it of tc.items) { s += it.str || ''; s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : ''); }
+    s = s.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+    parts.push('--- Page ' + i + ' ---\n' + (s || '(no text)'));
+    if (i % 10 === 0) setStatus('Reading PDF… page ' + i + ' of ' + pdf.numPages);
+  }
+  return { units: pdf.numPages, unitName: 'pages', parts };
+}
+
+async function extractTxt(file) {
+  const text = await file.text();
+  return { units: null, unitName: '', parts: text.split(/\n{2,}/).map(s => s.trim()).filter(Boolean) };
+}
+
+async function extractFile(file) {
+  const name = file.name.toLowerCase();
+  const ext = name.slice(name.lastIndexOf('.') + 1);
+  if (ext === 'txt') return Object.assign({ kind: 'txt' }, await extractTxt(file));
+  const buf = await file.arrayBuffer();
+  if (ext === 'pptx') return Object.assign({ kind: 'pptx' }, await extractPptx(buf));
+  if (ext === 'docx') return Object.assign({ kind: 'docx' }, await extractDocx(buf));
+  if (ext === 'pdf') return Object.assign({ kind: 'pdf' }, await extractPdf(buf));
+  if (ext === 'ppt' || ext === 'doc') throw new Error('Old .' + ext + ' files can\'t be read. Open it and "Save As" .' + ext + 'x first.');
+  throw new Error('Unsupported file type. Use .pptx, .docx, .pdf or .txt.');
+}
+
+// Split into ~CHUNK_TARGET character chunks on slide/page/paragraph boundaries.
+function makeChunks(parts) {
+  const chunks = []; let cur = '';
+  const push = () => { if (cur.trim()) chunks.push(cur.trim()); cur = ''; };
+  for (let p of parts) {
+    while (p.length > CHUNK_MAX) { // a single huge part: hard split
+      push(); chunks.push(p.slice(0, CHUNK_TARGET)); p = p.slice(CHUNK_TARGET);
+    }
+    if (cur.length && cur.length + p.length + 2 > CHUNK_TARGET) push();
+    cur += (cur ? '\n\n' : '') + p;
+  }
+  push();
+  // Merge a tiny last chunk into the previous one if it still fits.
+  if (chunks.length > 1 && chunks[chunks.length - 1].length < 5000 && chunks[chunks.length - 2].length + chunks[chunks.length - 1].length <= CHUNK_MAX) {
+    const last = chunks.pop(); chunks[chunks.length - 1] += '\n\n' + last;
+  }
+  return chunks;
+}
+
+// Plan the Worker calls: spread `total` questions over chunks by size.
+function planRequests(chunks, total) {
+  const totalLen = chunks.reduce((s, c) => s + c.length, 0) || 1;
+  let use = chunks.map((c, i) => i);
+  const maxReq = Math.max(1, Math.floor(total / MIN_PER_REQUEST));
+  if (use.length > maxReq) { // too few questions for every chunk: pick evenly spaced chunks
+    use = Array.from({ length: maxReq }, (_, k) => Math.floor((k + 0.5) * chunks.length / maxReq));
+  }
+  const useLen = use.reduce((s, i) => s + chunks[i].length, 0) || totalLen;
+  const raw = use.map(i => total * chunks[i].length / useLen);
+  const counts = raw.map(r => Math.max(1, Math.floor(r)));
+  let diff = total - counts.reduce((a, b) => a + b, 0);
+  const order = raw.map((r, k) => [r - Math.floor(r), k]).sort((a, b) => b[0] - a[0]);
+  for (let j = 0; diff > 0; j = (j + 1) % order.length, diff--) counts[order[j][1]]++;
+  for (let k = counts.length - 1; diff < 0 && k >= 0; k--) while (counts[k] > 1 && diff < 0) { counts[k]--; diff++; }
+  const reqs = [];
+  use.forEach((ci, k) => {
+    const text = chunks[ci], n = counts[k];
+    const pieces = Math.ceil(n / PER_REQUEST_MAX);
+    if (pieces <= 1) { reqs.push({ text, count: n, chunk: ci }); return; }
+    // Too many questions for one call: split this chunk's text so each call covers different material.
+    const size = Math.ceil(text.length / pieces);
+    for (let p = 0; p < pieces; p++) {
+      const sub = text.slice(p * size, (p + 1) * size);
+      const c = Math.floor(n / pieces) + (p < n % pieces ? 1 : 0);
+      if (sub.trim().length > 40 && c > 0) reqs.push({ text: sub, count: c, chunk: ci });
+    }
+  });
+  return reqs;
+}
+
+// ===================== UPLOAD UI =====================
+let extracted = null;  // {fileName, kind, units, unitName, text, chunks}
+let genOpts = { count: 25, type: 'mix' };
+let cancelGen = false;
+
+function setStatus(msg) { $('genMsg').textContent = msg; }
+function showError(msg) { const e = $('genError'); e.textContent = msg; e.classList.toggle('hidden', !msg); }
+
+function chipGroup(id, onPick) {
+  $(id).addEventListener('click', ev => {
+    const b = ev.target.closest('.chip'); if (!b) return;
+    $(id).querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === b));
+    onPick(b.dataset.v);
+  });
+}
+chipGroup('countChips', v => {
+  $('customCount').classList.toggle('hidden', v !== 'custom');
+  if (v === 'custom') { $('customCount').focus(); genOpts.count = parseInt($('customCount').value, 10) || 0; }
+  else genOpts.count = parseInt(v, 10);
+  updateGenBtn();
+});
+$('customCount').addEventListener('input', () => { genOpts.count = Math.min(MAX_TOTAL, parseInt($('customCount').value, 10) || 0); updateGenBtn(); });
+chipGroup('typeChips', v => { genOpts.type = v; });
+
+function updateGenBtn() {
+  const b = $('genBtn');
+  if (!extracted) { b.disabled = true; b.textContent = 'Choose a file first'; return; }
+  const n = genOpts.count;
+  if (!n || n < 1 || n > MAX_TOTAL) { b.disabled = true; b.textContent = 'Pick 1 to ' + MAX_TOTAL + ' questions'; return; }
+  b.disabled = false;
+  b.textContent = IS_CONNECTED ? 'Make ' + n + ' questions' : 'Make ' + n + ' questions (not connected yet)';
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  showError(''); extracted = null; updateGenBtn();
+  const info = $('fileInfo');
+  info.classList.remove('hidden');
+  info.textContent = 'Reading ' + file.name + '…';
+  if (file.size > 300 * 1024 * 1024) { info.textContent = 'That file is over 300 MB — too big to read on a phone.'; return; }
+  try {
+    const r = await extractFile(file);
+    const text = r.parts.join('\n\n');
+    const chunks = makeChunks(r.parts);
+    extracted = { fileName: file.name, kind: r.kind, units: r.units, unitName: r.unitName, text, chunks };
+    info.innerHTML = '';
+    const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
+    info.append(el('div', null, '📄 ', el('b', null, file.name)));
+    info.append(el('div', { class: 'muted' }, [unitsTxt, fmtNum(text.length) + ' characters', chunks.length > 1 ? 'sent in ' + chunks.length + ' parts' : ''].filter(Boolean).join(' · ')));
+    if (text.replace(/--- (Slide|Page) \d+ ---|\(no text\)/g, '').trim().length < 200) {
+      info.append(el('div', { style: 'color:#ffd700;margin-top:0.3rem' }, 'Very little text found. If this is a scanned PDF or slides that are just pictures, the AI can\'t read them.'));
+    }
+  } catch (e) {
+    console.error(e);
+    info.textContent = 'Could not read that file: ' + (e.message || e);
+  }
+  updateGenBtn();
+}
+$('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+const drop = $('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+
+if (!IS_CONNECTED) $('notConnected').classList.remove('hidden');
+$('demoLink').addEventListener('click', e => { e.preventDefault(); startDemo(); });
+$('demoBtn').addEventListener('click', startDemo);
+$('cancelBtn').addEventListener('click', () => { cancelGen = true; setStatus('Stopping after this part…'); });
+
+async function callWorker(req, focus) {
+  const res = await fetch(WORKER_URL, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: req.text, count: req.count, type: genOpts.type, focus })
+  });
+  let data = null; try { data = await res.json(); } catch (e) { /* ignore */ }
+  if (!res.ok) { const err = new Error((data && data.message) || ('Worker error ' + res.status)); err.status = res.status; err.data = data || {}; throw err; }
+  return data;
+}
+
+$('genBtn').addEventListener('click', async () => {
+  if (!extracted) return;
+  showError('');
+  if (!IS_CONNECTED) {
+    showError('Not connected yet: the Worker URL hasn\'t been added to this page. Follow worker/SETUP.md, then paste the URL into WORKER_URL. Meanwhile, try the demo quiz below.');
+    return;
+  }
+  const total = Math.min(MAX_TOTAL, genOpts.count);
+  const focus = $('focus').value.trim();
+  const reqs = planRequests(extracted.chunks, total);
+  const all = []; const seen = new Set();
+  cancelGen = false;
+  $('genBtn').disabled = true; $('genStatus').classList.remove('hidden');
+  const bar = $('genBar');
+  let stopMsg = '';
+  for (let i = 0; i < reqs.length && !cancelGen; i++) {
+    setStatus('Making questions… part ' + (i + 1) + ' of ' + reqs.length + ' (' + all.length + ' so far)');
+    bar.style.width = Math.round(i / reqs.length * 100) + '%';
+    let tries = 0;
+    while (true) {
+      try {
+        const data = await callWorker(reqs[i], focus);
+        for (const q of data.questions || []) {
+          const k = q.question.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          if (!seen.has(k)) { seen.add(k); all.push(q); }
+        }
+        break;
+      } catch (e) {
+        tries++;
+        const d = e.data || {};
+        if (e.status === 429 && !d.perDay && tries <= 3) {
+          const wait = Math.min(90, Math.max(20, d.retryAfterSeconds || 60));
+          for (let s = wait; s > 0 && !cancelGen; s--) { setStatus('Free limit hit — waiting ' + s + 's, then continuing (part ' + (i + 1) + ' of ' + reqs.length + ')'); await sleep(1000); }
+          if (cancelGen) break;
+          continue;
+        }
+        if (!e.status && tries <= 1) { await sleep(3000); continue; } // network blip: one retry
+        stopMsg = e.message || 'Something went wrong.';
+        break;
+      }
+    }
+    if (stopMsg) break;
+    if (i < reqs.length - 1 && !cancelGen) await sleep(GAP_MS);
+  }
+  bar.style.width = '100%';
+  $('genStatus').classList.add('hidden'); updateGenBtn();
+  if (!all.length) { showError(stopMsg || 'No questions were made.'); return; }
+  if (stopMsg) showError(stopMsg + ' Kept the ' + all.length + ' questions made so far.');
+  const deck = await saveDeckSafe({
+    id: DeckStore.newId(),
+    name: extracted.fileName.replace(/\.[^.]+$/, ''),
+    createdAt: new Date().toISOString(),
+    source: { fileName: extracted.fileName, kind: extracted.kind, units: extracted.units, chars: extracted.text.length },
+    settings: { count: total, type: genOpts.type, focus },
+    questions: shuffle(all).slice(0, total).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }, q)),
+    missed: [], attempts: []
+  });
+  startQuiz(deck, null, 'all');
+});
+
+async function saveDeckSafe(deck) {
+  try { return await DeckStore.save(deck); }
+  catch (e) { alert(e.message); deck.unsaved = true; return deck; }
+}
+
+// ===================== DEMO =====================
+const DEMO_QUESTIONS = [
+  { type: 'mc', question: 'What is the SI unit of absorbed dose?', choices: ['Gray (Gy)', 'Sievert (Sv)', 'Becquerel (Bq)', 'Coulomb per kilogram (C/kg)'], answerIndex: 0, explanation: 'Absorbed dose (energy deposited per kilogram of tissue) is measured in gray. Sievert is for equivalent/effective dose.', sourceHint: 'Demo: Radiation units' },
+  { type: 'short', question: 'What does ALARA stand for?', choices: [], answerIndex: -1, answer: 'As Low As Reasonably Achievable', explanation: 'ALARA means keeping radiation exposure as low as reasonably achievable.', sourceHint: 'Demo: Radiation protection' },
+  { type: 'mc', question: 'By the inverse square law, if the SID is doubled, the beam intensity becomes:', choices: ['Twice as strong', 'Half as strong', 'One-fourth as strong', 'Unchanged'], answerIndex: 2, explanation: 'Intensity is inversely proportional to the square of the distance: 2× the distance gives 1/4 the intensity.', sourceHint: 'Demo: Physics' },
+  { type: 'short', question: 'Name the three cardinal principles of radiation protection.', choices: [], answerIndex: -1, answer: 'Time, distance, shielding', explanation: 'Minimize time, maximize distance, and use shielding.', sourceHint: 'Demo: Radiation protection' },
+  { type: 'mc', question: 'For a PA Caldwell projection of the skull, which line is placed perpendicular to the IR?', choices: ['Infraorbitomeatal line (IOML)', 'Orbitomeatal line (OML)', 'Mentomeatal line (MML)', 'Glabellomeatal line (GML)'], answerIndex: 1, explanation: 'The OML is perpendicular to the IR, with the CR angled 15° caudad to exit at the nasion.', sourceHint: 'Demo: Skull positioning' },
+  { type: 'short', question: 'For a PA chest projection, the central ray is centered at the level of which vertebra?', choices: [], answerIndex: -1, answer: 'T7', explanation: 'The CR is centered to T7, about 7–8 inches below the vertebra prominens.', sourceHint: 'Demo: Chest positioning' },
+  { type: 'mc', question: 'Which projection best shows the intercondylar fossa of the knee?', choices: ['AP knee', 'Lateral knee', 'Tangential (sunrise) patella', 'PA axial (tunnel view)'], answerIndex: 3, explanation: 'The PA axial "tunnel" projection (e.g. Camp-Coventry or Holmblad) opens up the intercondylar fossa.', sourceHint: 'Demo: Knee positioning' },
+  { type: 'mc', question: 'Increasing kVp while adjusting mAs to keep exposure the same will mainly:', choices: ['Increase image contrast', 'Decrease image contrast (longer scale)', 'Increase spatial resolution', 'Increase motion blur'], answerIndex: 1, explanation: 'Higher kVp produces more penetrating photons and more scatter, giving lower contrast (a longer scale of grays).', sourceHint: 'Demo: Image quality' }
+].map(q => Object.assign({ answer: q.choices[q.answerIndex] }, q));
+
+function startDemo() {
+  const deck = {
+    id: 'demo', demo: true, name: 'Demo deck', createdAt: new Date().toISOString(),
+    source: { fileName: '(sample questions)', kind: 'demo' }, settings: { count: 8, type: 'mix' },
+    questions: DEMO_QUESTIONS.map((q, i) => Object.assign({ id: 'demo' + i, stats: { right: 0, wrong: 0 } }, q)), missed: [], attempts: []
+  };
+  startQuiz(deck, null, 'all');
+}
+
+// ===================== GRADING =====================
+const STOP = new Set('a an the of and or to in on at for by with is are was be as it its this that from into than then per'.split(' '));
+const norm = s => String(s || '').toLowerCase().replace(/°/g, ' degrees ').replace(/[^a-z0-9.\s/-]/g, ' ').replace(/[\/-]/g, ' ').replace(/\.(?!\d)/g, ' ').replace(/\s+/g, ' ').trim();
+const stem = w => w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '');
+const words = s => norm(s).split(' ').filter(w => w && !STOP.has(w)).map(stem).filter(Boolean);
+function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1); // swapped letters
+  }
+  return d[a.length][b.length];
+}
+// Returns 'right', 'close' or 'wrong'. Lenient: exact, containment, or keyword overlap (typos OK).
+function gradeShort(user, answer) {
+  const u = norm(user), a = norm(answer);
+  if (!u) return 'wrong';
+  if (u === a) return 'right';
+  const aw = words(answer), uw = words(user);
+  if (!aw.length) return u.includes(a) ? 'right' : 'wrong';
+  if (aw.length === 1 && /\d/.test(aw[0])) return uw.includes(aw[0]) ? 'right' : 'wrong'; // numbers must match exactly
+  if (a.length >= 3 && (` ${u} `).includes(` ${a} `)) return 'right';
+  const hit = aw.filter(w => uw.some(x => x === w || (w.length >= 5 && lev(x, w) <= 1) || (w.length >= 8 && lev(x, w) <= 2))).length;
+  const ratio = hit / aw.length;
+  // Acronym typed for a phrase (e.g. "ALARA").
+  if (aw.length >= 3 && uw.length === 1 && norm(answer).split(' ').map(w => w[0]).join('') === u) return 'right';
+  if (ratio >= 0.7) return 'right';
+  if (ratio >= 0.34) return 'close';
+  return 'wrong';
+}
+
+// ===================== QUIZ =====================
+let quiz = null; // {deck, items, i, score, missed:[], answered, mode}
+
+function startQuiz(deck, onlyIds, mode) {
+  let items = deck.questions;
+  if (onlyIds) items = items.filter(q => onlyIds.includes(q.id));
+  quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode };
+  $('qDeckName').textContent = deck.name;
+  showScreen('quiz');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = quiz.items[quiz.i];
+  quiz.answered = false; quiz.current = q;
+  $('qProgress').textContent = 'Question ' + (quiz.i + 1) + ' of ' + quiz.items.length;
+  $('qScore').textContent = 'Score: ' + quiz.score;
+  $('qBar').style.width = Math.round(quiz.i / quiz.items.length * 100) + '%';
+  $('qType').textContent = q.type === 'mc' ? 'Multiple choice' : 'Short answer';
+  $('qText').textContent = q.question;
+  const body = $('qBody'); body.innerHTML = '';
+  $('qFeedback').className = 'hidden'; $('qFeedback').innerHTML = '';
+  $('nextBtn').classList.add('hidden'); $('overrideBtn').classList.add('hidden');
+  if (q.type === 'mc') {
+    $('checkBtn').classList.add('hidden');
+    const box = el('div', { class: 'mc-options' });
+    shuffle(q.choices.map((c, idx) => ({ c, idx }))).forEach(o => {
+      box.append(el('button', { class: 'mc-opt', 'data-idx': o.idx, onclick: () => answerMC(o.idx) }, o.c));
+    });
+    body.append(box);
+  } else {
+    $('checkBtn').classList.remove('hidden');
+    const inp = el('input', { type: 'text', id: 'shortInput', placeholder: 'Type your answer', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); quiz.answered ? nextQuestion() : answerShort(); } });
+    body.append(inp);
+  }
+}
+
+function showFeedback(kind, headline, q) {
+  const fb = $('qFeedback');
+  fb.className = 'feedback ' + kind; fb.innerHTML = '';
+  fb.append(el('div', { style: 'font-weight:600' }, headline));
+  const ans = el('div', { class: 'answer' });
+  if (kind !== 'good') ans.append(el('div', null, el('b', null, 'Answer: '), q.answer));
+  if (q.explanation) ans.append(el('div', null, q.explanation));
+  if (q.sourceHint) ans.append(el('div', { class: 'src' }, '📍 ' + q.sourceHint));
+  fb.append(ans);
+}
+
+function finishAnswer(correct, kind, headline) {
+  const q = quiz.current;
+  quiz.answered = true;
+  if (correct) { quiz.score++; launchConfetti(); }
+  else { quiz.missed.push(q.id); if (kind === 'bad') wrongAnswerEffect(); }
+  showFeedback(kind, headline, q);
+  $('qScore').textContent = 'Score: ' + quiz.score;
+  $('checkBtn').classList.add('hidden');
+  $('nextBtn').classList.remove('hidden');
+  $('nextBtn').textContent = quiz.i + 1 < quiz.items.length ? 'Next' : 'See results';
+  if (!quiz.deck.demo && !quiz.deck.unsaved) DeckStore.recordAnswer(quiz.deck.id, q.id, correct).catch(() => {});
+}
+
+function answerMC(idx) {
+  if (quiz.answered) return;
+  const q = quiz.current;
+  document.querySelectorAll('.mc-opt').forEach(b => {
+    b.disabled = true;
+    const bi = +b.dataset.idx;
+    if (bi === q.answerIndex) b.classList.add('right');
+    else if (bi === idx) b.classList.add('wrong');
+  });
+  const ok = idx === q.answerIndex;
+  finishAnswer(ok, ok ? 'good' : 'bad', ok ? '✓ Correct!' : '✗ Not quite');
+}
+
+function answerShort() {
+  if (quiz.answered) return;
+  const inp = $('shortInput'); const val = inp.value.trim();
+  if (!val) { inp.focus(); return; }
+  inp.disabled = true;
+  const g = gradeShort(val, quiz.current.answer);
+  if (g === 'right') finishAnswer(true, 'good', '✓ Correct!');
+  else {
+    finishAnswer(false, g === 'close' ? 'close' : 'bad', g === 'close' ? '≈ Close — check the answer' : '✗ Not quite');
+    $('overrideBtn').classList.remove('hidden');
+  }
+}
+
+$('checkBtn').addEventListener('click', answerShort);
+$('nextBtn').addEventListener('click', nextQuestion);
+$('overrideBtn').addEventListener('click', () => {
+  const q = quiz.current;
+  quiz.missed = quiz.missed.filter(id => id !== q.id);
+  quiz.score++; $('qScore').textContent = 'Score: ' + quiz.score;
+  $('overrideBtn').classList.add('hidden');
+  showFeedback('good', '✓ Counted as correct', q);
+  launchConfetti();
+  if (!quiz.deck.demo && !quiz.deck.unsaved) DeckStore.recordAnswer(quiz.deck.id, q.id, true).catch(() => {});
+});
+$('quitBtn').addEventListener('click', () => { if (quiz.i === 0 && !quiz.answered) { showScreen('upload'); return; } showResults(true); });
+
+function nextQuestion() {
+  if (quiz.i + 1 < quiz.items.length) { quiz.i++; renderQuestion(); }
+  else showResults(false);
+}
+
+function showResults(early) {
+  const answered = quiz.i + (quiz.answered ? 1 : 0);
+  const total = early ? answered : quiz.items.length;
+  $('rDeck').textContent = quiz.deck.name + (early ? ' (ended early)' : '');
+  $('rScore').textContent = quiz.score + ' / ' + total;
+  $('rPct').textContent = total ? Math.round(quiz.score / total * 100) + '%' : '';
+  if (!quiz.deck.demo && !quiz.deck.unsaved && total) DeckStore.recordAttempt(quiz.deck.id, quiz.score, total, quiz.mode).catch(() => {});
+  const list = $('missedList'); list.innerHTML = '';
+  const missedQs = quiz.items.filter(q => quiz.missed.includes(q.id));
+  $('missedCard').classList.toggle('hidden', !missedQs.length);
+  $('retryMissedBtn').classList.toggle('hidden', !missedQs.length);
+  $('saveDemoBtn').classList.toggle('hidden', !quiz.deck.demo);
+  for (const q of missedQs) {
+    const d = el('div', { class: 'miss' });
+    d.append(el('div', { style: 'font-weight:600' }, q.question));
+    const a = el('div', { class: 'answer' }, el('div', null, el('b', null, 'Answer: '), q.answer));
+    if (q.explanation) a.append(el('div', null, q.explanation));
+    if (q.sourceHint) a.append(el('div', { class: 'src' }, '📍 ' + q.sourceHint));
+    d.append(a); list.append(d);
+  }
+  quiz.lastMissed = missedQs.map(q => q.id);
+  showScreen('results');
+}
+$('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed'));
+$('retakeBtn').addEventListener('click', () => startQuiz(quiz.deck, null, 'all'));
+$('doneBtn').addEventListener('click', () => { if (quiz.deck.demo) showScreen('upload'); else { renderDecks(); showScreen('decks'); } });
+$('saveDemoBtn').addEventListener('click', async () => {
+  const d = Object.assign({}, quiz.deck, { id: DeckStore.newId(), demo: false, name: 'Demo deck' });
+  d.questions = d.questions.map(q => Object.assign({}, q, { id: DeckStore.newId() }));
+  await saveDeckSafe(d); $('saveDemoBtn').textContent = 'Saved ✓'; $('saveDemoBtn').disabled = true;
+});
+
+// ===================== MY DECKS UI =====================
+async function renderDecks() {
+  const list = $('deckList'); list.innerHTML = '';
+  const decks = await DeckStore.list();
+  if (!decks.length) { list.append(el('div', { class: 'muted' }, 'No saved decks yet. Upload notes to make one.')); return; }
+  for (const d of decks) {
+    const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
+    const row = el('div', { class: 'deck' });
+    row.append(el('div', { class: 'name' }, d.name));
+    row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : ''].filter(Boolean).join(' · ')));
+    const btns = el('div', { class: 'row' });
+    btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
+    if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
+    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
+    btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+    row.append(btns); list.append(row);
+  }
+}
+$('exportBtn').addEventListener('click', async () => {
+  const blob = new Blob([await DeckStore.exportJSON()], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: 'xraysavvy-decks-' + new Date().toISOString().slice(0, 10) + '.json' });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  $('deckMsg').textContent = 'Exported. On iPhone, choose "Save to Files".';
+});
+$('importInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const n = await DeckStore.importJSON(await f.text()); $('deckMsg').textContent = 'Imported ' + n + ' deck(s).'; renderDecks(); }
+  catch (err) { $('deckMsg').textContent = 'Import failed: ' + (err.message || 'not a valid backup file'); }
+  e.target.value = '';
+});
+
+updateGenBtn();
+if (/[?&]demo=1/.test(location.search)) startDemo();
+</script>
+</body>
+</html>
