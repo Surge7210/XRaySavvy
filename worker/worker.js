@@ -1,6 +1,11 @@
-// XRaySavvy quiz generator - Cloudflare Worker (module syntax)
+// XRaySavvy study helper - Cloudflare Worker (module syntax)
 // Receives study-note text from upload.html and asks Google Gemini (free tier)
-// to write quiz questions from it. The Gemini key lives ONLY in the Worker
+// to write quiz questions, section summaries and explanations from it.
+// Actions (POST JSON field "action"):
+//   'questions' (default) {text, count, type, focus}      -> {questions[]}
+//   'section'   {text, title, count, type}               -> {title, summary, keyPoints[], questions[]}
+//   'explain'   {text, style:'simple'|'detail', summary} -> {explanation}
+//   'ask'       {text, question, context}                -> {answer, inNotes} The Gemini key lives ONLY in the Worker
 // secret GEMINI_API_KEY (Settings > Variables and Secrets). Never paste it here.
 
 // ---- Settings you might change ----
@@ -14,6 +19,9 @@ const MAX_TEXT_CHARS = 60000;       // text per request (the page sends ~25-40k 
 const MIN_TEXT_CHARS = 40;
 const MAX_COUNT = 50;               // questions per request (the page splits bigger jobs)
 const MAX_FOCUS_CHARS = 300;
+const MAX_QUESTION_CHARS = 500;     // 'ask' question length
+const MAX_SUMMARY_CHARS = 4000;     // summary sent back with 'explain'
+const MAX_SECTION_QUESTIONS = 6;
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
 
 const RESPONSE_SCHEMA = {
@@ -127,6 +135,188 @@ function sanitize(list, wantType) {
   return out;
 }
 
+// Same question object as above, reused inside the section schema.
+const QUESTION_ITEM = RESPONSE_SCHEMA.properties.questions.items;
+
+const SECTION_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    title: { type: 'STRING', description: 'Short section title (2-8 words) taken from the notes headings' },
+    summary: { type: 'STRING', description: '80-150 words. Plain sentences. Wrap the most important key terms in **double asterisks**.' },
+    keyPoints: { type: 'ARRAY', items: { type: 'STRING' }, description: '3-5 short bullet facts to remember' },
+    questions: { type: 'ARRAY', items: QUESTION_ITEM }
+  },
+  required: ['title', 'summary', 'keyPoints', 'questions'],
+  propertyOrdering: ['title', 'summary', 'keyPoints', 'questions']
+};
+
+const EXPLAIN_SCHEMA = {
+  type: 'OBJECT',
+  properties: { explanation: { type: 'STRING' } },
+  required: ['explanation']
+};
+
+const ASK_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    inNotes: { type: 'BOOLEAN', description: 'true only if the notes contain the answer' },
+    answer: { type: 'STRING' }
+  },
+  required: ['inNotes', 'answer'],
+  propertyOrdering: ['inNotes', 'answer']
+};
+
+const NOTES_ONLY = 'IMPORTANT: Use ONLY facts stated in the provided notes. Do not add outside knowledge or invent numbers, angles or steps. Keep medical and technical accuracy: never change a fact to make it simpler.';
+
+function notesBlock(text, label) {
+  return ['', '=== ' + (label || 'STUDY NOTES') + ' START ===', text, '=== ' + (label || 'STUDY NOTES') + ' END ==='].join('\n');
+}
+
+function buildSectionPrompt(text, title, count, type) {
+  const typeRule = type === 'mc'
+    ? 'Every question is multiple choice (type "mc") with exactly 4 choices.'
+    : type === 'short'
+      ? 'Every question is short answer (type "short"): choices = [], answerIndex = -1, answer of 1-6 words.'
+      : 'Mix multiple choice (type "mc", exactly 4 choices) and short answer (type "short", choices = [], answerIndex = -1, answer of 1-6 words).';
+  return [
+    'You are a friendly tutor helping a radiologic technology student learn one section of their class notes.',
+    title ? 'The section is probably about: "' + title + '".' : '',
+    NOTES_ONLY,
+    'Return:',
+    '- title: a short, clear title for this section (2-8 words) based on its headings.',
+    '- summary: a smart summary of 80-150 words that teaches the main ideas in order, in plain sentences. Wrap the most important key terms in **double asterisks** (about 3-8 terms).',
+    '- keyPoints: 3-5 short bullet facts worth memorizing (no asterisks).',
+    '- questions: exactly ' + count + ' quiz questions covering the most testable facts in THIS section only. ' + typeRule,
+    'For multiple choice: wrong choices must be plausible but clearly wrong according to the notes; vary the position of the correct answer; answer must equal choices[answerIndex].',
+    'Each explanation: 1-2 sentences using the notes. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the notes if present.',
+    'Do not ask about slide numbers, file names, or formatting.',
+    notesBlock(text, 'SECTION NOTES')
+  ].filter(Boolean).join('\n');
+}
+
+function buildExplainPrompt(text, style, summary) {
+  const how = style === 'simple'
+    ? [
+      'The student said "um dumb it down pls.." - they are confused. Re-explain this section so a beginner gets it.',
+      'Use very simple, everyday words and short sentences. Define any unavoidable technical term in plain words right after it.',
+      'Include exactly ONE everyday analogy (e.g. comparing something to a flashlight, a garden hose, a camera). Label it with "Think of it like:".',
+      'Keep it to about 80-160 words. You may use **double asterisks** for 2-4 key terms. Still keep every fact correct.'
+    ]
+    : [
+      'The student wants MORE DETAIL on this section. Go deeper than the summary: explain the why/how, list specifics (numbers, angles, positions, relationships) and how the ideas connect.',
+      'Only use details that are actually in the notes. If the notes do not go deeper on something, do not make it up.',
+      'Use short paragraphs or "- " bullet lines, about 150-300 words. Use **double asterisks** for key terms.'
+    ];
+  return [
+    'You are a friendly tutor helping a radiologic technology student with one section of their class notes.',
+    NOTES_ONLY,
+    ...how,
+    summary ? '\nThe student already read this summary:\n' + summary : '',
+    notesBlock(text, 'SECTION NOTES')
+  ].filter(Boolean).join('\n');
+}
+
+function buildAskPrompt(text, question, context) {
+  return [
+    'You are a friendly tutor answering a radiologic technology student\'s question about their class notes.',
+    NOTES_ONLY,
+    'Answer the question using the SECTION NOTES first; you may also use the OTHER NOTES FROM THE SAME FILE if given.',
+    'If the notes do not contain the answer, set inNotes to false and say plainly that it isn\'t covered in their notes (you may say what the notes DO cover that is related). Do not answer from outside knowledge.',
+    'If the notes do contain it, set inNotes to true and answer in 1-5 short sentences in simple words. You may use **double asterisks** for key terms and mention the slide/page if helpful.',
+    '',
+    'STUDENT QUESTION: ' + question,
+    notesBlock(text, 'SECTION NOTES'),
+    context ? notesBlock(context, 'OTHER NOTES FROM THE SAME FILE') : ''
+  ].filter(Boolean).join('\n');
+}
+
+// Multi-line text cleanup (keeps paragraph breaks and "- " bullets).
+function cleanText(v, max) {
+  return (typeof v === 'string' ? v : v == null ? '' : String(v))
+    .replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
+}
+
+// Calls Gemini and returns either {parsed} or {error: Response}.
+async function callGemini(env, cors, prompt, schema, opts) {
+  opts = opts || {};
+  let gRes;
+  try {
+    gRes = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: schema,
+          temperature: opts.temperature == null ? 0.4 : opts.temperature,
+          maxOutputTokens: opts.maxOutputTokens || 16384
+        }
+      })
+    });
+  } catch (e) {
+    return { error: json({ error: 'network', message: 'Could not reach Google Gemini. Try again in a moment.' }, 502, cors) };
+  }
+
+  if (gRes.status === 429) {
+    let retryAfterSeconds = null, perDay = false;
+    try {
+      const err = await gRes.json();
+      const details = (err.error && err.error.details) || [];
+      for (const d of details) {
+        if (d['@type'] && d['@type'].includes('RetryInfo') && d.retryDelay) retryAfterSeconds = Math.ceil(parseFloat(d.retryDelay));
+        if (d['@type'] && d['@type'].includes('QuotaFailure')) {
+          for (const v of d.violations || []) if (/PerDay/i.test(v.quotaId || '')) perDay = true;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    return {
+      error: json({
+        error: 'rate_limit',
+        perDay,
+        retryAfterSeconds,
+        message: perDay
+          ? "Gemini's free daily limit is used up. It resets at midnight Pacific time (2 AM Central). Your progress so far is kept."
+          : "Gemini's free tier is busy (too many requests per minute). Wait about a minute and try again."
+      }, 429, cors)
+    };
+  }
+
+  if (!gRes.ok) {
+    let detail = '';
+    try { const e = await gRes.json(); detail = (e.error && e.error.message) || ''; } catch (e) { /* ignore */ }
+    const keyProblem = gRes.status === 400 && /api key/i.test(detail) || gRes.status === 401 || gRes.status === 403;
+    return {
+      error: json({
+        error: keyProblem ? 'bad_key' : 'gemini_error',
+        status: gRes.status,
+        message: keyProblem
+          ? 'Google rejected the API key. Check the GEMINI_API_KEY secret in the Worker settings.'
+          : 'Gemini returned an error (' + gRes.status + '). ' + detail.slice(0, 200)
+      }, 502, cors)
+    };
+  }
+
+  let data;
+  try { data = await gRes.json(); } catch (e) {
+    return { error: json({ error: 'bad_response', message: 'Gemini sent back something unreadable. Try again.' }, 502, cors) };
+  }
+  const cand = data.candidates && data.candidates[0];
+  const out = cand && cand.content && Array.isArray(cand.content.parts)
+    ? cand.content.parts.filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('') : '';
+  try { return { parsed: JSON.parse(out) }; } catch (e) {
+    const reason = cand && cand.finishReason;
+    return {
+      error: json({
+        error: 'bad_response',
+        message: reason === 'MAX_TOKENS' ? 'Gemini ran out of room. Try a smaller request.'
+          : reason === 'SAFETY' ? 'Gemini blocked this text for safety reasons.'
+          : 'Gemini did not return a usable answer. Try again.'
+      }, 502, cors)
+    };
+  }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -136,7 +326,7 @@ export default {
       return new Response(null, { status: cors.ok ? 204 : 403, headers: cors.headers });
     }
     if (request.method === 'GET') {
-      return json({ ok: true, service: 'XRaySavvy quiz worker', model: MODEL, keySet: !!env.GEMINI_API_KEY }, 200, cors);
+      return json({ ok: true, service: 'XRaySavvy quiz worker', model: MODEL, keySet: !!env.GEMINI_API_KEY, actions: ['questions', 'section', 'explain', 'ask'] }, 200, cors);
     }
     if (request.method !== 'POST') return json({ error: 'method', message: 'Use POST.' }, 405, cors);
     if (origin && !cors.ok) return json({ error: 'origin', message: 'This site is not allowed to use this Worker.' }, 403, cors);
@@ -156,87 +346,67 @@ export default {
     } catch (e) {
       return json({ error: 'bad_json', message: 'Request was not valid JSON.' }, 400, cors);
     }
+    if (!body || typeof body !== 'object') return json({ error: 'bad_json', message: 'Request was not valid JSON.' }, 400, cors);
+
+    const action = body.action == null || body.action === '' ? 'questions' : body.action;
+    if (!['questions', 'section', 'explain', 'ask'].includes(action)) {
+      return json({ error: 'bad_action', message: 'Unknown action "' + cleanStr(action, 40) + '".' }, 400, cors);
+    }
 
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (text.length < MIN_TEXT_CHARS) return json({ error: 'too_short', message: 'Not enough text to make questions from.' }, 400, cors);
+    if (text.length < MIN_TEXT_CHARS) return json({ error: 'too_short', message: 'Not enough text to work with.' }, 400, cors);
     if (text.length > MAX_TEXT_CHARS) return json({ error: 'too_large', message: 'Text chunk is over ' + MAX_TEXT_CHARS + ' characters.' }, 413, cors);
-    const count = Math.max(1, Math.min(MAX_COUNT, parseInt(body.count, 10) || 10));
     const type = ['mc', 'short', 'mix'].includes(body.type) ? body.type : 'mix';
-    const focus = cleanStr(body.focus, MAX_FOCUS_CHARS);
 
-    let gRes;
-    try {
-      gRes = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: buildPrompt(text, count, type, focus) }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-            temperature: 0.4,
-            maxOutputTokens: 16384
-          }
-        })
-      });
-    } catch (e) {
-      return json({ error: 'network', message: 'Could not reach Google Gemini. Try again in a moment.' }, 502, cors);
+    // ---- Quiz questions (Exam Cram) ----
+    if (action === 'questions') {
+      const count = Math.max(1, Math.min(MAX_COUNT, parseInt(body.count, 10) || 10));
+      const focus = cleanStr(body.focus, MAX_FOCUS_CHARS);
+      const r = await callGemini(env, cors, buildPrompt(text, count, type, focus), RESPONSE_SCHEMA);
+      if (r.error) return r.error;
+      const questions = sanitize(Array.isArray(r.parsed) ? r.parsed : r.parsed.questions, type);
+      if (!questions.length) return json({ error: 'empty', message: 'Gemini could not make questions from this text.' }, 502, cors);
+      return json({ questions, model: MODEL }, 200, cors);
     }
 
-    if (gRes.status === 429) {
-      let retryAfterSeconds = null, perDay = false;
-      try {
-        const err = await gRes.json();
-        const details = (err.error && err.error.details) || [];
-        for (const d of details) {
-          if (d['@type'] && d['@type'].includes('RetryInfo') && d.retryDelay) retryAfterSeconds = Math.ceil(parseFloat(d.retryDelay));
-          if (d['@type'] && d['@type'].includes('QuotaFailure')) {
-            for (const v of d.violations || []) if (/PerDay/i.test(v.quotaId || '')) perDay = true;
-          }
-        }
-      } catch (e) { /* ignore */ }
+    // ---- Learn mode: one section's summary + questions ----
+    if (action === 'section') {
+      const count = Math.max(1, Math.min(MAX_SECTION_QUESTIONS, parseInt(body.count, 10) || 3));
+      const title = cleanStr(body.title, 120);
+      const r = await callGemini(env, cors, buildSectionPrompt(text, title, count, type), SECTION_SCHEMA);
+      if (r.error) return r.error;
+      const p = r.parsed || {};
+      const summary = cleanText(p.summary, 2500);
+      if (!summary) return json({ error: 'empty', message: 'Gemini could not summarize this section. Try again.' }, 502, cors);
       return json({
-        error: 'rate_limit',
-        perDay,
-        retryAfterSeconds,
-        message: perDay
-          ? "Gemini's free daily limit is used up. It resets at midnight Pacific time (2 AM Central). Your questions so far are kept."
-          : "Gemini's free tier is busy (too many requests per minute). Wait about a minute and try again."
-      }, 429, cors);
+        title: cleanStr(p.title, 120) || title || 'Section',
+        summary,
+        keyPoints: (Array.isArray(p.keyPoints) ? p.keyPoints : []).map(k => cleanStr(k, 300).replace(/\*\*/g, '')).filter(Boolean).slice(0, 6),
+        questions: sanitize(p.questions, type).slice(0, count),
+        model: MODEL
+      }, 200, cors);
     }
 
-    if (!gRes.ok) {
-      let detail = '';
-      try { const e = await gRes.json(); detail = (e.error && e.error.message) || ''; } catch (e) { /* ignore */ }
-      const keyProblem = gRes.status === 400 && /api key/i.test(detail) || gRes.status === 401 || gRes.status === 403;
-      return json({
-        error: keyProblem ? 'bad_key' : 'gemini_error',
-        status: gRes.status,
-        message: keyProblem
-          ? 'Google rejected the API key. Check the GEMINI_API_KEY secret in the Worker settings.'
-          : 'Gemini returned an error (' + gRes.status + '). ' + detail.slice(0, 200)
-      }, 502, cors);
+    // ---- Learn mode: "um dumb it down pls.." / "More detail" ----
+    if (action === 'explain') {
+      const style = body.style === 'detail' ? 'detail' : 'simple';
+      const summary = cleanText(body.summary, MAX_SUMMARY_CHARS);
+      const r = await callGemini(env, cors, buildExplainPrompt(text, style, summary), EXPLAIN_SCHEMA, { temperature: style === 'simple' ? 0.6 : 0.4, maxOutputTokens: 8192 });
+      if (r.error) return r.error;
+      const explanation = cleanText(r.parsed && r.parsed.explanation, 5000);
+      if (!explanation) return json({ error: 'empty', message: 'Gemini did not send an explanation. Try again.' }, 502, cors);
+      return json({ style, explanation, model: MODEL }, 200, cors);
     }
 
-    let data;
-    try { data = await gRes.json(); } catch (e) {
-      return json({ error: 'bad_response', message: 'Gemini sent back something unreadable. Try again.' }, 502, cors);
-    }
-    const cand = data.candidates && data.candidates[0];
-    const out = cand && cand.content && Array.isArray(cand.content.parts)
-      ? cand.content.parts.filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('') : '';
-    let parsed;
-    try { parsed = JSON.parse(out); } catch (e) {
-      const reason = cand && cand.finishReason;
-      return json({
-        error: 'bad_response',
-        message: reason === 'MAX_TOKENS' ? 'Gemini ran out of room. Try fewer questions.'
-          : reason === 'SAFETY' ? 'Gemini blocked this chunk for safety reasons.'
-          : 'Gemini did not return quiz questions. Try again.'
-      }, 502, cors);
-    }
-    const questions = sanitize(Array.isArray(parsed) ? parsed : parsed.questions, type);
-    if (!questions.length) return json({ error: 'empty', message: 'Gemini could not make questions from this text.' }, 502, cors);
-    return json({ questions, model: MODEL }, 200, cors);
+    // ---- Learn mode: "Ask a question" (answered only from the notes) ----
+    const question = cleanStr(body.question, MAX_QUESTION_CHARS);
+    if (question.length < 2) return json({ error: 'no_question', message: 'Type a question first.' }, 400, cors);
+    let context = typeof body.context === 'string' ? body.context.trim() : '';
+    if (text.length + context.length > MAX_TEXT_CHARS) context = context.slice(0, Math.max(0, MAX_TEXT_CHARS - text.length));
+    const r = await callGemini(env, cors, buildAskPrompt(text, question, context), ASK_SCHEMA, { temperature: 0.3, maxOutputTokens: 4096 });
+    if (r.error) return r.error;
+    const answer = cleanText(r.parsed && r.parsed.answer, 3000);
+    if (!answer) return json({ error: 'empty', message: 'Gemini did not send an answer. Try again.' }, 502, cors);
+    return json({ question, answer, inNotes: !!(r.parsed && r.parsed.inNotes === true), model: MODEL }, 200, cors);
   }
 };

@@ -4,6 +4,18 @@ The Upload page (`upload.html`) reads your notes on your phone and sends only th
 **text** to a tiny free "Worker" on Cloudflare. The Worker holds your secret
 Google Gemini key and asks Gemini to write the questions.
 
+The same Worker powers both study modes:
+
+- **📖 Learn (in order)**: your file is split into sections of about 5–8 slides/pages. Each one
+  gets a short smart summary with the 3 buttons (**um dumb it down pls..**, **More detail**,
+  **Ask a question**), then 2–4 questions on just that part. A Final Review comes at the end.
+- **⚡ Exam Cram**: one big quiz on the whole file.
+
+> ✅ **Already done:** your Worker is made and its link
+> (`https://xraysavvy-ai.opsab10.workers.dev`) is already in `upload.html`.
+> It's still running the Cloudflare "Hello World" sample, so **you only need to do step B
+> (steps 7–10: paste the code) and step C (the key)**.
+
 You do this **once**. It takes about 10 minutes. Everything here is free.
 
 > ⚠️ **Two rules**
@@ -50,16 +62,24 @@ You do **not** need to add a credit card. The free tier is enough.
 
 Your key is now hidden inside Cloudflare. Nobody can see it, not even on GitHub.
 
-## D. Send me the Worker link
+## D. Check it's working
 
-1. On your Worker's page, find its link. It looks like:
-   `https://xraysavvy-quiz.YOUR-NAME.workers.dev`
-2. (Optional check) Open that link in your browser. You should see something like
-   `{"ok":true, ... "keySet":true}`. If it says `"keySet":false`, redo step C.
-3. **Copy that link and send it to Cohort 26.** This link is **not** secret, so it's fine to share.
-4. It gets pasted into `upload.html` at the top, in this line:
-   `const WORKER_URL = 'PASTE_WORKER_URL_HERE';`
-5. Then the "Not connected yet" message goes away and the **Make questions** button works.
+The Worker link (`https://xraysavvy-ai.opsab10.workers.dev`) is **already added** to
+`upload.html`, so there's nothing to paste here. This link is **not** secret.
+
+1. Open **https://xraysavvy-ai.opsab10.workers.dev** in your browser. You should see something like
+   `{"ok":true,"service":"XRaySavvy quiz worker", ... "keySet":true,"actions":["questions","section","explain","ask"]}`.
+2. Open the Upload page. The box at the top checks the Worker every time the page loads:
+
+| What the Upload page says | What it means | Fix |
+|---|---|---|
+| ✅ **AI connected and ready** | Everything works | Nothing! |
+| **Your Worker is set up, but the XRaySavvy code/key isn't added yet** | The Worker still has the Hello World sample (or can't be reached) | Do step B, steps 7–10 |
+| **Almost there! … the Gemini key isn't added yet** | Code is in, key is missing | Do step C |
+| **The Worker has an older version of the code** | Exam Cram works, Learn mode doesn't | Re-paste the newest `worker.js` (step B, 8–10) |
+
+Tap **Check again** in that box after you deploy, so you don't have to reload. The demo Learn deck and the
+demo quiz always work, even before the AI is ready.
 
 ---
 
@@ -70,6 +90,11 @@ Your key is now hidden inside Cloudflare. Nobody can see it, not even on GitHub.
 - **"Google rejected the API key"**: redo step C and paste the key again carefully.
 - **"missing its GEMINI_API_KEY secret"**: step C wasn't saved or deployed. Do step C again.
 - **Very few questions from a PDF**: it's probably a scanned PDF (pictures of text). Use the PowerPoint or a text PDF instead.
+
+## Updating the Worker code later
+
+Whenever `worker/worker.js` changes on GitHub (like when Learn mode was added), open it, tap **Raw**,
+copy it all, and paste over the code in the Cloudflare editor, then tap **Deploy**. Your key stays saved.
 
 ## Changing the AI model (only if needed)
 

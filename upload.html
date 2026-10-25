@@ -68,6 +68,46 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .deck .name{font-weight:600;word-break:break-word}
 .deck .row{margin-top:0.5rem}
 .deck .btn{padding:0.45rem 0.8rem;font-size:0.85rem}
+.mode-btn{display:block;width:100%;text-align:left;padding:0.85rem 1rem;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:1rem;cursor:pointer;margin-top:0.6rem}
+.mode-btn.rec{border-color:var(--accent)}
+.mode-btn.active{background:#132a3d;box-shadow:0 0 0 2px var(--accent) inset}
+.mode-btn .t{font-weight:700}
+.mode-btn .d{color:var(--muted);font-size:0.85rem;margin-top:0.15rem}
+.rec-badge{font-size:0.7rem;background:var(--accent);color:#fff;border-radius:999px;padding:0.05rem 0.5rem;margin-left:0.3rem;vertical-align:middle;font-weight:600}
+.sample-banner{background:#3d331a;color:#ffd700;border-radius:8px;padding:0.35rem 0.7rem;font-size:0.8rem;font-weight:700;margin-bottom:0.7rem}
+.learn-top{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.3rem}
+.btn-sm{padding:0.4rem 0.8rem;font-size:0.85rem}
+.sec-label{color:var(--muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.sec-title{font-size:1.25rem;font-weight:700;margin:0.1rem 0 0.6rem;line-height:1.3}
+.summary{font-size:1rem}
+.summary p,.ai-resp p{margin:0 0 0.6rem}
+.summary b,.ai-resp b{color:#fff;background:#1d3a55;border-radius:4px;padding:0 0.2rem}
+.kp-h{font-weight:700;font-size:0.9rem;margin-top:0.4rem}
+.keypoints{margin:0.3rem 0 0;padding-left:1.2rem}
+.keypoints li{margin:0.25rem 0}
+.helpers{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:1rem}
+.helpers .btn{flex:1 1 auto;font-size:0.9rem;padding:0.6rem 0.7rem}
+.ai-resp{margin-top:0.8rem;padding:0.8rem 0.9rem;border-radius:10px;background:#1e2a3a;border-left:3px solid var(--accent);font-size:0.95rem}
+.ai-resp .h{font-size:0.75rem;color:var(--muted);font-weight:700;margin-bottom:0.35rem;text-transform:uppercase;letter-spacing:.04em}
+.ai-resp ul{margin:0.2rem 0 0.6rem;padding-left:1.2rem}
+.ai-resp>:last-child,.ai-resp p:last-child{margin-bottom:0}
+.ai-resp.notin{border-left-color:#ffd700}
+.ai-resp.flash{animation:flash 1s}
+@keyframes flash{from{background:#2a4a6a}to{background:#1e2a3a}}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;margin-right:0.45rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sec{display:flex;gap:0.7rem;align-items:center;padding:0.7rem 0.5rem;border:none;border-top:1px solid var(--border);cursor:pointer;width:100%;background:none;color:var(--text);text-align:left;font-family:inherit;font-size:0.95rem}
+.sec:first-child{border-top:none}
+.sec .ic{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;font-weight:700;font-size:0.85rem;border:2px solid var(--border);color:var(--muted)}
+.sec.done .ic{background:var(--good);border-color:var(--good);color:#fff}
+.sec.cur{background:#132a3d;border-radius:8px}
+.sec.cur .ic{border-color:var(--accent);color:var(--accent)}
+.sec .nm{flex:1;min-width:0}
+.sec .nm .a{font-weight:600;line-height:1.3}
+.sec .sc{font-weight:700;font-size:0.9rem;white-space:nowrap}
+.sec .sc.good{color:var(--good)}
+.sec .sc.mid{color:#ffd700}
+.sec .sc.low{color:#ff8a92}
 #confetti-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999}
 </style>
 </head>
@@ -88,7 +128,8 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 <!-- ============ UPLOAD SCREEN ============ -->
 <section id="screen-upload">
   <div id="notConnected" class="notice warn hidden">
-    <b>Not connected yet.</b> The AI question maker isn't hooked up (the Worker link still needs to be added). You can still read a file below, or <a href="#" id="demoLink" style="color:#ffd700">try the demo quiz</a>.
+    <div id="aiStatusMsg"><b>Not connected yet.</b> The AI isn't hooked up (the Worker link still needs to be added).</div>
+    <div id="aiStatusExtra" style="margin-top:0.35rem">You can still read a file below, or try the <a href="#" id="demoLearnLink" style="color:#ffd700">demo Learn deck</a> or the <a href="#" id="demoLink" style="color:#ffd700">demo quiz</a>. <a href="#" id="recheckLink" style="color:#ffd700">Check again</a></div>
   </div>
 
   <div class="card">
@@ -102,9 +143,17 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
     <p class="muted small" style="margin:0.6rem 0 0">Your file is read on your phone. Only the text is sent to Google Gemini (free tier, which Google may use to improve its products) &mdash; <b>never upload patient info.</b></p>
   </div>
 
+  <div class="card hidden" id="modeCard">
+    <h2>2. How do you want to study?</h2>
+    <button class="mode-btn rec" id="learnBtn"><div class="t">📖 Learn (in order) <span class="rec-badge">Recommended</span></div><div class="d">Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
+    <button class="mode-btn" id="cramBtn"><div class="t">⚡ Exam Cram (everything)</div><div class="d">One big quiz on the whole file, 10 to 200 questions.</div></button>
+    <div id="learnPreview" class="hidden" style="margin-top:0.8rem"></div>
+  </div>
+
+  <div id="cramOptions" class="hidden">
   <div class="card">
-    <h2>2. Quiz options</h2>
-    <label class="lbl">How many questions?</label>
+    <h2>3. Exam Cram options</h2>
+    <label class="lbl" style="margin-top:0">How many questions?</label>
     <div class="chips" id="countChips">
       <button class="chip" data-v="10">10</button><button class="chip active" data-v="25">25</button><button class="chip" data-v="50">50</button><button class="chip" data-v="100">100</button><button class="chip" data-v="custom">Custom</button>
     </div>
@@ -118,7 +167,7 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
   </div>
 
   <div class="card">
-    <h2>3. Make my quiz</h2>
+    <h2>4. Make my quiz</h2>
     <button class="btn btn-primary btn-block" id="genBtn" disabled>Choose a file first</button>
     <div id="genStatus" class="hidden" style="margin-top:0.8rem">
       <div class="muted" id="genMsg">Starting…</div>
@@ -126,8 +175,33 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
       <div class="row"><button class="btn btn-secondary" id="cancelBtn">Stop</button></div>
     </div>
     <div id="genError" class="notice err hidden" style="margin-top:0.8rem;margin-bottom:0"></div>
-    <div style="margin-top:0.8rem"><button class="btn btn-secondary btn-block" id="demoBtn">Try the demo quiz (8 sample questions)</button></div>
   </div>
+  </div>
+
+  <div class="card">
+    <h2>Just looking?</h2>
+    <button class="btn btn-secondary btn-block" id="demoLearnBtn">Try the demo Learn deck (sample)</button>
+    <div style="margin-top:0.6rem"><button class="btn btn-secondary btn-block" id="demoBtn">Try the demo quiz (8 sample questions)</button></div>
+  </div>
+</section>
+
+<!-- ============ LEARN SCREEN ============ -->
+<section id="screen-learn" class="hidden">
+  <div class="learn-top"><span class="muted small" id="lDeckName" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span><button class="btn btn-secondary btn-sm" id="mapBtn">☰ Sections</button></div>
+  <div class="quiz-label"><span id="lProgress"></span><span id="lScore"></span></div>
+  <div class="progress"><div id="lBar"></div></div>
+  <div class="card" id="lCard"></div>
+</section>
+
+<!-- ============ SECTION MAP ============ -->
+<section id="screen-map" class="hidden">
+  <div class="card">
+    <div class="learn-top"><h2 style="margin:0">Sections</h2><button class="btn btn-secondary btn-sm" id="mapBackBtn">Back</button></div>
+    <div class="muted small" id="mapDeck"></div>
+    <div class="progress"><div id="mapBar"></div></div>
+    <div id="mapList"></div>
+  </div>
+  <div class="card" id="mapFinal"></div>
 </section>
 
 <!-- ============ QUIZ SCREEN ============ -->
@@ -190,8 +264,8 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 <script>
 // ===================== CONNECTION =====================
 // Paste your Cloudflare Worker URL here (see worker/SETUP.md). It is NOT a secret.
-const WORKER_URL = 'PASTE_WORKER_URL_HERE';
-const IS_CONNECTED = /^https:\/\//.test(WORKER_URL);
+const WORKER_URL = 'https://xraysavvy-ai.opsab10.workers.dev';
+const IS_CONNECTED = /^https:\/\//.test(WORKER_URL); // a URL is set; checkWorker() tells if it's really ready
 
 const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/legacy/build/pdf.min.mjs';
 const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/legacy/build/pdf.worker.min.mjs';
@@ -752,7 +826,7 @@ const fmtNum = n => n.toLocaleString('en-US');
 function fmtDate(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } }
 
 function showScreen(name) {
-  for (const s of ['upload', 'quiz', 'results', 'decks']) $('screen-' + s).classList.toggle('hidden', s !== name);
+  for (const s of ['upload', 'learn', 'map', 'quiz', 'results', 'decks']) $('screen-' + s).classList.toggle('hidden', s !== name);
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name || (name !== 'decks' && b.dataset.tab === 'upload' && name === 'upload')));
   window.scrollTo(0, 0);
 }
@@ -1005,12 +1079,13 @@ function updateGenBtn() {
   const n = genOpts.count;
   if (!n || n < 1 || n > MAX_TOTAL) { b.disabled = true; b.textContent = 'Pick 1 to ' + MAX_TOTAL + ' questions'; return; }
   b.disabled = false;
-  b.textContent = IS_CONNECTED ? 'Make ' + n + ' questions' : 'Make ' + n + ' questions (not connected yet)';
+  b.textContent = aiReady('cram') ? 'Make ' + n + ' questions' : 'Make ' + n + ' questions (AI not ready yet)';
 }
 
 async function handleFile(file) {
   if (!file) return;
   showError(''); extracted = null; updateGenBtn();
+  $('modeCard').classList.add('hidden'); $('learnPreview').classList.add('hidden');
   const info = $('fileInfo');
   info.classList.remove('hidden');
   info.textContent = 'Reading ' + file.name + '…';
@@ -1019,11 +1094,12 @@ async function handleFile(file) {
     const r = await extractFile(file);
     const text = r.parts.join('\n\n');
     const chunks = makeChunks(r.parts);
-    extracted = { fileName: file.name, kind: r.kind, units: r.units, unitName: r.unitName, text, chunks };
+    const sections = makeSections(makeUnits(r));
+    extracted = { fileName: file.name, kind: r.kind, units: r.units, unitName: r.unitName, text, chunks, sections };
     info.innerHTML = '';
     const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
     info.append(el('div', null, '📄 ', el('b', null, file.name)));
-    info.append(el('div', { class: 'muted' }, [unitsTxt, fmtNum(text.length) + ' characters', chunks.length > 1 ? 'sent in ' + chunks.length + ' parts' : ''].filter(Boolean).join(' · ')));
+    info.append(el('div', { class: 'muted' }, [unitsTxt, fmtNum(text.length) + ' characters', sections.length + ' learn section' + (sections.length === 1 ? '' : 's')].filter(Boolean).join(' · ')));
     if (text.replace(/--- (Slide|Page) \d+ ---|\(no text\)/g, '').trim().length < 200) {
       info.append(el('div', { style: 'color:#ffd700;margin-top:0.3rem' }, 'Very little text found. If this is a scanned PDF or slides that are just pictures, the AI can\'t read them.'));
     }
@@ -1031,6 +1107,7 @@ async function handleFile(file) {
     console.error(e);
     info.textContent = 'Could not read that file: ' + (e.message || e);
   }
+  if (extracted) $('modeCard').classList.remove('hidden');
   updateGenBtn();
 }
 $('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
@@ -1039,26 +1116,112 @@ drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add(
 drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
 drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
 
-if (!IS_CONNECTED) $('notConnected').classList.remove('hidden');
+// ---- Worker status (GET health check) ----
+// States: no_url, checking, no_code (Hello World / not our code / can't read it), no_key, old_code, ready, offline.
+// A Hello World Worker sends no CORS headers, so the browser can't even read it: that also counts as no_code.
+let workerState = IS_CONNECTED ? 'checking' : 'no_url', workerModel = '', workerCheck = null;
+const WORKER_MSGS = {
+  no_url: ['warn', '<b>Not connected yet.</b> The AI isn\'t hooked up (the Worker link still needs to be added).'],
+  checking: ['info', 'Checking the AI connection…'],
+  no_code: ['warn', '<b>Your Worker is set up, but the XRaySavvy code/key isn\'t added yet.</b> Paste <code>worker/worker.js</code> into it and Deploy (SETUP.md step B), then add the <code>GEMINI_API_KEY</code> secret (step C).'],
+  no_key: ['warn', '<b>Almost there!</b> The Worker code is in, but the Gemini key isn\'t added yet. Add the <code>GEMINI_API_KEY</code> secret and Deploy (SETUP.md step C).'],
+  old_code: ['warn', '<b>The Worker has an older version of the code.</b> Exam Cram works, but Learn mode needs the new <code>worker/worker.js</code>. Re-paste it and Deploy (SETUP.md step B).'],
+  offline: ['warn', '<b>You look offline.</b> Connect to the internet to use the AI.'],
+  ready: ['info', '✅ <b>AI connected</b> and ready.']
+};
+function aiReady(feature) { return workerState === 'ready' || (feature === 'cram' && workerState === 'old_code'); }
+function showWorkerState() {
+  const box = $('notConnected'), m = WORKER_MSGS[workerState] || WORKER_MSGS.no_code;
+  box.className = 'notice ' + m[0];
+  $('aiStatusMsg').innerHTML = m[1] + (workerState === 'ready' && workerModel ? ' <span class="muted small">(' + esc(workerModel) + ')</span>' : '');
+  $('aiStatusExtra').classList.toggle('hidden', workerState === 'ready' || workerState === 'checking');
+  $('recheckLink').classList.toggle('hidden', workerState === 'no_url');
+  updateGenBtn();
+}
+function setWorkerState(st, model) { workerState = st; workerModel = model || ''; showWorkerState(); return st; }
+function checkWorker() {
+  if (!IS_CONNECTED) return Promise.resolve(setWorkerState('no_url'));
+  setWorkerState('checking');
+  workerCheck = (async () => {
+    let res;
+    try { res = await fetch(WORKER_URL, { method: 'GET', cache: 'no-store' }); }
+    catch (e) { return setWorkerState(navigator.onLine === false ? 'offline' : 'no_code'); }
+    let data = null;
+    try { data = JSON.parse(await res.text()); } catch (e) { /* Hello World or HTML: not our code */ }
+    if (!data || data.service !== 'XRaySavvy quiz worker') return setWorkerState('no_code');
+    if (!data.keySet) return setWorkerState('no_key');
+    if (!Array.isArray(data.actions) || !data.actions.includes('section')) return setWorkerState('old_code');
+    return setWorkerState('ready', data.model);
+  })();
+  return workerCheck;
+}
+async function workerStateNow() { if (workerState === 'checking' && workerCheck) await workerCheck; return workerState; }
+$('recheckLink').addEventListener('click', e => { e.preventDefault(); checkWorker(); });
+checkWorker();
 $('demoLink').addEventListener('click', e => { e.preventDefault(); startDemo(); });
+$('demoLearnLink').addEventListener('click', e => { e.preventDefault(); startDemoLearn(); });
 $('demoBtn').addEventListener('click', startDemo);
+$('demoLearnBtn').addEventListener('click', () => startDemoLearn());
+
+// ---- Mode choice: Learn (in order) vs Exam Cram (everything) ----
+function pickMode(m) {
+  $('learnBtn').classList.toggle('active', m === 'learn');
+  $('cramBtn').classList.toggle('active', m === 'cram');
+  $('cramOptions').classList.toggle('hidden', m !== 'cram');
+  if (m !== 'learn') $('learnPreview').classList.add('hidden');
+}
+$('cramBtn').addEventListener('click', () => { pickMode('cram'); $('cramOptions').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('learnBtn').addEventListener('click', async () => {
+  if (!extracted) return;
+  pickMode('learn');
+  const secs = extracted.sections || [];
+  const pv = $('learnPreview'); pv.innerHTML = ''; pv.classList.remove('hidden');
+  if (!secs.length) { pv.append(el('div', { class: 'notice err' }, 'No readable text was found to split into sections.')); return; }
+  if ((await workerStateNow()) !== 'ready') {
+    const why = el('div'); why.innerHTML = (WORKER_MSGS[workerState] || WORKER_MSGS.no_code)[1];
+    pv.append(el('div', { class: 'notice warn' }, why, el('div', { style: 'margin-top:0.35rem' }, 'Once the AI is ready, your file will be split into ' + secs.length + ' section' + (secs.length === 1 ? '' : 's') + ' like this:')));
+    const ol = el('ol', { class: 'small', style: 'margin:0 0 0.6rem;padding-left:1.3rem' });
+    secs.slice(0, 12).forEach(x => ol.append(el('li', null, x.title + ' ', el('span', { class: 'muted' }, '(' + x.label + ')'))));
+    if (secs.length > 12) ol.append(el('li', { class: 'muted' }, '…and ' + (secs.length - 12) + ' more'));
+    pv.append(ol, el('button', { class: 'btn btn-primary btn-block', onclick: () => startDemoLearn() }, 'Try the demo Learn deck (sample)'));
+    return;
+  }
+  const deck = await saveDeckSafe(newLearnDeck(extracted));
+  openLearn(deck, 0);
+});
 $('cancelBtn').addEventListener('click', () => { cancelGen = true; setStatus('Stopping after this part…'); });
 
-async function callWorker(req, focus) {
-  const res = await fetch(WORKER_URL, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: req.text, count: req.count, type: genOpts.type, focus })
-  });
-  let data = null; try { data = await res.json(); } catch (e) { /* ignore */ }
-  if (!res.ok) { const err = new Error((data && data.message) || ('Worker error ' + res.status)); err.status = res.status; err.data = data || {}; throw err; }
+// body.action: 'questions' (Exam Cram), 'section', 'explain' or 'ask' (Learn mode). See worker/worker.js.
+async function callWorker(body) {
+  let res;
+  try {
+    res = await fetch(WORKER_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (e) {
+    // Network failure, or a Worker without our code (Hello World sends no CORS headers).
+    throw new Error(navigator.onLine === false ? 'You look offline. Connect to the internet and try again.' : 'Couldn\'t reach the AI. If the Worker is still the Hello World sample, paste worker/worker.js into it and Deploy (SETUP.md step B).');
+  }
+  let data = null; try { data = await res.json(); } catch (e) { /* not JSON */ }
+  if (!data || typeof data !== 'object') {
+    setWorkerState('no_code');
+    const err = new Error('The Worker answered, but not with the XRaySavvy code yet (it may still be the Hello World sample). Paste worker/worker.js into it and Deploy, then add the GEMINI_API_KEY secret.');
+    err.status = 'bad_worker'; err.data = {}; throw err;
+  }
+  if (!res.ok) {
+    if (data.error === 'no_key') setWorkerState('no_key');
+    const err = new Error(data.message || ('Worker error ' + res.status)); err.status = res.status; err.data = data; throw err;
+  }
   return data;
 }
 
 $('genBtn').addEventListener('click', async () => {
   if (!extracted) return;
   showError('');
-  if (!IS_CONNECTED) {
-    showError('Not connected yet: the Worker URL hasn\'t been added to this page. Follow worker/SETUP.md, then paste the URL into WORKER_URL. Meanwhile, try the demo quiz below.');
+  if (!aiReady('cram') && (await workerStateNow(), !aiReady('cram'))) {
+    const d = el('div'); d.innerHTML = (WORKER_MSGS[workerState] || WORKER_MSGS.no_code)[1];
+    showError(''); $('genError').append(d, el('div', { style: 'margin-top:0.3rem' }, 'Meanwhile, try the demo quiz or demo Learn deck below.')); $('genError').classList.remove('hidden');
     return;
   }
   const total = Math.min(MAX_TOTAL, genOpts.count);
@@ -1075,7 +1238,7 @@ $('genBtn').addEventListener('click', async () => {
     let tries = 0;
     while (true) {
       try {
-        const data = await callWorker(reqs[i], focus);
+        const data = await callWorker({ action: 'questions', text: reqs[i].text, count: reqs[i].count, type: genOpts.type, focus });
         for (const q of data.questions || []) {
           const k = q.question.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
           if (!seen.has(k)) { seen.add(k); all.push(q); }
@@ -1221,11 +1384,13 @@ function gradeShort(user, answer) {
 // ===================== QUIZ =====================
 let quiz = null; // {deck, items, i, score, missed:[], answered, mode}
 
-function startQuiz(deck, onlyIds, mode) {
+// opts (Learn mode): {label, onComplete(result), onQuit(), retryMissed}
+function startQuiz(deck, onlyIds, mode, opts) {
   let items = deck.questions;
   if (onlyIds) items = items.filter(q => onlyIds.includes(q.id));
-  quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode };
-  $('qDeckName').textContent = deck.name;
+  if (!items.length) { alert('No questions to show yet.'); return; }
+  quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode, opts: opts || {}, round: 1, total: items.length };
+  $('qDeckName').textContent = quiz.opts.label || deck.name;
   showScreen('quiz');
   renderQuestion();
 }
@@ -1233,8 +1398,8 @@ function startQuiz(deck, onlyIds, mode) {
 function renderQuestion() {
   const q = quiz.items[quiz.i];
   quiz.answered = false; quiz.current = q;
-  $('qProgress').textContent = 'Question ' + (quiz.i + 1) + ' of ' + quiz.items.length;
-  $('qScore').textContent = 'Score: ' + quiz.score;
+  $('qProgress').textContent = (quiz.round > 1 ? 'Try again: ' : 'Question ') + (quiz.i + 1) + ' of ' + quiz.items.length;
+  $('qScore').textContent = quiz.round > 1 ? 'Re-asking missed' : 'Score: ' + quiz.score;
   $('qBar').style.width = Math.round(quiz.i / quiz.items.length * 100) + '%';
   $('qType').textContent = q.type === 'mc' ? 'Multiple choice' : 'Short answer';
   $('qText').textContent = q.question;
@@ -1278,11 +1443,26 @@ function finishAnswer(correct, kind, headline) {
   if (correct) { quiz.score++; launchConfetti(); }
   else { quiz.missed.push(q.id); if (kind === 'bad') wrongAnswerEffect(); }
   showFeedback(kind, headline, q);
-  $('qScore').textContent = 'Score: ' + quiz.score;
+  if (quiz.round === 1) $('qScore').textContent = 'Score: ' + quiz.score;
   $('checkBtn').classList.add('hidden');
   $('nextBtn').classList.remove('hidden');
-  $('nextBtn').textContent = quiz.i + 1 < quiz.items.length ? 'Next' : 'See results';
-  if (!quiz.deck.demo && !quiz.deck.unsaved) DeckStore.recordAnswer(quiz.deck.id, q.id, correct).catch(() => {});
+  setNextLabel();
+  recordAnswerFor(quiz.deck, q, correct);
+}
+function setNextLabel() {
+  let t = 'See results';
+  if (quiz.i + 1 < quiz.items.length) t = 'Next';
+  else if (quiz.opts.onComplete) t = quiz.round === 1 && quiz.opts.retryMissed && quiz.missed.length ? 'Retry the ' + quiz.missed.length + ' I missed' : 'Finish section';
+  $('nextBtn').textContent = t;
+}
+// Learn decks keep everything in one object, so update it in memory and save the whole deck.
+function recordAnswerFor(deck, q, correct) {
+  if (deck.demo || deck.unsaved) return;
+  if (deck.mode !== 'learn') { DeckStore.recordAnswer(deck.id, q.id, correct).catch(() => {}); return; }
+  q.stats = q.stats || { right: 0, wrong: 0 };
+  if (correct) { q.stats.right++; deck.missed = deck.missed.filter(x => x !== q.id); }
+  else { q.stats.wrong++; q.stats.lastMissed = new Date().toISOString(); if (!deck.missed.includes(q.id)) deck.missed.push(q.id); }
+  persistDeck(deck);
 }
 
 function answerMC(idx) {
@@ -1316,17 +1496,35 @@ $('nextBtn').addEventListener('click', nextQuestion);
 $('overrideBtn').addEventListener('click', () => {
   const q = quiz.current;
   quiz.missed = quiz.missed.filter(id => id !== q.id);
-  quiz.score++; $('qScore').textContent = 'Score: ' + quiz.score;
+  quiz.score++; if (quiz.round === 1) $('qScore').textContent = 'Score: ' + quiz.score;
   $('overrideBtn').classList.add('hidden');
   showFeedback('good', '✓ Counted as correct', q);
   launchConfetti();
-  if (!quiz.deck.demo && !quiz.deck.unsaved) DeckStore.recordAnswer(quiz.deck.id, q.id, true).catch(() => {});
+  setNextLabel();
+  if (quiz.deck.mode === 'learn') { if (q.stats && q.stats.wrong > 0) q.stats.wrong--; }
+  recordAnswerFor(quiz.deck, q, true);
 });
-$('quitBtn').addEventListener('click', () => { if (quiz.i === 0 && !quiz.answered) { showScreen('upload'); return; } showResults(true); });
+$('quitBtn').addEventListener('click', () => {
+  if (quiz.opts.onQuit) { quiz.opts.onQuit(); return; }
+  if (quiz.i === 0 && !quiz.answered) { showScreen('upload'); return; }
+  showResults(true);
+});
 
 function nextQuestion() {
-  if (quiz.i + 1 < quiz.items.length) { quiz.i++; renderQuestion(); }
-  else showResults(false);
+  if (quiz.i + 1 < quiz.items.length) { quiz.i++; renderQuestion(); return; }
+  if (quiz.opts.onComplete) {
+    // Learn mode: re-ask what was missed (once), then hand back to the section.
+    if (quiz.round === 1) { quiz.firstScore = quiz.score; quiz.firstMissed = quiz.missed.slice(); }
+    if (quiz.round === 1 && quiz.opts.retryMissed && quiz.missed.length) {
+      const ids = quiz.missed.slice();
+      quiz.items = shuffle(quiz.items.filter(q => ids.includes(q.id)));
+      quiz.round = 2; quiz.i = 0; quiz.missed = [];
+      renderQuestion(); return;
+    }
+    quiz.opts.onComplete({ firstScore: quiz.firstScore, total: quiz.total, firstMissed: quiz.firstMissed, stillMissed: quiz.round > 1 ? quiz.missed.slice() : quiz.firstMissed });
+    return;
+  }
+  showResults(false);
 }
 
 function showResults(early) {
@@ -1335,7 +1533,14 @@ function showResults(early) {
   $('rDeck').textContent = quiz.deck.name + (early ? ' (ended early)' : '');
   $('rScore').textContent = quiz.score + ' / ' + total;
   $('rPct').textContent = total ? Math.round(quiz.score / total * 100) + '%' : '';
-  if (!quiz.deck.demo && !quiz.deck.unsaved && total) DeckStore.recordAttempt(quiz.deck.id, quiz.score, total, quiz.mode).catch(() => {});
+  if (quiz.deck.mode === 'learn') {
+    if (total && !quiz.deck.demo && !quiz.deck.unsaved) {
+      quiz.deck.attempts.push({ date: new Date().toISOString(), score: quiz.score, total, mode: quiz.mode });
+      quiz.deck.attempts = quiz.deck.attempts.slice(-50);
+      if (quiz.mode === 'final' && !early) quiz.deck.learn.finalLast = { score: quiz.score, total, date: new Date().toISOString() };
+      persistDeck(quiz.deck);
+    }
+  } else if (!quiz.deck.demo && !quiz.deck.unsaved && total) DeckStore.recordAttempt(quiz.deck.id, quiz.score, total, quiz.mode).catch(() => {});
   const list = $('missedList'); list.innerHTML = '';
   const missedQs = quiz.items.filter(q => quiz.missed.includes(q.id));
   $('missedCard').classList.toggle('hidden', !missedQs.length);
@@ -1352,14 +1557,529 @@ function showResults(early) {
   quiz.lastMissed = missedQs.map(q => q.id);
   showScreen('results');
 }
-$('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed'));
-$('retakeBtn').addEventListener('click', () => startQuiz(quiz.deck, null, 'all'));
-$('doneBtn').addEventListener('click', () => { if (quiz.deck.demo) showScreen('upload'); else { renderDecks(); showScreen('decks'); } });
+$('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed', quiz.opts.label ? { label: quiz.opts.label } : null));
+$('retakeBtn').addEventListener('click', () => quiz.mode === 'final' ? startFinalReview(quiz.deck) : startQuiz(quiz.deck, null, 'all'));
+$('doneBtn').addEventListener('click', () => {
+  if (quiz.deck.mode === 'learn') { L = { deck: quiz.deck, pending: {} }; renderMap(); showScreen('map'); }
+  else if (quiz.deck.demo) showScreen('upload'); else { renderDecks(); showScreen('decks'); }
+});
 $('saveDemoBtn').addEventListener('click', async () => {
   const d = Object.assign({}, quiz.deck, { id: DeckStore.newId(), demo: false, name: 'Demo deck' });
   d.questions = d.questions.map(q => Object.assign({}, q, { id: DeckStore.newId() }));
   await saveDeckSafe(d); $('saveDemoBtn').textContent = 'Saved ✓'; $('saveDemoBtn').disabled = true;
 });
+
+// ===================== LEARN MODE =====================
+// Learn goes through the file IN ORDER, ~5-8 slides/pages at a time. Each section gets ONE
+// Worker call (summary + questions, action 'section'), made only when needed. The next section is
+// prefetched in the background when we're well under the free per-minute limit. The
+// "um dumb it down pls.." / "More detail" / "Ask a question" answers are cached in the deck.
+
+// ---- AI request queue: one call at a time, spaced GAP_MS apart (~13/min, under the free ~15/min).
+// Taps by the student go ahead of background prefetches. Per-minute 429s wait and retry.
+const AI = (() => {
+  const q = []; let running = false, lastAt = 0; const recent = [];
+  function enqueue(payload, opts) {
+    return new Promise((resolve, reject) => {
+      const job = { payload, opts: opts || {}, resolve, reject };
+      const firstBg = q.findIndex(j => j.opts.background);
+      if (job.opts.background || firstBg < 0) q.push(job); else q.splice(firstBg, 0, job);
+      pump();
+    });
+  }
+  async function pump() {
+    if (running) return; running = true;
+    while (q.length) {
+      const job = q.shift();
+      try { job.resolve(await run(job)); } catch (e) { job.reject(e); }
+    }
+    running = false;
+  }
+  async function run(job) {
+    let tries = 0;
+    const status = m => { if (job.opts.onStatus) job.opts.onStatus(m); };
+    while (true) {
+      const wait = lastAt + GAP_MS - Date.now();
+      if (wait > 0) await sleep(wait);
+      lastAt = Date.now(); recent.push(lastAt);
+      try { return await callWorker(job.payload); }
+      catch (e) {
+        tries++; const d = e.data || {};
+        if (e.status === 429 && !d.perDay && tries <= 3) {
+          const secs = Math.min(90, Math.max(20, d.retryAfterSeconds || 60));
+          for (let t = secs; t > 0; t--) { status('Free limit hit — waiting ' + t + 's, then trying again…'); await sleep(1000); }
+          status('Trying again…'); continue;
+        }
+        if (!e.status && tries <= 1) { await sleep(3000); continue; } // network blip: one retry
+        throw e;
+      }
+    }
+  }
+  function callsLastMinute() { const t = Date.now() - 60000; while (recent.length && recent[0] < t) recent.shift(); return recent.length; }
+  return { enqueue, callsLastMinute, waiting: () => q.length };
+})();
+const PREFETCH_MAX_PER_MIN = 9; // only prefetch while comfortably under the ~15/min free limit
+
+// ---- Splitting the file into sections ----
+const SEC_MIN = 5, SEC_MAX = 8, SEC_MAX_CHARS = 24000, SEC_TEXT_CAP = 50000;
+function cleanLines(body) {
+  return body.split('\n').map(x => x.trim()).filter(l => l && l !== '(no text)' && !/^\[Notes\]/.test(l));
+}
+function titleKey(t) {
+  return (t || '').toLowerCase().replace(/\b(cont(inued|'d|d)?\.?|part\s+\w+|\d+)\b/g, '').replace(/[^a-z]+/g, ' ').trim();
+}
+function shortTitle(t) { t = t.replace(/\s+/g, ' ').trim(); return t.length > 70 ? t.slice(0, 67).replace(/\s+\S*$/, '') + '…' : t; }
+// A slide/page's own title: its first real line, skipping running headers that repeat on many pages.
+function unitTitle(lines, common) {
+  const l = lines.find(x => /[a-z]{3}/i.test(x) && x.length >= 3 && x.length <= 120 && !common.has(x.toLowerCase()) && !/^(page|slide)?\s*\d+$/i.test(x));
+  return l ? shortTitle(l) : '';
+}
+function makeUnits(r) {
+  if (r.kind === 'pptx' || r.kind === 'pdf') {
+    const word = r.kind === 'pptx' ? 'Slide' : 'Page';
+    const bodies = r.parts.map(p => p.replace(/^--- (Slide|Page) \d+ ---\n?/, ''));
+    const lineSets = bodies.map(cleanLines);
+    const freq = {};
+    lineSets.forEach(ls => new Set(ls.slice(0, 3).concat(ls.slice(-2)).map(x => x.toLowerCase())).forEach(x => { freq[x] = (freq[x] || 0) + 1; }));
+    const common = new Set(Object.keys(freq).filter(k => r.parts.length >= 6 && freq[k] >= Math.max(3, r.parts.length * 0.25)));
+    return r.parts.map((p, i) => {
+      const ls = lineSets[i]; const chars = ls.join(' ').length;
+      return { word, n: i + 1, text: p, title: unitTitle(ls, common), heading: chars > 0 && chars < 160 && ls.length <= 4 };
+    });
+  }
+  // .docx / .txt: group paragraphs into "parts" of ~1800 characters, starting a new part at headings.
+  const units = []; let cur = null;
+  const isHead = t => t.length <= 80 && !/[.,;:]$/.test(t) && /[a-z]/i.test(t) && !/^[-•*\d]/.test(t);
+  for (const para of r.parts) {
+    const head = isHead(para);
+    if (!cur || cur.chars > 1800 || (head && cur.chars > 600)) {
+      cur = { word: 'Part', n: units.length + 1, lines: [], chars: 0, title: '', heading: false };
+      units.push(cur);
+    }
+    if (!cur.lines.length) { cur.title = shortTitle(para.split('\n')[0]); cur.heading = head; }
+    cur.lines.push(para); cur.chars += para.length;
+  }
+  return units.map(u => ({ word: u.word, n: u.n, text: u.lines.join('\n\n'), title: u.title, heading: u.heading }));
+}
+function makeSections(units) {
+  units = units.filter(u => cleanLines(u.text.replace(/^--- (Slide|Page) \d+ ---/, '')).length);
+  const groups = []; let cur = [], chars = 0;
+  const flush = () => { if (cur.length) groups.push(cur); cur = []; chars = 0; };
+  units.forEach((u, i) => {
+    if (cur.length) {
+      const prev = cur[cur.length - 1], next = units[i + 1];
+      const k = titleKey(u.title);
+      const newTopic = k && k !== titleKey(prev.title) && !(next && titleKey(next.title) === titleKey(prev.title) && titleKey(prev.title));
+      if (cur.length >= SEC_MAX || chars + u.text.length > SEC_MAX_CHARS) flush();
+      else if (u.heading && cur.length >= 3) flush();             // a title/divider slide starts a new section
+      else if (cur.length >= SEC_MIN && newTopic) flush();        // otherwise break where the topic changes
+    }
+    cur.push(u); chars += u.text.length;
+  });
+  flush();
+  if (groups.length > 1 && groups[groups.length - 1].length < 3) { // tiny tail: merge into the previous section
+    const last = groups.pop(); groups[groups.length - 1].push(...last);
+  }
+  return groups.map((g, i) => {
+    const a = g[0], b = g[g.length - 1];
+    const label = g.length === 1 ? a.word + ' ' + a.n : a.word + 's ' + a.n + '–' + b.n;
+    const named = g.find(u => u.heading && u.title) || g.find(u => u.title);
+    let text = g.map(u => u.text).join('\n\n');
+    if (text.length > SEC_TEXT_CAP) text = text.slice(0, SEC_TEXT_CAP);
+    return { title: named ? named.title : 'Section ' + (i + 1), label, text };
+  });
+}
+
+function newLearnDeck(x) {
+  return {
+    id: DeckStore.newId(), mode: 'learn',
+    name: x.fileName.replace(/\.[^.]+$/, ''), createdAt: new Date().toISOString(),
+    source: { fileName: x.fileName, kind: x.kind, units: x.units, chars: x.text.length },
+    settings: { type: 'mix' }, questions: [], missed: [], attempts: [],
+    learn: {
+      current: 0, finalLast: null,
+      sections: x.sections.map(s => ({ title: s.title, label: s.label, text: s.text, status: 'new', summary: '', keyPoints: [], extras: {}, asks: [], score: null, misses: [] }))
+    }
+  };
+}
+async function persistDeck(deck) {
+  if (deck.demo || deck.unsaved) return;
+  try { await DeckStore.save(deck); }
+  catch (e) { if (!deck.warned) { deck.warned = true; alert(e.message); } }
+}
+
+// ---- tiny safe formatter: **bold**, "- " bullets, paragraphs ----
+function esc(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function md(t) {
+  const inline = x => esc(x).replace(/\*\*([^*]+?)\*\*/g, '<b>$1</b>').replace(/^(Think of it like:)/i, '<b>$1</b>');
+  let html = '', list = false;
+  for (const raw of String(t || '').split('\n')) {
+    const line = raw.trim();
+    const m = line.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/);
+    if (m) { if (!list) { html += '<ul>'; list = true; } html += '<li>' + inline(m[1]) + '</li>'; continue; }
+    if (list) { html += '</ul>'; list = false; }
+    if (line) html += '<p>' + inline(line) + '</p>';
+  }
+  if (list) html += '</ul>';
+  return html;
+}
+function htmlDiv(cls, html) { const d = el('div', { class: cls }); d.innerHTML = html; return d; }
+
+// ---- Learn state ----
+let L = null; // { deck, pending: {sectionIndex: Promise} }
+const sec = i => L.deck.learn.sections[i];
+const learnVisible = () => !$('screen-learn').classList.contains('hidden');
+function sectionQuestionCount(text) { return text.length < 1500 ? 2 : text.length < 4500 ? 3 : 4; }
+function doneCount(deck) { return deck.learn.sections.filter(s => s.status === 'done').length; }
+
+function openLearn(deck, idx) {
+  if (!L || L.deck !== deck) L = { deck, pending: {} };
+  if (idx != null) deck.learn.current = idx;
+  persistDeck(deck);
+  showScreen('learn');
+  renderSection();
+}
+
+// Makes sure section i has its summary + questions (one Worker call, deduped).
+function ensureSection(i, background, onStatus) {
+  const s = sec(i);
+  if (s.summary) return Promise.resolve(s);
+  if (L.deck.sample) return Promise.reject(new Error('Sample section is missing.'));
+  if (!L.pending[i]) {
+    const deck = L.deck;
+    L.pending[i] = AI.enqueue({ action: 'section', text: s.text, title: s.title, count: sectionQuestionCount(s.text), type: 'mix' }, { background, onStatus })
+      .then(data => {
+        if (data.title) s.title = data.title;
+        s.summary = data.summary; s.keyPoints = data.keyPoints || [];
+        const qs = (data.questions || []).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 }, section: i }, q));
+        deck.questions = deck.questions.filter(q => q.section !== i).concat(qs);
+        if (s.status === 'new') s.status = 'ready';
+        persistDeck(deck);
+        return s;
+      })
+      .finally(() => { if (L && L.deck === deck) delete L.pending[i]; });
+  } else if (!background && onStatus) {
+    onStatus('Already working on this section…');
+  }
+  return L.pending[i];
+}
+function prefetchNext() {
+  if (!L || L.deck.sample || workerState !== 'ready') return;
+  const i = L.deck.learn.current + 1;
+  if (i >= L.deck.learn.sections.length || sec(i).summary || L.pending[i]) return;
+  if (AI.callsLastMinute() >= PREFETCH_MAX_PER_MIN || AI.waiting() > 0) return;
+  ensureSection(i, true).catch(() => { /* quiet: we'll try again when the student gets there */ });
+}
+
+function renderLearnHeader() {
+  const d = L.deck, n = d.learn.sections.length, i = d.learn.current;
+  const done = doneCount(d);
+  const right = d.learn.sections.reduce((a, s) => a + (s.score ? s.score.right : 0), 0);
+  const total = d.learn.sections.reduce((a, s) => a + (s.score ? s.score.total : 0), 0);
+  $('lDeckName').textContent = d.name;
+  $('lProgress').textContent = 'Section ' + (i + 1) + ' of ' + n;
+  $('lScore').textContent = done + ' done' + (total ? ' · ' + right + '/' + total + ' right' : '');
+  $('lBar').style.width = Math.round(done / n * 100) + '%';
+}
+
+async function renderSection() {
+  const deck = L.deck, i = deck.learn.current, s = sec(i);
+  renderLearnHeader();
+  const card = $('lCard'); card.innerHTML = '';
+  if (deck.sample) card.append(el('div', { class: 'sample-banner' }, 'Sample — not from your file'));
+  if (!s.summary) {
+    const msg = el('div', { class: 'muted' }, 'Reading ' + s.label + ' and writing your summary…');
+    card.append(el('div', { class: 'sec-label' }, s.label), el('div', { class: 'sec-title' }, s.title),
+      el('div', { style: 'margin:0.8rem 0' }, el('span', { class: 'spinner' }), msg));
+    if (AI.waiting() > 0) msg.textContent = 'Waiting for the AI (spacing calls to stay under the free limit)…';
+    try { await ensureSection(i, false, m => { msg.textContent = m; }); }
+    catch (e) {
+      if (L.deck !== deck || deck.learn.current !== i || !learnVisible()) return;
+      card.innerHTML = '';
+      card.append(el('div', { class: 'sec-label' }, s.label), el('div', { class: 'sec-title' }, s.title),
+        el('div', { class: 'notice err' }, e.message || 'Something went wrong.'),
+        el('div', { class: 'row' }, el('button', { class: 'btn btn-primary', onclick: renderSection }, 'Try again'),
+          el('button', { class: 'btn btn-secondary', onclick: () => { renderMap(); showScreen('map'); } }, 'Sections')));
+      return;
+    }
+    if (L.deck !== deck || deck.learn.current !== i || !learnVisible()) return; // they moved on
+    return renderSection();
+  }
+  renderSummary(card, s, i);
+  prefetchNext();
+}
+
+function renderSummary(card, s, i) {
+  const deck = L.deck;
+  card.append(el('div', { class: 'sec-label' }, 'Section ' + (i + 1) + ' · ' + s.label));
+  card.append(el('div', { class: 'sec-title' }, s.title));
+  card.append(htmlDiv('summary', md(s.summary)));
+  if (s.keyPoints && s.keyPoints.length) {
+    const ul = el('ul', { class: 'keypoints' });
+    s.keyPoints.forEach(k => ul.append(el('li', null, k)));
+    card.append(el('div', { class: 'kp-h' }, 'Key points'), ul);
+  }
+  const helpers = el('div', { class: 'helpers' });
+  const simpleBtn = el('button', { class: 'btn btn-secondary', id: 'dumbBtn' }, 'um dumb it down pls..');
+  const detailBtn = el('button', { class: 'btn btn-secondary', id: 'detailBtn' }, 'More detail');
+  const askBtn = el('button', { class: 'btn btn-secondary', id: 'askBtn' }, 'Ask a question');
+  helpers.append(simpleBtn, detailBtn, askBtn);
+  card.append(helpers);
+  const askBox = el('div', { class: 'hidden', style: 'margin-top:0.7rem' });
+  const askInput = el('input', { type: 'text', id: 'askInput', maxlength: '500', placeholder: 'e.g. Why does the anode spin?' });
+  const askGo = el('button', { class: 'btn btn-primary', style: 'margin-top:0.5rem' }, 'Ask');
+  askBox.append(askInput, askGo, el('div', { class: 'muted small', style: 'margin-top:0.3rem' }, 'Answered only from your notes. If your notes don\'t cover it, it will say so.'));
+  card.append(askBox);
+  const out = el('div', { id: 'aiOut' });
+  card.append(out);
+
+  const panels = {};
+  function panel(key, heading, text, cls) {
+    let p = panels[key];
+    if (!p) { p = el('div', { class: 'ai-resp' }); panels[key] = p; out.append(p); }
+    p.className = 'ai-resp' + (cls ? ' ' + cls : '');
+    p.innerHTML = '';
+    p.append(el('div', { class: 'h' }, heading + (deck.sample ? ' · Sample — not from your file' : '')));
+    if (text != null) p.append(htmlDiv('', md(text)));
+    return p;
+  }
+  function loading(key, heading) { const p = panel(key, heading, null); p.append(el('div', { class: 'muted' }, el('span', { class: 'spinner' }), 'Thinking…')); return p; }
+  const HEAD = { simple: 'Dumbed down', detail: 'More detail' };
+  function showExplain(style) { panel(style, HEAD[style], s.extras[style]); }
+  function showAsk(a, idx) { panel('ask' + idx, 'You asked: ' + a.q, (a.inNotes ? '' : '⚠️ ') + a.a, a.inNotes ? '' : 'notin'); }
+  // cached responses from earlier visits
+  if (s.extras.simple) showExplain('simple');
+  if (s.extras.detail) showExplain('detail');
+  s.asks.forEach(showAsk);
+
+  async function explain(style, btn) {
+    if (s.extras[style]) { const p = panels[style] || panel(style, HEAD[style], s.extras[style]); p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+    btn.disabled = true;
+    const p = loading(style, HEAD[style]); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try {
+      let text;
+      if (deck.sample) { await sleep(700); text = (s.sampleExtras || {})[style] || 'Sample text not available.'; }
+      else {
+        const data = await AI.enqueue({ action: 'explain', style, text: s.text, summary: s.summary }, { onStatus: m => { p.lastChild.textContent = m; } });
+        text = data.explanation;
+      }
+      s.extras[style] = text; persistDeck(deck);
+      showExplain(style);
+    } catch (e) { panel(style, HEAD[style], null, 'notin').append(el('div', { style: 'color:#ff8a92' }, e.message || 'Something went wrong.')); }
+    btn.disabled = false;
+  }
+  simpleBtn.addEventListener('click', () => explain('simple', simpleBtn));
+  detailBtn.addEventListener('click', () => explain('detail', detailBtn));
+  askBtn.addEventListener('click', () => { askBox.classList.toggle('hidden'); if (!askBox.classList.contains('hidden')) askInput.focus(); });
+  async function ask() {
+    const qText = askInput.value.trim(); if (qText.length < 2) { askInput.focus(); return; }
+    const key = norm(qText);
+    const prev = s.asks.findIndex(a => norm(a.q) === key);
+    if (prev >= 0) { const p = panels['ask' + prev]; if (p) { p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } askInput.value = ''; return; }
+    askGo.disabled = true;
+    const idx = s.asks.length;
+    const p = loading('ask' + idx, 'You asked: ' + qText);
+    try {
+      let a;
+      if (deck.sample) { await sleep(700); a = sampleAnswer(s, qText); }
+      else {
+        const others = deck.learn.sections.filter((_, j) => j !== i).map(x => x.text).join('\n\n');
+        const room = Math.max(0, 58000 - s.text.length);
+        const data = await AI.enqueue({ action: 'ask', text: s.text, question: qText, context: others.slice(0, room) }, { onStatus: m => { p.lastChild.textContent = m; } });
+        a = { q: qText, a: data.answer, inNotes: !!data.inNotes };
+      }
+      s.asks.push(a); persistDeck(deck);
+      showAsk(a, idx); askInput.value = '';
+    } catch (e) { p.remove(); delete panels['ask' + idx]; alert(e.message || 'Something went wrong.'); }
+    askGo.disabled = false;
+  }
+  askGo.addEventListener('click', ask);
+  askInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ask(); } });
+
+  if (s.status === 'done' && s.score) {
+    card.append(el('div', { class: 'notice info', style: 'margin:1rem 0 0' }, '✓ Done — ' + s.score.right + '/' + s.score.total + ' on the first try.'));
+  }
+  const go = el('button', { class: 'btn btn-primary btn-block', id: 'understandBtn', style: 'margin-top:1rem' }, s.status === 'done' ? 'Quiz me on this section again' : 'Ok, I understand →');
+  go.addEventListener('click', () => startSectionQuiz(i));
+  card.append(go);
+  if (s.status === 'done') card.append(el('button', { class: 'btn btn-secondary btn-block', style: 'margin-top:0.5rem', onclick: () => goNext(i) }, i + 1 < deck.learn.sections.length ? 'Next section →' : 'Final Review →'));
+}
+
+function startSectionQuiz(i) {
+  const deck = L.deck, s = sec(i);
+  const ids = deck.questions.filter(q => q.section === i).map(q => q.id);
+  if (!ids.length) { finishSection(i, { firstScore: 0, total: 0, firstMissed: [], stillMissed: [] }); return; }
+  if (s.status !== 'done') s.status = 'quiz';
+  persistDeck(deck);
+  startQuiz(deck, ids, 'section', {
+    label: 'Section ' + (i + 1) + ' · ' + s.title, retryMissed: true,
+    onQuit: () => { showScreen('learn'); renderSection(); },
+    onComplete: r => finishSection(i, r)
+  });
+}
+
+function finishSection(i, r) {
+  const deck = L.deck, s = sec(i);
+  s.status = 'done'; s.score = { right: r.firstScore, total: r.total }; s.misses = r.firstMissed;
+  persistDeck(deck);
+  showScreen('learn'); renderLearnHeader();
+  const card = $('lCard'); card.innerHTML = '';
+  if (deck.sample) card.append(el('div', { class: 'sample-banner' }, 'Sample — not from your file'));
+  card.append(el('div', { class: 'sec-label' }, 'Section ' + (i + 1) + ' complete'), el('div', { class: 'sec-title' }, s.title));
+  if (r.total) {
+    card.append(el('div', { class: 'score-big' }, r.firstScore + ' / ' + r.total));
+    card.append(el('div', { class: 'muted', style: 'text-align:center;margin-bottom:0.8rem' },
+      r.firstMissed.length ? 'on the first try · ' + (r.stillMissed.length ? r.stillMissed.length + ' still tricky — they\'ll come back in the Final Review' : 'and you got the missed one' + (r.firstMissed.length > 1 ? 's' : '') + ' on the retry ✓') : 'Perfect! 🎉'));
+  }
+  const last = i + 1 >= deck.learn.sections.length;
+  card.append(el('button', { class: 'btn btn-primary btn-block', id: 'nextSectionBtn', onclick: () => goNext(i) }, last ? 'Final Review →' : 'Next section →'));
+  card.append(el('div', { class: 'row', style: 'margin-top:0.5rem' },
+    el('button', { class: 'btn btn-secondary', onclick: () => { deck.learn.current = i; renderSection(); } }, 'Review summary'),
+    el('button', { class: 'btn btn-secondary', onclick: () => { renderMap(); showScreen('map'); } }, 'Sections')));
+  prefetchNext();
+}
+
+function goNext(i) {
+  const deck = L.deck;
+  if (i + 1 < deck.learn.sections.length) { deck.learn.current = i + 1; persistDeck(deck); showScreen('learn'); renderSection(); return; }
+  renderMap(); showScreen('map');
+}
+
+// Final Review: a mixed quiz over all sections, weighted toward what was missed.
+function finalPool(deck) {
+  const doneIdx = new Set(deck.learn.sections.map((s, i) => s.status === 'done' ? i : -1).filter(i => i >= 0));
+  return deck.questions.filter(q => doneIdx.has(q.section));
+}
+function startFinalReview(deck) {
+  const pool = finalPool(deck);
+  if (!pool.length) { alert('Finish at least one section first.'); return; }
+  const missedIds = new Set(deck.missed);
+  deck.learn.sections.forEach(s => (s.misses || []).forEach(id => missedIds.add(id)));
+  const missed = shuffle(pool.filter(q => missedIds.has(q.id) || (q.stats && q.stats.wrong > 0)));
+  const others = shuffle(pool.filter(q => !missed.includes(q)));
+  const target = Math.min(pool.length, 20);
+  const take = missed.slice(0, Math.min(missed.length, Math.ceil(target * 0.6)));
+  const pick = take.concat(others.slice(0, target - take.length));
+  if (pick.length < target) pick.push(...missed.slice(take.length, take.length + target - pick.length));
+  L = L && L.deck === deck ? L : { deck, pending: {} };
+  startQuiz(deck, pick.map(q => q.id), 'final', { label: 'Final Review · ' + deck.name });
+}
+
+// ---- Section map ----
+function renderMap() {
+  const deck = L.deck, n = deck.learn.sections.length, done = doneCount(deck);
+  $('mapDeck').textContent = deck.name + ' · ' + done + ' of ' + n + ' sections done' + (deck.sample ? ' · Sample — not from your file' : '');
+  $('mapBar').style.width = Math.round(done / n * 100) + '%';
+  const list = $('mapList'); list.innerHTML = '';
+  deck.learn.sections.forEach((s, i) => {
+    const cur = i === deck.learn.current;
+    const state = s.status === 'done' ? (s.score && s.score.total ? s.score.right + '/' + s.score.total + ' on first try' : 'Done')
+      : s.status === 'quiz' ? 'Quiz in progress' : s.summary ? 'Ready' : L.pending[i] ? 'Getting ready…' : 'Not started';
+    let scCls = '', scTxt = '';
+    if (s.status === 'done' && s.score && s.score.total) { const pct = s.score.right / s.score.total; scTxt = Math.round(pct * 100) + '%'; scCls = pct >= 0.8 ? 'good' : pct >= 0.5 ? 'mid' : 'low'; }
+    else if (cur) scTxt = 'You\'re here';
+    list.append(el('button', { class: 'sec' + (s.status === 'done' ? ' done' : '') + (cur ? ' cur' : ''), onclick: () => openLearn(deck, i) },
+      el('span', { class: 'ic' }, s.status === 'done' ? '✓' : String(i + 1)),
+      el('span', { class: 'nm' }, el('div', { class: 'a' }, s.title), el('div', { class: 'muted small' }, s.label + ' · ' + state)),
+      el('span', { class: 'sc ' + scCls }, scTxt)));
+  });
+  const fin = $('mapFinal'); fin.innerHTML = '';
+  fin.append(el('h2', null, '🏁 Final Review'));
+  const pool = finalPool(deck).length;
+  const fl = deck.learn.finalLast;
+  fin.append(el('div', { class: 'muted small', style: 'margin-bottom:0.6rem' },
+    done === n ? 'All sections done! A mixed quiz from every section, heavy on the ones you missed.' : 'Unlocks fully when every section is done (' + done + ' of ' + n + '). You can try it early on the sections you\'ve finished.',
+    fl ? ' Last time: ' + fl.score + '/' + fl.total + '.' : ''));
+  const b = el('button', { class: 'btn ' + (done === n ? 'btn-primary' : 'btn-secondary') + ' btn-block', onclick: () => startFinalReview(deck) }, done === n ? 'Start Final Review' : 'Final Review (finished sections)');
+  if (!pool) b.disabled = true;
+  fin.append(b);
+}
+$('mapBtn').addEventListener('click', () => { renderMap(); showScreen('map'); });
+$('mapBackBtn').addEventListener('click', () => { showScreen('learn'); renderSection(); });
+
+function renderLearnDeckRow(d, row, list) {
+  const n = d.learn.sections.length, done = doneCount(d);
+  row.append(el('div', { class: 'name' }, '📖 ' + d.name));
+  row.append(el('div', { class: 'muted small' }, ['Learn', fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : ''].filter(Boolean).join(' · ')));
+  const btns = el('div', { class: 'row' });
+  btns.append(el('button', { class: 'btn btn-primary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; const open = x.learn.sections.findIndex(z => z.status !== 'done'); openLearn(x, open >= 0 ? open : x.learn.current); } }, done === n ? 'Review' : 'Resume'));
+  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; renderMap(); showScreen('map'); } }, 'Sections'));
+  if (d.questions.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Quiz all (' + d.questions.length + ')'));
+  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const nm = prompt('Rename deck', d.name); if (nm && nm.trim()) { await DeckStore.rename(d.id, nm.trim()); renderDecks(); } } }, 'Rename'));
+  btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+  row.append(btns); list.append(row);
+}
+
+// ===================== DEMO LEARN DECK =====================
+// Original sample content written for this demo (not from any textbook or class file).
+const DEMO_LEARN = [
+  {
+    title: 'How X-rays Are Made', label: 'Sample slides 1–5',
+    text: 'X-ray tube basics. Cathode (negative) holds the filament. Thermionic emission: heated filament releases electrons. mA = number of electrons; kVp = voltage that accelerates them toward the anode (positive). Electrons strike the focal spot on the tungsten target. ~99% of the energy becomes heat, ~1% x-rays. Rotating anode spreads heat over a larger area.',
+    summary: 'X-rays are made inside the **x-ray tube** when fast electrons slam into a metal target. The **cathode** (the negative side) holds a thin **filament**. When the filament is heated, it releases a cloud of electrons — this is **thermionic emission**. The **mA** setting controls how many electrons are released, and the **kVp** is the voltage that pushes them across the tube toward the **anode** (the positive side). When the electrons hit the **focal spot** on the tungsten target, about 99% of their energy turns into heat and only about 1% becomes x-rays. That\'s why many tubes have a **rotating anode**: spinning spreads the heat over a bigger area so the target doesn\'t overheat.',
+    keyPoints: ['Cathode = negative side with the filament; anode = positive side with the target', 'Thermionic emission = a heated filament releasing electrons', 'mA controls how many electrons; kVp controls how hard they are pushed', 'About 99% of the energy becomes heat and about 1% becomes x-rays', 'A rotating anode spreads the heat over a larger area'],
+    simple: 'Super simple version: inside the x-ray tube there\'s a tiny wire called the **filament** on the negative side. When it gets hot, electrons pop off of it. Then a big push of voltage (the **kVp**) flings those electrons across the tube really fast. They smash into a metal target on the other side, and that crash makes x-rays — plus a LOT of heat.\n\nThink of it like: making popcorn. Turning up the heat (the mA) makes more kernels pop (more electrons). How hard you shake the pan (the kVp) decides how fast they fly. And most of the energy just ends up as heat in the pan — only a tiny bit turns into the "popcorn" you wanted, the x-rays.',
+    detail: '- **Cathode side:** the filament is heated by its own current. More filament heat (set through the **mA**) means more electrons boil off by **thermionic emission**, so mA controls the **quantity** of electrons and therefore of x-rays.\n- **Across the tube:** the **kVp** is the voltage difference between cathode and anode. A higher kVp accelerates electrons harder, so they arrive with more energy.\n- **Anode side:** electrons hit the **focal spot** on the tungsten target. Only about **1%** of their energy becomes x-rays; about **99%** becomes **heat**.\n- **Why it rotates:** because so much heat is made, a **rotating anode** keeps moving fresh target metal under the beam, spreading the heat over a larger area so the tube can handle more exposures.',
+    asks: [{ q: 'Why does the anode spin?', a: 'Because about **99%** of the electrons\' energy turns into heat. Spinning the anode spreads that heat over a bigger area so the target doesn\'t overheat.', inNotes: true }],
+    questions: [
+      { type: 'mc', question: 'What is thermionic emission?', choices: ['Electrons released from a heated filament', 'X-rays bouncing off the patient', 'Heat leaving the anode', 'Electrons absorbed by the image receptor'], answerIndex: 0, explanation: 'Heating the filament on the cathode side releases electrons — that is thermionic emission.', sourceHint: 'Sample slide 2' },
+      { type: 'short', question: 'Which side of the x-ray tube holds the filament?', choices: [], answerIndex: -1, answer: 'Cathode', explanation: 'The cathode (negative side) holds the filament.', sourceHint: 'Sample slide 1' },
+      { type: 'mc', question: 'About how much of the electrons\' energy becomes x-rays at the anode?', choices: ['About 1%', 'About 25%', 'About 50%', 'About 99%'], answerIndex: 0, explanation: 'About 1% becomes x-rays; about 99% becomes heat.', sourceHint: 'Sample slide 4' }
+    ]
+  },
+  {
+    title: 'Radiation Protection Basics', label: 'Sample slides 6–11',
+    text: 'ALARA: as low as reasonably achievable. Cardinal principles: time, distance, shielding. Inverse square law: doubling distance gives one-fourth the intensity. Patient is the main source of scatter for the technologist. Lead aprons and shields absorb scatter. Wear the dosimeter at the collar, outside the apron.',
+    summary: 'The goal of radiation protection is **ALARA** — keeping dose **As Low As Reasonably Achievable**. Three **cardinal principles** get you there: spend less **time** near the source, keep more **distance**, and use **shielding**. Distance is powerful because of the **inverse square law**: double your distance and the intensity drops to one-fourth. During an exam the patient becomes the main source of **scatter** for the technologist, so step back and stand behind barriers when you can. Lead aprons and shields absorb scatter. When you wear an apron, your **dosimeter** badge goes at the collar, outside the apron, so it reads what your unprotected head and neck receive.',
+    keyPoints: ['ALARA = As Low As Reasonably Achievable', 'Cardinal principles: time, distance, shielding', 'Double the distance → one-fourth the intensity', 'The patient is the main source of scatter for the tech', 'Dosimeter goes at the collar, outside the lead apron'],
+    simple: 'Basically: radiation is like sunburn — you want as little as you can get away with. That\'s **ALARA**. Three easy ways: be near it for less **time**, stand farther away (**distance**), and put something between you and it (**shielding**, like a lead apron).\n\nThink of it like: standing near a campfire. Stay a shorter time, back up, or stand behind a wall, and you feel less heat. Backing up works really well — twice as far away and you get only a quarter as much (that\'s the **inverse square law**).',
+    detail: '- **ALARA** is the overall rule: keep every exposure as low as reasonably achievable.\n- **Time:** less time near the source means less exposure.\n- **Distance:** the most effective tool because of the **inverse square law** — intensity changes with the square of the distance. 2× the distance = **1/4** the intensity; 3× the distance = **1/9**.\n- **Shielding:** lead aprons, shields and barriers absorb scatter.\n- **Scatter:** during an exam the **patient** is the main source of scatter reaching the technologist.\n- **Monitoring:** with an apron on, wear the **dosimeter at the collar, outside the apron**, so it estimates dose to the unshielded head and neck.',
+    asks: [],
+    questions: [
+      { type: 'short', question: 'What does ALARA stand for?', choices: [], answerIndex: -1, answer: 'As Low As Reasonably Achievable', explanation: 'ALARA means keeping radiation exposure as low as reasonably achievable.', sourceHint: 'Sample slide 6' },
+      { type: 'mc', question: 'If you double your distance from the source, the intensity becomes:', choices: ['Twice as strong', 'Half as strong', 'One-fourth as strong', 'Unchanged'], answerIndex: 2, explanation: 'Inverse square law: 2× the distance gives 1/4 the intensity.', sourceHint: 'Sample slide 8' },
+      { type: 'mc', question: 'When wearing a lead apron, where is the dosimeter badge usually worn?', choices: ['At the collar, outside the apron', 'Under the apron at the waist', 'On the wrist', 'In a back pocket'], answerIndex: 0, explanation: 'At the collar outside the apron, so it reads dose to the unshielded head and neck.', sourceHint: 'Sample slide 11' }
+    ]
+  },
+  {
+    title: 'Exposure Factors & Image Quality', label: 'Sample slides 12–17',
+    text: 'mAs controls the quantity of x-rays and receptor exposure. kVp controls penetration (beam quality) and affects contrast: higher kVp gives lower contrast (longer scale). 15% rule: increasing kVp 15% is about like doubling mAs for receptor exposure. Magnification: increase SID and decrease OID to reduce it.',
+    summary: '**mAs** controls the **quantity** of x-rays, so it is the main control for **receptor exposure** (how much radiation reaches the detector). **kVp** controls **penetration** — the energy, or quality, of the beam. kVp also affects **contrast**: raising kVp gives **lower contrast** (a longer scale of grays), while lowering it gives higher contrast. The **15% rule** links the two: raising kVp by 15% affects receptor exposure about the same as doubling mAs. Geometry matters too. To reduce **magnification**, use a longer **SID** (source-to-image distance) and a shorter **OID** (object-to-image distance) — keep the part close to the detector.',
+    keyPoints: ['mAs = quantity → main control of receptor exposure', 'kVp = penetration/beam quality; higher kVp = lower contrast', '15% rule: +15% kVp ≈ doubling mAs (receptor exposure)', 'Less magnification: increase SID, decrease OID'],
+    simple: 'Two knobs: **mAs** is HOW MANY x-rays. **kVp** is HOW STRONG each one is. More strength (kVp) means the picture looks more gray and less black-and-white (**lower contrast**).\n\nThink of it like: a garden hose. mAs is how much water comes out; kVp is how hard the water sprays. Spray harder and it gets through more stuff.\n\nFor less blow-up (**magnification**): put the body part close to the detector (small **OID**) and the tube farther away (big **SID**).',
+    detail: '- **mAs (quantity):** mA × time. Doubling mAs doubles the number of x-rays, so it is the primary control of **receptor exposure**.\n- **kVp (quality):** sets beam energy and **penetration**. Higher kVp → **lower contrast** (long scale); lower kVp → **higher contrast** (short scale).\n- **15% rule:** +15% kVp ≈ 2× mAs for receptor exposure; −15% kVp ≈ ½ mAs. Lets you trade kVp and mAs while keeping exposure similar.\n- **Magnification:** grows when OID increases or SID decreases. Best detail: **long SID, short OID**.',
+    asks: [],
+    questions: [
+      { type: 'short', question: 'Which exposure factor is the main control of the quantity of x-rays?', choices: [], answerIndex: -1, answer: 'mAs', explanation: 'mAs controls quantity and is the main control of receptor exposure.', sourceHint: 'Sample slide 12' },
+      { type: 'mc', question: 'Raising kVp (with mAs adjusted to keep exposure similar) mainly does what to contrast?', choices: ['Raises contrast (short scale)', 'Lowers contrast (long scale)', 'No effect on contrast', 'Removes all scatter'], answerIndex: 1, explanation: 'Higher kVp gives lower contrast — a longer scale of grays.', sourceHint: 'Sample slide 14' },
+      { type: 'mc', question: 'To reduce magnification, you should:', choices: ['Increase SID and decrease OID', 'Decrease SID and increase OID', 'Increase both SID and OID', 'Raise the kVp'], answerIndex: 0, explanation: 'A long SID and short OID keep magnification low.', sourceHint: 'Sample slide 17' }
+    ]
+  }
+].map(s => Object.assign(s, { questions: s.questions.map(q => Object.assign({ answer: q.choices[q.answerIndex] }, q)) }));
+
+const SAMPLE_DECK_ID = 'sample-learn';
+async function startDemoLearn() {
+  let deck = await DeckStore.get(SAMPLE_DECK_ID);
+  if (!deck || deck.mode !== 'learn') {
+    deck = {
+      id: SAMPLE_DECK_ID, mode: 'learn', sample: true, name: 'Sample Learn deck', createdAt: new Date().toISOString(),
+      source: { fileName: '(sample notes)', kind: 'demo' }, settings: { type: 'mix' }, missed: [], attempts: [], questions: [],
+      learn: { current: 0, finalLast: null, sections: [] }
+    };
+    DEMO_LEARN.forEach((d, i) => {
+      deck.learn.sections.push({ title: d.title, label: d.label, text: d.text, status: 'ready', summary: d.summary, keyPoints: d.keyPoints, extras: {}, sampleExtras: { simple: d.simple, detail: d.detail }, sampleAsks: d.asks, asks: [], score: null, misses: [] });
+      d.questions.forEach((q, k) => deck.questions.push(Object.assign({ id: 'sample' + i + '-' + k, section: i, stats: { right: 0, wrong: 0 } }, q)));
+    });
+    deck = await saveDeckSafe(deck);
+  }
+  L = { deck, pending: {} };
+  openLearn(deck);
+}
+function sampleAnswer(s, qText) {
+  const hit = (s.sampleAsks || []).find(a => norm(a.q) === norm(qText) || norm(qText).includes('spin'));
+  if (hit) return { q: qText, a: hit.a, inNotes: true };
+  return { q: qText, a: 'This is the sample deck, so there\'s no AI here yet. Once the Worker is connected, Gemini answers questions like this from your own notes — and tells you if your notes don\'t cover it. (In section 1, try: "Why does the anode spin?")', inNotes: false };
+}
 
 // ===================== MY DECKS UI =====================
 async function renderDecks() {
@@ -1369,6 +2089,7 @@ async function renderDecks() {
   for (const d of decks) {
     const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
     const row = el('div', { class: 'deck' });
+    if (d.mode === 'learn' && d.learn) { renderLearnDeckRow(d, row, list); continue; }
     row.append(el('div', { class: 'name' }, d.name));
     row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : ''].filter(Boolean).join(' · ')));
     const btns = el('div', { class: 'row' });
@@ -1395,6 +2116,7 @@ $('importInput').addEventListener('change', async e => {
 
 updateGenBtn();
 if (/[?&]demo=1/.test(location.search)) startDemo();
+else if (/[?&]demo=learn/.test(location.search)) startDemoLearn();
 </script>
 </body>
 </html>
