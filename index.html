@@ -1649,6 +1649,36 @@ function loadQuiz() {
   quizDegreeEl.focus();
 }
 
+const ORDINAL_WORDS = { first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' };
+
+// Numbered locations: "1st MCP joint", "base of the third metatarsal", "T7", "C7–T1".
+// Returns 'wrong' when the user's number is missing or different, otherwise null (use the general matcher).
+function vertebralLevels(str, expand) {
+  const s = String(str || '').toLowerCase();
+  const levels = new Set();
+  s.replace(/\b([ctls])\s?(\d{1,2})\b(?:\s*(?:-|\u2013|\u2014|to)\s*([ctls])?\s?(\d{1,2})\b)?/g, (m, a, x, b, y) => {
+    levels.add(a + Number(x));
+    if (y) {
+      const b2 = b || a;
+      levels.add(b2 + Number(y));
+      if (expand && b2 === a) for (let k = Math.min(+x, +y); k <= Math.max(+x, +y); k++) levels.add(a + k);
+    }
+    return m;
+  });
+  return levels;
+}
+function checkNumberedLocation(user, correct) {
+  const ords = s => new Set(normalize(s).match(/\b[1-5](?:st|nd|rd|th)\b/g) || []);
+  const cOrd = ords(correct);
+  if (cOrd.size) {
+    const uOrd = ords(user);
+    if (!uOrd.size || [...uOrd].some(o => !cOrd.has(o))) return 'wrong'; // e.g. "MCP joint" or "2nd MCP" for "1st MCP joint"
+  }
+  const cLev = vertebralLevels(correct, true), uLev = vertebralLevels(user, false);
+  if (cLev.size && [...uLev].some(l => !cLev.has(l))) return 'wrong';     // e.g. T8 when the answer is T7
+  return null;
+}
+
 function normalize(str) {
   return String(str || '')
     .toLowerCase()
@@ -1656,6 +1686,9 @@ function normalize(str) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\bceph(?:alic(?:ally)?|alad|alically)?\b/g, 'cephalad') // cephalic = cephalad
     .replace(/\bcaud(?:al(?:ly)?|ad)?\b/g, 'caudad')                   // caudal = caudad
+    .replace(/\b(first|second|third|fourth|fifth)\b/g, w => ORDINAL_WORDS[w]) // first = 1st
+    .replace(/\b([1-5])(?:st|nd|rd|th)?\s*(?=(?:mcp|pip|dip|mtp|ip|cmc|mc|mt|metacarpals?|metatarsals?|digits?|toes?|fingers?)\b)/g,
+      (m, n) => ORDINAL_WORDS[n] + ' ')                                // "1 MCP" = "1st MCP"
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1723,6 +1756,9 @@ function scoreMatch(user, correct, field) {
   if (field === 'degree') {
     const d = scoreDegreeDirection(user, correct);
     if (d) return d;
+  } else {
+    const n = checkNumberedLocation(user, correct);
+    if (n) return n;
   }
 
   const uNorm = normalize(user);
@@ -1731,8 +1767,9 @@ function scoreMatch(user, correct, field) {
   const c = coreWords(correct);
   if (u.length === 0 || c.length === 0) return 'wrong';
 
-  const uNums = uNorm.match(/\d+/g) || [];
-  const cNums = cNorm.match(/\d+/g) || [];
+  // whole tokens, so an ordinal ("1st") only matches the same ordinal, not a plain "1"
+  const uNums = uNorm.match(/\d+(?:st|nd|rd|th)?/g) || [];
+  const cNums = cNorm.match(/\d+(?:st|nd|rd|th)?/g) || [];
   const numMatch = uNums.length > 0 && cNums.some(n => uNums.includes(n));
 
   const hits = u.filter(w => c.some(cw => cw.includes(w) || w.includes(cw))).length;

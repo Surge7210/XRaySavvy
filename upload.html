@@ -1141,11 +1141,14 @@ function startDemo() {
 }
 
 // ===================== GRADING =====================
+const ORDINALS = { first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' };
 const STOP = new Set('a an the of and or to in on at for by with is are was be as it its this that from into than then per'.split(' '));
 const norm = s => String(s || '').toLowerCase().replace(/°/g, ' degrees ').replace(/[^a-z0-9.\s/-]/g, ' ').replace(/[\/-]/g, ' ').replace(/\.(?!\d)/g, ' ')
   .replace(/\b(?:degrees?|deg)\b/g, 'degrees')                       // °, deg, degree, degrees are the same
   .replace(/\bceph(?:alic(?:ally)?|alad|alically)?\b/g, 'cephalad') // cephalic = cephalad
   .replace(/\bcaud(?:al(?:ly)?|ad)?\b/g, 'caudad')                   // caudal = caudad
+  .replace(/\b(first|second|third|fourth|fifth)\b/g, w => ORDINALS[w])   // first = 1st
+  .replace(/\b([1-5])(?:st|nd|rd|th)?\s*(?=(?:mcp|pip|dip|mtp|ip|cmc|mc|mt|metacarpals?|metatarsals?|digits?|toes?|fingers?)\b)/g, (m, n) => ORDINALS[n] + ' ') // "1 MCP" = "1st MCP"
   .replace(/\s+/g, ' ').trim();
 const stem = w => w.replace(/(ies)$/, 'y').replace(/(ing|ed|es|s)$/, '');
 const words = s => norm(s).split(' ').filter(w => w && !STOP.has(w)).map(stem).filter(Boolean);
@@ -1172,6 +1175,23 @@ function gradeAngle(user, answer) {
   const ok = un.every(n => an.includes(n) || ranges.some(([x, y]) => n >= Math.min(x, y) && n <= Math.max(x, y)));
   return ok ? 'right' : null;
 }
+// "1st MCP joint", "third metatarsal", "T7", "C7–T1": the user's number must be there and match.
+function numberedMismatch(user, answer) {
+  const ords = s => new Set(norm(s).match(/\b[1-5](?:st|nd|rd|th)\b/g) || []);
+  const aOrd = ords(answer), uOrd = ords(user);
+  if (aOrd.size && (!uOrd.size || [...uOrd].some(o => !aOrd.has(o)))) return true;
+  const levels = (s, expand) => {
+    const out = new Set();
+    String(s || '').toLowerCase().replace(/\b([ctls])\s?(\d{1,2})\b(?:\s*(?:-|\u2013|\u2014|to)\s*([ctls])?\s?(\d{1,2})\b)?/g, (m, a, x, b, y) => {
+      out.add(a + Number(x));
+      if (y) { const b2 = b || a; out.add(b2 + Number(y)); if (expand && b2 === a) for (let k = Math.min(+x, +y); k <= Math.max(+x, +y); k++) out.add(a + k); }
+      return m;
+    });
+    return out;
+  };
+  const aLev = levels(answer, true), uLev = levels(user, false);
+  return aLev.size > 0 && [...uLev].some(l => !aLev.has(l));
+}
 // Returns 'right', 'close' or 'wrong'. Lenient: exact, containment, or keyword overlap (typos OK).
 function gradeShort(user, answer) {
   const u = norm(user), a = norm(answer);
@@ -1179,6 +1199,12 @@ function gradeShort(user, answer) {
   if (u === a) return 'right';
   const angle = gradeAngle(user, answer);
   if (angle) return angle;
+  if (numberedMismatch(user, answer)) return 'wrong';
+  // Answer is just vertebral level(s) like "T5–T6" and the user named one of them.
+  if (words(answer).every(w => /^[ctls]\d{1,2}$/.test(w)) && /\b[ctls]\s?\d/.test(String(user).toLowerCase())) return 'right';
+  // Numbered joint ("3rd MCP joint"): the number is right, so the word "joint" is optional.
+  const core = s => words(s).filter(w => w !== 'joint');
+  if (/\b[1-5](?:st|nd|rd|th)\b/.test(a) && core(answer).length && core(answer).every(w => core(user).includes(w))) return 'right';
   const aw = words(answer), uw = words(user);
   if (!aw.length) return u.includes(a) ? 'right' : 'wrong';
   if (aw.length === 1 && /\d/.test(aw[0])) return uw.includes(aw[0]) ? 'right' : 'wrong'; // numbers must match exactly
