@@ -261,7 +261,7 @@ function playPop(delay, volume) {
   src.start(t);
 }
 
-const CELEBRATION = 'bats'; // 'bats', 'confetti' or 'fireworks'
+const CELEBRATION = 'confetti'; // 'bats', 'confetti' or 'fireworks' — Halloween: set to 'bats' (bat code kept below)
 function launchConfetti() {
   if (CELEBRATION === 'bats') launchBats();
   else if (CELEBRATION === 'fireworks') launchFireworks();
@@ -569,7 +569,7 @@ function launchFireworks() {
 
 
 // ---- Wrong-answer effect: playful ghost jump scare ----
-const WRONG_EFFECT = 'ghost'; // 'ghost' or 'none'
+const WRONG_EFFECT = 'none'; // 'ghost' or 'none' — Halloween: set to 'ghost' (ghost + BOO code kept below)
 function wrongAnswerEffect() { if (WRONG_EFFECT === 'ghost') ghostJumpScare(); }
 
 // "BOO" sting: falling detuned saw stab through a closing lowpass + low sine thump + short airy whoosh (no crackle)
