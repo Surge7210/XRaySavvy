@@ -78,6 +78,14 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .sample-banner{background:#3d331a;color:#ffd700;border-radius:8px;padding:0.35rem 0.7rem;font-size:0.8rem;font-weight:700;margin-bottom:0.7rem}
 .learn-top{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.3rem}
 .btn-sm{padding:0.4rem 0.8rem;font-size:0.85rem}
+.modebar{display:flex;gap:0.5rem;margin:0 0 0.6rem}
+.modebar .btn{flex:1 1 0;min-height:44px;padding:0.5rem 0.6rem;font-size:0.92rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.deckname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:0.45rem}
+#screen-upload.deckctx .upload-only{display:none}
+#screen-upload:not(.deckctx) .ctx-only{display:none}
+.ctx-extras .btn{width:100%;min-height:44px;margin-top:0.5rem;text-align:left}
+.ctx-name{font-size:1.1rem;font-weight:700;word-break:break-word}
+.mode-btn:disabled{opacity:0.5;cursor:default}
 .sec-label{color:var(--muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 .sec-title{font-size:1.25rem;font-weight:700;margin:0.1rem 0 0.6rem;line-height:1.3}
 .summary{font-size:1rem}
@@ -133,7 +141,15 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
     <div id="aiStatusExtra" style="margin-top:0.35rem">You can still read a file below, or try the <a href="#" id="demoLearnLink" style="color:#ffd700">demo Learn deck</a> or the <a href="#" id="demoLink" style="color:#ffd700">demo quiz</a>. <a href="#" id="recheckLink" style="color:#ffd700">Check again</a></div>
   </div>
 
-  <div class="card">
+  <div class="card ctx-only" id="deckCtxCard">
+    <div class="muted small">Study this deck</div>
+    <div class="ctx-name" id="ctxName"></div>
+    <div class="muted small" id="ctxInfo" style="margin-top:0.2rem"></div>
+    <div class="muted small" style="margin-top:0.35rem">Switch any time — nothing gets re-uploaded and your Learn progress is kept.</div>
+    <button class="btn btn-secondary btn-sm" id="ctxNewBtn" style="margin-top:0.6rem">＋ Upload different notes</button>
+  </div>
+
+  <div class="card upload-only">
     <h2>1. Pick your notes</h2>
     <label class="drop" id="drop">
       <input type="file" id="fileInput" multiple accept=".pptx,.docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*,.heic,.heif">
@@ -147,15 +163,16 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
   </div>
 
   <div class="card hidden" id="modeCard">
-    <h2>2. How do you want to study?</h2>
-    <button class="mode-btn rec" id="learnBtn"><div class="t">📖 Learn (in order) <span class="rec-badge">Recommended</span></div><div class="d">Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
-    <button class="mode-btn" id="cramBtn"><div class="t">⚡ Exam Cram (everything)</div><div class="d">One big quiz on the whole file, 10 to 200 questions.</div></button>
+    <h2 id="modeTitle">2. How do you want to study?</h2>
+    <button class="mode-btn rec" id="learnBtn"><div class="t">📖 Learn (in order) <span class="rec-badge">Recommended</span></div><div class="d" id="learnDesc">Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
+    <button class="mode-btn" id="cramBtn"><div class="t">⚡ Exam Cram (everything)</div><div class="d" id="cramDesc">One big quiz on the whole file, 10 to 200 questions.</div></button>
+    <div id="ctxExtras" class="ctx-extras ctx-only"></div>
     <div id="learnPreview" class="hidden" style="margin-top:0.8rem"></div>
   </div>
 
   <div id="cramOptions" class="hidden">
   <div class="card">
-    <h2>3. Exam Cram options</h2>
+    <h2 id="cramTitle">3. Exam Cram options</h2>
     <label class="lbl" style="margin-top:0">How many questions?</label>
     <div class="chips" id="countChips">
       <button class="chip" data-v="10">10</button><button class="chip active" data-v="25">25</button><button class="chip" data-v="50">50</button><button class="chip" data-v="100">100</button><button class="chip" data-v="custom">Custom</button>
@@ -170,7 +187,7 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
   </div>
 
   <div class="card">
-    <h2>4. Make my quiz</h2>
+    <h2 id="makeTitle">4. Make my quiz</h2>
     <button class="btn btn-primary btn-block" id="genBtn" disabled>Choose a file first</button>
     <div id="genStatus" class="hidden" style="margin-top:0.8rem">
       <div class="muted" id="genMsg">Starting…</div>
@@ -181,7 +198,7 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
   </div>
   </div>
 
-  <div class="card">
+  <div class="card upload-only" id="justLookCard">
     <h2>Just looking?</h2>
     <button class="btn btn-secondary btn-block" id="demoLearnBtn">Try the demo Learn deck (sample)</button>
     <div style="margin-top:0.6rem"><button class="btn btn-secondary btn-block" id="demoBtn">Try the demo quiz (8 sample questions)</button></div>
@@ -190,7 +207,8 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 
 <!-- ============ LEARN SCREEN ============ -->
 <section id="screen-learn" class="hidden">
-  <div class="learn-top"><span class="muted small" id="lDeckName" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span><button class="btn btn-secondary btn-sm" id="mapBtn">☰ Sections</button></div>
+  <div class="deckname muted small" id="lDeckName"></div>
+  <div class="modebar"><button class="btn btn-secondary" id="learnModesBtn">⇄ Switch mode</button><button class="btn btn-secondary" id="mapBtn">☰ Sections</button></div>
   <div class="quiz-label"><span id="lProgress"></span><span id="lScore"></span></div>
   <div class="progress"><div id="lBar"></div></div>
   <div class="card" id="lCard"></div>
@@ -199,7 +217,7 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 <!-- ============ SECTION MAP ============ -->
 <section id="screen-map" class="hidden">
   <div class="card">
-    <div class="learn-top"><h2 style="margin:0">Sections</h2><button class="btn btn-secondary btn-sm" id="mapBackBtn">Back</button></div>
+    <div class="learn-top"><h2 style="margin:0">Sections</h2><div class="row" style="flex-wrap:nowrap;gap:0.4rem"><button class="btn btn-secondary btn-sm" id="mapModesBtn" style="min-height:40px">⇄ Switch mode</button><button class="btn btn-secondary btn-sm" id="mapBackBtn" style="min-height:40px">Back</button></div></div>
     <div class="muted small" id="mapDeck"></div>
     <div class="progress"><div id="mapBar"></div></div>
     <div id="mapList"></div>
@@ -209,6 +227,7 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 
 <!-- ============ QUIZ SCREEN ============ -->
 <section id="screen-quiz" class="hidden">
+  <div class="modebar" id="qModebar"><button class="btn btn-secondary" id="quizModesBtn">⇄ Switch mode</button><button class="btn btn-secondary hidden" id="quizLearnBtn">📖 Learn this deck</button></div>
   <div class="quiz-box">
     <div class="quiz-label"><span id="qProgress"></span><span id="qScore"></span></div>
     <div class="progress"><div id="qBar"></div></div>
@@ -235,6 +254,7 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
       <button class="btn btn-primary" id="retryMissedBtn">Retry missed</button>
       <button class="btn btn-secondary" id="retakeBtn">Retake all</button>
       <button class="btn btn-secondary" id="saveDemoBtn">Save to My Decks</button>
+      <button class="btn btn-secondary" id="resultsModesBtn">⇄ Switch mode</button>
       <button class="btn btn-secondary" id="doneBtn">Done</button>
     </div>
   </div>
@@ -828,12 +848,19 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 const fmtNum = n => n.toLocaleString('en-US');
 function fmtDate(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } }
 
+let currentScreen = 'upload', histGuard = false;
+function isRootScreen(name) { return name === 'decks' || (name === 'upload' && !studyCtx); }
 function showScreen(name) {
+  currentScreen = name;
+  // Keep one extra history entry while inside a deck, so the iPhone back swipe / browser Back
+  // steps back inside the app (see the popstate handler) instead of leaving the page.
+  if (!isRootScreen(name) && !histGuard) { try { history.pushState({ xs: 1 }, ''); histGuard = true; } catch (e) { /* ignore */ } }
   for (const s of ['upload', 'learn', 'map', 'quiz', 'results', 'decks']) $('screen-' + s).classList.toggle('hidden', s !== name);
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name || (name !== 'decks' && b.dataset.tab === 'upload' && name === 'upload')));
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  exitDeckCtx();
   if (b.dataset.tab === 'decks') { renderDecks(); showScreen('decks'); } else showScreen('upload');
 }));
 
@@ -1103,6 +1130,7 @@ function planRequests(chunks, total) {
 }
 
 // ===================== UPLOAD UI =====================
+let studyCtx = null;  // { learn, cram, name } while the mode picker is showing one saved deck
 let extracted = null;  // {fileName, kind, units, unitName, text, chunks}
 let genOpts = { count: 25, type: 'mix' };
 let cancelGen = false;
@@ -1150,7 +1178,7 @@ function useExtracted(r, fileName, displayName, icon) {
   const text = r.parts.join('\n\n');
   const chunks = makeChunks(r.parts);
   const sections = makeSections(makeUnits(r));
-  extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, text, chunks, sections };
+  extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, parts: r.parts, text, chunks, sections };
   info.innerHTML = '';
   const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
   info.append(el('div', null, (icon || '📄') + ' ', el('b', null, displayName || fileName)));
@@ -1307,6 +1335,12 @@ function pickMode(m) {
 }
 $('cramBtn').addEventListener('click', () => { pickMode('cram'); $('cramOptions').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 $('learnBtn').addEventListener('click', async () => {
+  // Already have a Learn deck for these notes? Resume it (progress kept) instead of starting over.
+  const lid = (studyCtx && studyCtx.learn && studyCtx.learn.id) || (extracted && extracted.learnId);
+  if (lid) {
+    const d = (L && L.deck && L.deck.id === lid) ? L.deck : await DeckStore.get(lid);
+    if (d && d.learn) { if (!L || L.deck !== d) L = { deck: d, pending: {} }; openLearn(d); return; }
+  }
   if (!extracted) return;
   pickMode('learn');
   const secs = extracted.sections || [];
@@ -1322,6 +1356,9 @@ $('learnBtn').addEventListener('click', async () => {
     return;
   }
   const deck = await saveDeckSafe(newLearnDeck(extracted));
+  extracted.learnId = deck.id;
+  if (studyCtx) studyCtx.learn = deck;
+  if (extracted.cramId) setDeckLink(extracted.cramId, 'learnId', deck.id);
   openLearn(deck, 0);
 });
 $('cancelBtn').addEventListener('click', () => { cancelGen = true; setStatus('Stopping after this part…'); });
@@ -1402,13 +1439,17 @@ $('genBtn').addEventListener('click', async () => {
   if (stopMsg) showError(stopMsg + ' Kept the ' + all.length + ' questions made so far.');
   const deck = await saveDeckSafe({
     id: DeckStore.newId(),
-    name: extracted.fileName.replace(/\.[^.]+$/, ''),
+    name: extracted.deckName || extracted.fileName.replace(/\.[^.]+$/, ''),
     createdAt: new Date().toISOString(),
     source: { fileName: extracted.fileName, kind: extracted.kind, units: extracted.units, chars: extracted.text.length },
+    src: srcFromExtracted(extracted), learnId: extracted.learnId || null,
     settings: { count: total, type: genOpts.type, focus },
     questions: shuffle(all).slice(0, total).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }, q)),
     missed: [], attempts: []
   });
+  extracted.cramId = deck.id;
+  if (studyCtx) studyCtx.cram = deck;
+  if (extracted.learnId) setDeckLink(extracted.learnId, 'cramId', deck.id);
   startQuiz(deck, null, 'all');
 });
 
@@ -1526,6 +1567,8 @@ function startQuiz(deck, onlyIds, mode, opts) {
   if (!items.length) { alert('No questions to show yet.'); return; }
   quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode, opts: opts || {}, round: 1, total: items.length };
   $('qDeckName').textContent = quiz.opts.label || deck.name;
+  $('quizLearnBtn').classList.toggle('hidden', deck.mode === 'learn' || !!deck.demo);
+  $('resultsModesBtn').classList.toggle('hidden', !!deck.demo);
   showScreen('quiz');
   renderQuestion();
 }
@@ -1876,7 +1919,7 @@ function makeSections(units) {
 function newLearnDeck(x) {
   return {
     id: DeckStore.newId(), mode: 'learn',
-    name: x.fileName.replace(/\.[^.]+$/, ''), createdAt: new Date().toISOString(),
+    name: x.deckName || x.fileName.replace(/\.[^.]+$/, ''), createdAt: new Date().toISOString(), cramId: x.cramId || null,
     source: { fileName: x.fileName, kind: x.kind, units: x.units, chars: x.text.length },
     settings: { type: 'mix' }, questions: [], missed: [], attempts: [],
     learn: {
@@ -2190,6 +2233,7 @@ function renderLearnDeckRow(d, row, list) {
   row.append(el('div', { class: 'muted small' }, ['Learn', fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : ''].filter(Boolean).join(' · ')));
   const btns = el('div', { class: 'row' });
   btns.append(el('button', { class: 'btn btn-primary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; const open = x.learn.sections.findIndex(z => z.status !== 'done'); openLearn(x, open >= 0 ? open : x.learn.current); } }, done === n ? 'Review' : 'Resume'));
+  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'cram') }, '⚡ Exam Cram'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; renderMap(); showScreen('map'); } }, 'Sections'));
   if (d.questions.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Quiz all (' + d.questions.length + ')'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const nm = prompt('Rename deck', d.name); if (nm && nm.trim()) { await DeckStore.rename(d.id, nm.trim()); renderDecks(); } } }, 'Rename'));
@@ -2268,8 +2312,131 @@ function sampleAnswer(s, qText) {
   return { q: qText, a: 'This is the sample deck, so there\'s no AI here yet. Once the Worker is connected, Gemini answers questions like this from your own notes — and tells you if your notes don\'t cover it. (In section 1, try: "Why does the anode spin?")', inNotes: false };
 }
 
+// ===================== SWITCH MODE (same deck, no re-upload) =====================
+// A deck can be studied either way. Learn decks keep their section text; Exam Cram decks keep the
+// extracted notes (src) when they're not huge. Linked decks point at each other (learnId / cramId),
+// so switching back resumes Learn where it was left and never re-reads files or photos.
+const SRC_KEEP_CHARS = 150000;
+const ORIG = { learnDesc: $('learnDesc').innerHTML, cramDesc: $('cramDesc').innerHTML, modeTitle: $('modeTitle').textContent, cramTitle: $('cramTitle').textContent, makeTitle: $('makeTitle').textContent };
+function srcFromExtracted(x) {
+  return x && Array.isArray(x.parts) && x.text.length <= SRC_KEEP_CHARS ? { parts: x.parts, kind: x.kind, units: x.units, unitName: x.unitName } : null;
+}
+function extractedFromDeck(d) {
+  if (!d) return null;
+  const fileName = (d.source && d.source.fileName) || d.name;
+  if (d.mode === 'learn' && d.learn && d.learn.sections.length) {
+    const parts = d.learn.sections.map(s => s.text || '').filter(t => t.trim());
+    if (!parts.length) return null;
+    return { fileName, deckName: d.name, kind: (d.source && d.source.kind) || 'txt', units: d.source && d.source.units, unitName: 'parts',
+      text: parts.join('\n\n'), chunks: makeChunks(parts), sections: d.learn.sections.map(s => ({ title: s.title, label: s.label, text: s.text })) };
+  }
+  if (d.src && Array.isArray(d.src.parts) && d.src.parts.length) {
+    const r = d.src;
+    return { fileName, deckName: d.name, kind: r.kind, units: r.units, unitName: r.unitName, parts: r.parts,
+      text: r.parts.join('\n\n'), chunks: makeChunks(r.parts), sections: makeSections(makeUnits(r)) };
+  }
+  return null;
+}
+// Set learnId/cramId on a saved deck (uses the in-memory Learn deck if it's open, so nothing is overwritten).
+async function setDeckLink(id, key, val) {
+  try {
+    if (L && L.deck && L.deck.id === id) { L.deck[key] = val; await persistDeck(L.deck); return; }
+    const d = await DeckStore.get(id);
+    if (d && !d.demo) { d[key] = val; await DeckStore.save(d); }
+  } catch (e) { /* linking is a nice-to-have */ }
+}
+async function openModes(deck, then) {
+  if (!deck || deck.demo) { exitDeckCtx(); showScreen('upload'); $('justLookCard').scrollIntoView({ block: 'start' }); return; }
+  const live = id => (L && L.deck && L.deck.id === id) ? L.deck : DeckStore.get(id);
+  const learn = deck.mode === 'learn' ? ((L && L.deck && L.deck.id === deck.id) ? L.deck : deck) : (deck.learnId ? await live(deck.learnId) : null);
+  const cram = deck.mode !== 'learn' ? deck : (deck.cramId ? await DeckStore.get(deck.cramId) : null);
+  const useLearn = learn && learn.learn ? learn : null, useCram = cram && cram.mode !== 'learn' ? cram : null;
+  let x = extracted && ((useLearn && extracted.learnId === useLearn.id) || (useCram && extracted.cramId === useCram.id)) ? extracted : null;
+  if (!x) x = extractedFromDeck(useLearn) || extractedFromDeck(useCram);
+  const name = (useLearn || useCram || deck).name;
+  if (x) { x.learnId = useLearn ? useLearn.id : null; x.cramId = useCram ? useCram.id : null; x.deckName = name; }
+  extracted = x;
+  studyCtx = { learn: useLearn, cram: useCram, name };
+  renderDeckCtx();
+  showScreen('upload');
+  if (then === 'learn') $('learnBtn').click();
+  else if (then === 'cram' && !$('cramBtn').disabled) $('cramBtn').click();
+}
+function renderDeckCtx() {
+  const c = studyCtx, lr = c.learn, cr = c.cram;
+  $('screen-upload').classList.add('deckctx');
+  showError(''); pickMode(null);
+  $('ctxName').textContent = c.name;
+  const info = [];
+  if (lr) info.push('📖 Learn: ' + doneCount(lr) + ' of ' + lr.learn.sections.length + ' sections done');
+  if (cr) info.push('⚡ Exam Cram: ' + cr.questions.length + ' questions');
+  $('ctxInfo').textContent = info.join(' · ');
+  $('modeTitle').textContent = 'How do you want to study?';
+  $('cramTitle').textContent = '2. Exam Cram options';
+  $('makeTitle').textContent = '3. Make my quiz';
+  if (lr) {
+    const n = lr.learn.sections.length, done = doneCount(lr);
+    $('learnDesc').textContent = done >= n ? 'All ' + n + ' sections done — review any section or take the Final Review.' : 'Pick up where you left off: section ' + (lr.learn.current + 1) + ' of ' + n + (done ? ' (' + done + ' done)' : '') + '.';
+  } else $('learnDesc').innerHTML = extracted ? ORIG.learnDesc : 'Not available for this older quiz — its notes weren\'t saved with it. Tap “Upload different notes” and pick the file again.';
+  $('cramDesc').textContent = !extracted ? 'Not available — this deck\'s notes weren\'t saved with it.' : cr ? 'Make a NEW quiz on the whole deck (10 to 200 questions) — or retake your saved one below.' : 'One big quiz on the whole deck, 10 to 200 questions.';
+  $('learnBtn').disabled = !lr && !extracted;
+  $('cramBtn').disabled = !extracted;
+  const ex = $('ctxExtras'); ex.innerHTML = '';
+  if (cr && cr.questions.length) {
+    ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz((await DeckStore.get(cr.id)) || cr, null, 'all') }, '↻ Retake my Exam Cram quiz (' + cr.questions.length + ' questions)'));
+    if (cr.missed && cr.missed.length) ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = (await DeckStore.get(cr.id)) || cr; startQuiz(x, x.missed, 'missed'); } }, '✗ Just the ones I missed (' + cr.missed.length + ')'));
+  }
+  if (lr && lr.questions.length) ex.append(el('button', { class: 'btn btn-secondary', onclick: () => { L = L && L.deck === lr ? L : { deck: lr, pending: {} }; startQuiz(lr, null, 'all'); } }, '🔀 Quiz me on all Learn questions so far (' + lr.questions.length + ')'));
+  $('modeCard').classList.remove('hidden');
+  $('learnPreview').classList.add('hidden');
+  updateGenBtn();
+}
+function exitDeckCtx() {
+  if (!studyCtx) return;
+  studyCtx = null;
+  $('screen-upload').classList.remove('deckctx');
+  $('learnDesc').innerHTML = ORIG.learnDesc; $('cramDesc').innerHTML = ORIG.cramDesc;
+  $('modeTitle').textContent = ORIG.modeTitle; $('cramTitle').textContent = ORIG.cramTitle; $('makeTitle').textContent = ORIG.makeTitle;
+  $('learnBtn').disabled = false; $('cramBtn').disabled = false; $('ctxExtras').innerHTML = '';
+  pickMode(null);
+  // The deck's notes stay loaded, so Learn/Exam Cram on the Upload screen still work for it.
+  if (extracted) {
+    const info = $('fileInfo'); info.classList.remove('hidden'); info.innerHTML = '';
+    info.append(el('div', null, '📚 ', el('b', null, extracted.deckName || extracted.fileName)), el('div', { class: 'muted' }, fmtNum(extracted.text.length) + ' characters · ' + extracted.sections.length + ' learn sections'));
+  } else $('modeCard').classList.add('hidden');
+  updateGenBtn();
+}
+$('ctxNewBtn').addEventListener('click', () => { exitDeckCtx(); resetUpload(''); $('fileInfo').classList.add('hidden'); showScreen('upload'); });
+$('learnModesBtn').addEventListener('click', () => L && openModes(L.deck));
+$('mapModesBtn').addEventListener('click', () => L && openModes(L.deck));
+function leaveQuizOk() {
+  if (!quiz || quiz.deck.mode === 'learn' || quiz.i < 3) return true;
+  return confirm('Leave this quiz? Your answers so far are saved, but this round won\'t be scored.');
+}
+$('quizModesBtn').addEventListener('click', () => { if (quiz && leaveQuizOk()) openModes(quiz.deck); });
+$('quizLearnBtn').addEventListener('click', () => { if (quiz && leaveQuizOk()) openModes(quiz.deck, 'learn'); });
+$('resultsModesBtn').addEventListener('click', () => quiz && openModes(quiz.deck));
+
+// Back swipe / browser Back: step "up" one level inside the app instead of leaving the page.
+window.addEventListener('popstate', () => {
+  histGuard = false;
+  const cur = currentScreen;
+  if (cur === 'quiz' && quiz) {
+    if (quiz.opts.onQuit) quiz.opts.onQuit();
+    else if (quiz.deck.demo) showScreen('upload');
+    else if (quiz.deck.mode === 'learn') { L = L && L.deck === quiz.deck ? L : { deck: quiz.deck, pending: {} }; renderMap(); showScreen('map'); }
+    else openModes(quiz.deck);
+  } else if (cur === 'results' && quiz) {
+    if (quiz.deck.demo) showScreen('upload'); else openModes(quiz.deck);
+  } else if (cur === 'learn' && L) openModes(L.deck);
+  else if (cur === 'map' && L) { showScreen('learn'); renderSection(); }
+  else if (cur === 'upload' && studyCtx) { exitDeckCtx(); renderDecks(); showScreen('decks'); }
+  else if (!isRootScreen(cur)) showScreen('upload');
+});
+
 // ===================== MY DECKS UI =====================
 async function renderDecks() {
+  exitDeckCtx();
   const list = $('deckList'); list.innerHTML = '';
   const decks = await DeckStore.list();
   if (!decks.length) { list.append(el('div', { class: 'muted' }, 'No saved decks yet. Upload notes to make one.')); return; }
@@ -2277,11 +2444,13 @@ async function renderDecks() {
     const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
     const row = el('div', { class: 'deck' });
     if (d.mode === 'learn' && d.learn) { renderLearnDeckRow(d, row, list); continue; }
-    row.append(el('div', { class: 'name' }, d.name));
+    row.append(el('div', { class: 'name' }, '⚡ ' + d.name));
     row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : ''].filter(Boolean).join(' · ')));
     const btns = el('div', { class: 'row' });
     btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
     if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
+    if (d.learnId || (d.src && d.src.parts)) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
+    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
     btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
     btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
     row.append(btns); list.append(row);
