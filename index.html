@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>X-Ray Projections</title>
+<script src="./auth.js?v=1"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -44,18 +45,35 @@
   .qa-item { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem; margin-bottom:0.8rem; }
   .qa-item p { margin:0 0 0.6rem 0; }
   .answer { margin-top:0.6rem; padding:0.7rem; background:#1e2a3a; border-radius:6px; font-size:0.95rem; }
+
+  .hdr-top { display:flex; align-items:center; justify-content:space-between; gap:0.6rem; margin-bottom:0.6rem; }
+  .hdr-top h1 { margin:0; }
+  .pg-big { font-size:2.2rem; font-weight:700; line-height:1.1; }
+  .pg-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; text-align:center; }
+  .pg-stats .card { margin:0; padding:0.7rem 0.4rem; }
+  .pg-stats .lbl { color:var(--muted); font-size:0.78rem; }
+  .pg-row { margin:0.55rem 0; }
+  .pg-row .t { display:flex; justify-content:space-between; gap:0.5rem; font-size:0.9rem; }
+  .pg-row .t span:first-child { overflow:hidden; text-overflow:ellipsis; }
+  .pg-row .t span:last-child { white-space:nowrap; color:var(--muted); }
+  .pg-bar { height:9px; background:var(--bg); border:1px solid var(--border); border-radius:999px; overflow:hidden; margin-top:0.2rem; }
+  .pg-bar > div { height:100%; border-radius:999px; }
+  .pg-good { background:var(--good); } .pg-mid { background:#ffd700; } .pg-low { background:var(--bad); }
+  .pg-h { font-size:1rem; margin:0 0 0.4rem; }
+  .pg-note { color:var(--muted); font-size:0.8rem; }
 </style>
 </head>
 <body>
 <canvas id="confetti-canvas"></canvas>
 
 <header>
-  <h1>X-Ray Projections</h1>
+  <div class="hdr-top"><h1>X-Ray Projections</h1><span id="acct-slot"></span></div>
   <div class="tabs">
     <button id="tab-ref" class="active">Reference</button>
     <button id="tab-random">Random Quiz</button>
     <button id="tab-focus">Focused Quiz</button>
     <button id="tab-mc">Multiple Choice</button>
+    <button id="tab-progress">📊 Progress</button>
     <a class="tab-link" id="tab-upload" href="./upload.html">📄 Upload &amp; Quiz</a>
   </div>
   <div id="ref-controls">
@@ -105,7 +123,9 @@
     </div>
   </div>
 
-
+  <div id="progress-view" class="hidden">
+    <div id="progress-body"></div>
+  </div>
 </main>
 <script id="data" type="application/json">
 [
@@ -1002,10 +1022,14 @@ const rotationSection = document.getElementById('rotation-section');
 const checkBtn = document.getElementById('check-btn');
 const nextBtn = document.getElementById('next-btn');
 const quizFeedback = document.getElementById('quiz-feedback');
+const tabProgress = document.getElementById('tab-progress');
+const progressView = document.getElementById('progress-view');
+const progressBody = document.getElementById('progress-body');
 
 const extremities = [...new Set(data.map(p => p.extremity))].sort();
 let activeFilter = 'All';
 let currentQuiz = null;
+let quizSerial = 0, loggedSerial = -1; // log only the first check of each question
 
 function renderFilters() {
   filtersEl.innerHTML = '';
@@ -1055,7 +1079,9 @@ let focusQueue = [];
 let focusIndex = 0;
 let focusCorrect = 0;
 
+let weakPool = null; // "Quiz my weak spots" (from the Progress tab)
 function getQuizPool() {
+  if (quizMode === 'focus' && focusSelect.value === '__weak__' && weakPool && weakPool.length) return weakPool;
   if (quizMode === 'focus' && focusSelect.value) {
     return data.filter(p => p.extremity === focusSelect.value);
   }
@@ -1582,6 +1608,17 @@ function selectMC(btn, selected) {
     ? '<div class="feedback good">Correct!</div>'
     : `<div class="feedback bad">Wrong. Correct answer: ${currentMC.crLocation}</div>`;
   if (isCorrect) launchConfetti(); else wrongAnswerEffect();
+  logResults([{ field: 'mc', correct: isCorrect, result: isCorrect ? 'correct' : 'wrong' }], currentMC);
+}
+
+// ---- Optional account: log each graded answer (async; never blocks the quiz) ----
+function logResults(rows, p) {
+  try {
+    if (!window.XRS || !XRS.user || !p) return;
+    setTimeout(() => {
+      try { XRS.log(rows.map(r => Object.assign({ source: 'projections', projection: p.projection, group_label: p.extremity }, r))); } catch (e) {}
+    }, 0);
+  } catch (e) {}
 }
 
 
@@ -1639,6 +1676,7 @@ function loadQuiz() {
     }
     currentQuiz = pool[Math.floor(Math.random() * pool.length)];
   }
+  quizSerial++;
   const hasRot = hasRotation(currentQuiz);
   quizQuestionEl.textContent = hasRot
     ? `What is the CR Degree and Direction, CR Location, and Body Part Rotation for a ${currentQuiz.projection} ${currentQuiz.extremity}?`
@@ -1817,6 +1855,16 @@ function checkAnswer() {
   html += `</div>`;
   quizFeedback.innerHTML = html;
 
+  if (loggedSerial !== quizSerial) {
+    loggedSerial = quizSerial;
+    const rows = [
+      { field: 'cr_angle', correct: degreeResult === 'correct', result: degreeResult },
+      { field: 'cr_location', correct: locResult === 'correct', result: locResult }
+    ];
+    if (hasRot) rows.push({ field: 'rotation', correct: rotResult === 'correct', result: rotResult });
+    logResults(rows, currentQuiz);
+  }
+
   if (quizMode === 'focus' && currentQuiz) {
     const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct';
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
@@ -1841,8 +1889,9 @@ function checkAnswer() {
 }
 
 function setActiveTab(active) {
-  [tabRef, tabRandom, tabFocus, tabMC].forEach(t => t.classList.remove('active'));
+  [tabRef, tabRandom, tabFocus, tabMC, tabProgress].forEach(t => t.classList.remove('active'));
   active.classList.add('active');
+  progressView.classList.toggle('hidden', active !== tabProgress);
 }
 
 tabRef.onclick = () => {
@@ -1922,6 +1971,114 @@ extremities.forEach(ext => {
   opt.textContent = ext;
   focusSelect.appendChild(opt);
 });
+
+// ===================== PROGRESS TAB (optional account) =====================
+let lastProgress = null;
+function pgEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function pgBar(label, pct, sub) {
+  const cls = pct >= 80 ? 'pg-good' : pct >= 50 ? 'pg-mid' : 'pg-low';
+  return `<div class="pg-row"><div class="t"><span>${pgEsc(label)}</span><span>${Math.round(pct)}%${sub ? ' · ' + pgEsc(sub) : ''}</span></div><div class="pg-bar"><div class="${cls}" style="width:${Math.max(2, Math.min(100, pct))}%"></div></div></div>`;
+}
+const FIELD_NAMES = { cr_angle: 'CR angle (degree & direction)', cr_location: 'CR location', rotation: 'Body part rotation', mc: 'Multiple choice (CR location)' };
+const PRIVACY_NOTE = 'Accounts store only your email, your decks and your quiz results. Never upload patient info.';
+
+async function renderProgress() {
+  if (!window.XRS || !XRS.user) {
+    progressBody.innerHTML = `<div class="card" style="text-align:center; padding:1.6rem 1rem;">
+      <div style="font-size:2rem;">📊</div>
+      <h3 style="margin:0.3rem 0;">Log in to track your progress</h3>
+      <p style="color:var(--muted); margin:0.3rem 0 1rem;">See your % correct by body area, your most-missed projections, your day streak, and sync your Upload &amp; Quiz decks across devices. Totally optional — everything else works without an account.</p>
+      <button class="btn-primary" id="pg-login" style="padding:0.7rem 1.4rem; border:none; border-radius:10px; font-size:1rem; cursor:pointer;">Log in / Sign up</button>
+      <p class="pg-note" style="margin-top:1rem;">${PRIVACY_NOTE}</p></div>`;
+    const b = document.getElementById('pg-login');
+    if (b) b.onclick = () => window.XRS ? XRS.openSheet('login') : alert('Login is not available right now. Check your connection and reload.');
+    return;
+  }
+  if (!lastProgress) progressBody.innerHTML = '<div class="empty">Loading your progress…</div>';
+  try {
+    if (XRS.flush) await XRS.flush();
+    const sb = await XRS.client();
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
+    const { data: d, error } = await sb.rpc('my_progress', { tz });
+    if (error) throw error;
+    if (!tabProgress.classList.contains('active')) return;
+    lastProgress = d || {};
+    drawProgress(lastProgress);
+  } catch (e) {
+    progressBody.innerHTML = `<div class="card"><p>Couldn't load your progress right now (${pgEsc(e.message || e)}). Check your connection and try again.</p><button class="btn-secondary" id="pg-retry" style="padding:0.6rem 1rem; border:none; border-radius:8px; cursor:pointer;">Try again</button></div>`;
+    document.getElementById('pg-retry').onclick = renderProgress;
+  }
+}
+
+function drawProgress(d) {
+  const total = d.total || 0;
+  if (!total) {
+    progressBody.innerHTML = `<div class="card" style="text-align:center;"><h3 style="margin-top:0;">No answers yet</h3>
+      <p style="color:var(--muted);">Take a Random, Focused or Multiple Choice quiz (or a quiz in 📄 Upload &amp; Quiz) and your results will show up here.</p></div>
+      <p class="pg-note">${PRIVACY_NOTE}</p>`;
+    return;
+  }
+  const pct = Math.round(100 * d.correct / total);
+  let html = `<div class="pg-stats" style="margin-bottom:0.8rem;">
+      <div class="card"><div class="pg-big" id="pg-overall">${pct}%</div><div class="lbl">overall correct</div></div>
+      <div class="card"><div class="pg-big" id="pg-total">${total}</div><div class="lbl">answers graded</div></div>
+      <div class="card"><div class="pg-big" id="pg-streak">${d.streak || 0}🔥</div><div class="lbl">day streak</div></div>
+    </div>
+    <p class="pg-note" style="margin:-0.3rem 0 0.8rem;">${d.today || 0} today · active on ${d.days_active || 0} day${d.days_active === 1 ? '' : 's'}. Each CR angle, CR location and rotation box counts as its own answer; "Pretty close" counts as not correct.</p>`;
+
+  if ((d.most_missed || []).length) {
+    html += `<div class="card"><h3 class="pg-h">🎯 Most-missed projections</h3>
+      <button class="btn-primary" id="pg-weak" style="width:100%; padding:0.7rem; border:none; border-radius:10px; font-size:1rem; cursor:pointer; margin:0.2rem 0 0.6rem;">Quiz my weak spots (${d.most_missed.length})</button>
+      ${d.most_missed.map(m => `<div class="pg-row"><div class="t"><span>${pgEsc(m.projection)} <span style="color:var(--accent); font-size:0.8rem;">${pgEsc(m.group_label)}</span></span><span>missed ${m.missed} of ${m.n}</span></div></div>`).join('')}
+    </div>`;
+  }
+  if ((d.by_group || []).length) {
+    html += `<div class="card"><h3 class="pg-h">By body area <span class="pg-note">(weakest first)</span></h3>
+      ${d.by_group.map(g => pgBar(g.label || 'Other', +g.pct, g.ok + '/' + g.n)).join('')}</div>`;
+  }
+  if ((d.by_field || []).length) {
+    html += `<div class="card"><h3 class="pg-h">By question part</h3>
+      ${d.by_field.map(f => pgBar(FIELD_NAMES[f.label] || f.label, +f.pct, f.ok + '/' + f.n)).join('')}</div>`;
+  }
+  if ((d.by_deck || []).length) {
+    html += `<div class="card"><h3 class="pg-h">📄 Upload &amp; Quiz decks</h3>
+      ${d.by_deck.map(g => pgBar(g.label || 'Deck', +g.pct, g.ok + '/' + g.n)).join('')}
+      ${(d.by_section || []).length ? `<h3 class="pg-h" style="margin-top:0.9rem;">By section <span class="pg-note">(weakest first)</span></h3>
+      ${d.by_section.map(g => pgBar((g.deck ? g.deck + ' › ' : '') + g.label, +g.pct, g.ok + '/' + g.n)).join('')}` : ''}
+    </div>`;
+  }
+  html += `<p class="pg-note">${PRIVACY_NOTE}</p>`;
+  progressBody.innerHTML = html;
+  const wb = document.getElementById('pg-weak');
+  if (wb) wb.onclick = () => startWeakSpots(d.most_missed);
+}
+
+function startWeakSpots(list) {
+  const keys = new Set((list || []).map(m => m.group_label + '|' + m.projection));
+  weakPool = data.filter(p => keys.has(p.extremity + '|' + p.projection));
+  if (!weakPool.length) { alert('No weak spots to quiz yet — keep practicing!'); return; }
+  let opt = focusSelect.querySelector('option[value="__weak__"]');
+  if (!opt) { opt = document.createElement('option'); opt.value = '__weak__'; focusSelect.insertBefore(opt, focusSelect.firstChild); }
+  opt.textContent = '⭐ My weak spots (' + weakPool.length + ')';
+  focusSelect.value = '__weak__';
+  tabFocus.onclick();
+  window.scrollTo(0, 0);
+}
+
+function showProgressTab() {
+  setActiveTab(tabProgress);
+  quizMode = 'progress';
+  quizView.classList.add('hidden');
+  refView.classList.add('hidden');
+  mcView.classList.add('hidden');
+  refControls.classList.add('hidden');
+  focusControls.classList.add('hidden');
+  renderProgress();
+}
+window.showProgressTab = showProgressTab;
+tabProgress.onclick = showProgressTab;
+if (window.XRS) XRS.on(() => { if (tabProgress.classList.contains('active')) { lastProgress = null; renderProgress(); } });
+if (location.hash === '#progress') showProgressTab();
 
 renderFilters();
 render();

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload &amp; Quiz – X-Ray Projections</title>
+<script src="./auth.js?v=1"></script>
 <style>
 :root{--bg:#0f1419;--card:#1a2332;--text:#e7e9ea;--muted:#8b98a5;--accent:#1d9bf0;--border:#38444d;--good:#00ba7c;--bad:#f4212e}
 *{box-sizing:border-box}
@@ -14,7 +15,7 @@ h1{font-size:1.35rem;margin:0}
 .badge{font-size:0.7rem;background:#3d331a;color:#ffd700;border-radius:999px;padding:0.1rem 0.5rem;vertical-align:middle;margin-left:0.3rem}
 .back{color:var(--accent);text-decoration:none;font-size:0.9rem;white-space:nowrap}
 .tabs{display:flex;gap:0.5rem;max-width:800px;margin:0.7rem auto 0;overflow-x:auto}
-.tabs button{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:999px;padding:0.45rem 1rem;font-size:0.9rem;cursor:pointer;white-space:nowrap}
+.tabs button,.tabs a.tab-pill{text-decoration:none;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:999px;padding:0.45rem 1rem;font-size:0.9rem;cursor:pointer;white-space:nowrap}
 .tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff}
 main{max-width:800px;margin:0 auto;padding:1rem}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:1rem}
@@ -125,11 +126,12 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 <header>
   <div class="top">
     <h1>Upload &amp; Quiz</h1>
-    <a class="back" href="./index.html">&larr; Back to main app</a>
+    <div style="display:flex;align-items:center;gap:0.6rem"><a class="back" href="./index.html">&larr; Back to main app</a><span id="acct-slot"></span></div>
   </div>
   <nav class="tabs">
     <button data-tab="upload" class="active">Upload</button>
     <button data-tab="decks">My Decks</button>
+    <a id="progressLink" class="tab-pill" href="./index.html#progress">📊 Progress</a>
   </nav>
 </header>
 
@@ -268,7 +270,8 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 <section id="screen-decks" class="hidden">
   <div class="card">
     <h2>My Decks</h2>
-    <p class="muted small" style="margin-top:0">Saved on this phone/browser only. Use Export to back them up.</p>
+    <p class="muted small" style="margin-top:0" id="deckWhere">Saved on this phone/browser only. Use Export to back them up.</p>
+    <div id="syncBar" class="row hidden" style="margin:-0.2rem 0 0.4rem"><span class="muted small" id="syncStatus"></span><button class="btn btn-secondary btn-sm" id="syncNowBtn">↻ Sync now</button></div>
     <div id="deckList"></div>
   </div>
   <div class="card">
@@ -772,10 +775,13 @@ const DeckStore = (() => {
     try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; }
     catch (e) { return []; }
   }
-  function writeAll(decks) {
+  function writeAll(decks, fromSync) {
     try { localStorage.setItem(KEY, JSON.stringify(decks)); }
     catch (e) { throw new Error('Could not save — this browser\'s storage is full. Delete or export some decks.'); }
+    if (!fromSync && window.DeckSync) DeckSync.schedule();
   }
+  // _mod = last change time used for account sync (newest wins). Kept apart from updatedAt so list order is unchanged.
+  const touch = d => { if (d) { d._mod = new Date().toISOString(); if (window.DeckSync) DeckSync.dirty(d.id); } return d; };
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   function normalizeDeck(d) {
     if (!d || typeof d !== 'object' || !Array.isArray(d.questions)) return null;
@@ -791,16 +797,16 @@ const DeckStore = (() => {
     async get(id) { return readAll().find(d => d.id === id) || null; },
     async save(deck) {
       const all = readAll(); const d = normalizeDeck(deck);
-      d.updatedAt = new Date().toISOString();
+      d.updatedAt = new Date().toISOString(); touch(d);
       const i = all.findIndex(x => x.id === d.id);
       if (i >= 0) all[i] = d; else all.push(d);
       writeAll(all); return d;
     },
     async rename(id, name) {
       const all = readAll(); const d = all.find(x => x.id === id); if (!d) return null;
-      d.name = String(name).slice(0, 120); d.updatedAt = new Date().toISOString(); writeAll(all); return d;
+      d.name = String(name).slice(0, 120); d.updatedAt = new Date().toISOString(); touch(d); writeAll(all); return d;
     },
-    async remove(id) { writeAll(readAll().filter(d => d.id !== id)); },
+    async remove(id) { if (window.DeckSync) DeckSync.tombstone(id); writeAll(readAll().filter(d => d.id !== id)); },
     // Record one answer: updates per-question stats and the deck's missed list.
     async recordAnswer(id, qid, correct) {
       const all = readAll(); const d = all.find(x => x.id === id); if (!d) return;
@@ -808,12 +814,12 @@ const DeckStore = (() => {
       q.stats = q.stats || { right: 0, wrong: 0 };
       if (correct) { q.stats.right++; d.missed = d.missed.filter(x => x !== qid); }
       else { q.stats.wrong++; q.stats.lastMissed = new Date().toISOString(); if (!d.missed.includes(qid)) d.missed.push(qid); }
-      writeAll(all);
+      touch(d); writeAll(all);
     },
     async recordAttempt(id, score, total, mode) {
       const all = readAll(); const d = all.find(x => x.id === id); if (!d) return;
       d.attempts.push({ date: new Date().toISOString(), score, total, mode });
-      d.attempts = d.attempts.slice(-50); d.updatedAt = new Date().toISOString(); writeAll(all);
+      d.attempts = d.attempts.slice(-50); d.updatedAt = new Date().toISOString(); touch(d); writeAll(all);
     },
     async exportJSON() { return JSON.stringify({ app: 'XRaySavvy', version: 1, exportedAt: new Date().toISOString(), decks: readAll() }, null, 2); },
     async importJSON(text) {
@@ -822,12 +828,16 @@ const DeckStore = (() => {
       const all = readAll(); let n = 0;
       for (const raw of incoming) {
         const d = normalizeDeck(raw); if (!d) continue;
+        touch(d);
         const i = all.findIndex(x => x.id === d.id);
         if (i >= 0) all[i] = d; else all.push(d);
         n++;
       }
       writeAll(all); return n;
-    }
+    },
+    // used by DeckSync only
+    _readAll: readAll,
+    _writeAll: decks => writeAll(decks, true)
   };
 })();
 
@@ -1626,6 +1636,19 @@ function finishAnswer(correct, kind, headline) {
   $('nextBtn').classList.remove('hidden');
   setNextLabel();
   recordAnswerFor(quiz.deck, q, correct);
+  quiz.logId = logUploadResult(quiz.deck, q, correct, kind);
+}
+// Optional account: one row per graded answer, tagged with deck + section. Async, never blocks the quiz.
+function logUploadResult(deck, q, correct, kind) {
+  try {
+    if (!window.XRS || !XRS.user) return null;
+    const secs = deck.learn && deck.learn.sections;
+    const section = secs && typeof q.section === 'number' && secs[q.section] ? secs[q.section].title : null;
+    const ids = XRS.log([{ source: 'upload', field: q.type === 'mc' ? 'mc' : 'short', correct: !!correct,
+      result: correct ? 'correct' : kind === 'close' ? 'close' : 'wrong',
+      deck_client_id: deck.demo ? 'demo' : deck.id, deck_name: deck.name, group_label: section }]);
+    return ids && ids[0];
+  } catch (e) { return null; }
 }
 function setNextLabel() {
   let t = 'See results';
@@ -1681,6 +1704,7 @@ $('overrideBtn').addEventListener('click', () => {
   setNextLabel();
   if (quiz.deck.mode === 'learn') { if (q.stats && q.stats.wrong > 0) q.stats.wrong--; }
   recordAnswerFor(quiz.deck, q, true);
+  if (quiz.logId && window.XRS) XRS.mark(quiz.logId, { correct: true, result: 'override' });
 });
 $('quitBtn').addEventListener('click', () => {
   if (quiz.opts.onQuit) { quiz.opts.onQuit(); return; }
@@ -2469,6 +2493,142 @@ $('importInput').addEventListener('change', async e => {
   catch (err) { $('deckMsg').textContent = 'Import failed: ' + (err.message || 'not a valid backup file'); }
   e.target.value = '';
 });
+
+// ===================== ACCOUNT DECK SYNC (optional) =====================
+// Logged out: nothing here runs; decks stay in this browser only (exactly as before).
+// Logged in: each deck is one row in Supabase `decks` (whole deck as jsonb), matched by its local id.
+// Newest change wins (deck._mod vs updated_at). Deletes are kept as tombstones so they sync too.
+window.DeckSync = (() => {
+  const TOMBS = 'xraysavvy.deckTombs.v1';
+  let timer = null, running = false, again = false, lastOk = null, lastErr = '';
+  const dirtySet = new Set();
+  const ms = t => { const n = Date.parse(t || ''); return isNaN(n) ? 0 : n; };
+  const modOf = d => d._mod || d.updatedAt || d.createdAt;
+  const tombs = () => { try { return JSON.parse(localStorage.getItem(TOMBS) || '{}') || {}; } catch (e) { return {}; } };
+  const saveTombs = t => { try { localStorage.setItem(TOMBS, JSON.stringify(t)); } catch (e) {} };
+  const loggedIn = () => !!(window.XRS && XRS.user);
+  function status(t) { const s = $('syncStatus'); if (s) s.textContent = t; }
+  function tombstone(id) { const t = tombs(); t[id] = new Date().toISOString(); saveTombs(t); }
+  function schedule(delay) { if (!loggedIn()) return; clearTimeout(timer); timer = setTimeout(() => { timer = null; run(); }, delay == null ? 1500 : delay); }
+  function sizeKB(d) { try { return Math.round(JSON.stringify(d).length / 1024); } catch (e) { return 0; } }
+
+  async function run() {
+    if (!loggedIn()) return;
+    if (running) { again = true; return; }
+    running = true; again = false; status('Syncing…');
+    const dirtyAtStart = [...dirtySet];
+    let up = 0, down = 0, del = 0;
+    try {
+      const sb = await XRS.client();
+      const sess = (await sb.auth.getSession()).data.session;
+      if (!sess) { status(''); return; }
+      const remote = await sb.from('decks').select('client_id,updated_at,deleted');
+      if (remote.error) throw remote.error;
+      const R = new Map(remote.data.map(r => [r.client_id, r]));
+      const local = DeckStore._readAll().filter(d => d && d.id && !d.demo && !d.unsaved);
+      const L = new Map(local.map(d => [d.id, d]));
+      const t = tombs();
+
+      // 1) push local deletes
+      for (const [id, when] of Object.entries(t)) {
+        const r = R.get(id);
+        if (r && !r.deleted && ms(r.updated_at) <= ms(when)) {
+          const u = await sb.from('decks').update({ deleted: true, data: {}, updated_at: when }).eq('client_id', id);
+          if (u.error) throw u.error;
+          r.deleted = true; r.updated_at = when; del++;
+        }
+        if (!L.has(id)) delete t[id];
+      }
+      saveTombs(t);
+
+      // 2) upload local decks that are new or newer
+      for (const d of local) {
+        const r = R.get(d.id), lm = modOf(d);
+        if (r && ms(r.updated_at) >= ms(lm)) continue;
+        const row = { name: String(d.name || '').slice(0, 200), kind: d.mode === 'learn' ? 'learn' : 'cram', data: d, updated_at: new Date(ms(lm) || Date.now()).toISOString(), deleted: false };
+        let res;
+        if (!r) {
+          res = await sb.from('decks').insert(Object.assign({ client_id: d.id }, row));
+          if (res.error && res.error.code === '23505') res = await sb.from('decks').update(row).eq('client_id', d.id);
+        } else res = await sb.from('decks').update(row).eq('client_id', d.id);
+        if (res.error) throw new Error((res.error.message || 'upload failed') + ' (deck "' + d.name + '", ' + sizeKB(d) + ' KB)');
+        up++;
+      }
+
+      // 3) download remote decks that are newer, and apply remote deletes
+      const need = [], kill = [];
+      for (const r of R.values()) {
+        const d = L.get(r.client_id), lm = d ? ms(modOf(d)) : 0;
+        if (r.deleted) { if (d && ms(r.updated_at) >= lm) kill.push(r.client_id); }
+        else if (!d || ms(r.updated_at) > lm) { if (!t[r.client_id]) need.push(r.client_id); }
+      }
+      const got = [];
+      for (let i = 0; i < need.length; i += 20) {
+        const res = await sb.from('decks').select('client_id,updated_at,data').in('client_id', need.slice(i, i + 20));
+        if (res.error) throw res.error;
+        got.push(...res.data);
+      }
+      if (got.length || kill.length) {
+        const all = DeckStore._readAll(); // re-read: the user may have changed something meanwhile
+        for (const r of got) {
+          const d = r.data; if (!d || !Array.isArray(d.questions)) continue;
+          d.id = r.client_id; d._mod = r.updated_at;
+          const i = all.findIndex(x => x.id === d.id);
+          if (i >= 0) { if (ms(modOf(all[i])) >= ms(r.updated_at)) continue; all[i] = d; } else all.push(d);
+          down++;
+        }
+        for (const id of kill) {
+          const i = all.findIndex(x => x.id === id);
+          if (i >= 0 && ms(modOf(all[i])) <= ms((R.get(id) || {}).updated_at)) { all.splice(i, 1); del++; }
+        }
+        DeckStore._writeAll(all);
+        if (currentScreen === 'decks') renderDecks();
+      }
+      dirtyAtStart.forEach(id => dirtySet.delete(id));
+      lastOk = new Date(); lastErr = '';
+      status('✓ Synced ' + lastOk.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (up || down || del ? ' (' + [up && up + ' up', down && down + ' down', del && del + ' removed'].filter(Boolean).join(', ') + ')' : ''));
+    } catch (e) {
+      lastErr = e.message || String(e);
+      console.warn('[DeckSync]', e);
+      status('⚠️ Not synced yet — ' + (/fetch|network|load/i.test(lastErr) ? 'no connection' : lastErr) + '. Your decks are safe on this device.');
+    } finally {
+      running = false;
+      if (again) schedule(500);
+    }
+  }
+  function updateUI() {
+    const inn = loggedIn();
+    const w = $('deckWhere'), bar = $('syncBar');
+    if (w) w.textContent = inn ? 'Saved on this device and synced to your account (' + (XRS.user.email || '') + '), so they show up when you log in on another phone or computer.' : 'Saved on this phone/browser only. Use Export to back them up — or log in to sync them across devices.';
+    if (bar) bar.classList.toggle('hidden', !inn);
+  }
+  // Leaving the page: one conditional update per changed deck ("only if the server copy is older"),
+  // sent with keepalive. New decks and anything that doesn't make it are synced on the next visit.
+  async function flushSoon() {
+    if (!loggedIn() || !dirtySet.size) return;
+    clearTimeout(timer); timer = null;
+    try {
+      const sb = await XRS.client();
+      const all = DeckStore._readAll();
+      for (const id of [...dirtySet]) {
+        const d = all.find(x => x.id === id); if (!d || d.demo || d.unsaved) continue;
+        const lm = new Date(ms(modOf(d)) || Date.now()).toISOString();
+        sb.from('decks').update({ name: String(d.name || '').slice(0, 200), kind: d.mode === 'learn' ? 'learn' : 'cram', data: d, updated_at: lm, deleted: false })
+          .eq('client_id', id).lt('updated_at', lm).then(r => { if (!r.error) dirtySet.delete(id); }, () => {});
+      }
+    } catch (e) {}
+  }
+  function dirty(id) { if (id) dirtySet.add(id); }
+  return { schedule, run, tombstone, updateUI, flushSoon, dirty };
+})();
+$('syncNowBtn').addEventListener('click', () => DeckSync.run());
+if (window.XRS) {
+  XRS.on(u => { DeckSync.updateUI(); if (u) DeckSync.schedule(200); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') DeckSync.schedule(300); else DeckSync.flushSoon(); });
+  window.addEventListener('pagehide', () => DeckSync.flushSoon());
+  if (XRS.user) DeckSync.schedule(800);
+}
+DeckSync.updateUI();
 
 updateGenBtn();
 if (/[?&]demo=1/.test(location.search)) startDemo();
