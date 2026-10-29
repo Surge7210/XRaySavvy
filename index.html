@@ -10,7 +10,8 @@
   body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
   header { padding:1rem 1rem 0.5rem; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:10; }
   h1 { margin:0 0 0.6rem 0; font-size:1.35rem; }
-  .tabs { display:flex; gap:0.4rem; margin-bottom:0.6rem; }
+  .tabs { display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.6rem; }
+  .tabs a.tab-link { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.9rem; border-radius:999px; font-size:0.9rem; text-decoration:none; }
   .tabs button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.9rem; border-radius:999px; cursor:pointer; font-size:0.9rem; }
   .tabs button.active { background:var(--accent); border-color:var(--accent); color:white; }
   input[type="search"], input[type="text"] { width:100%; padding:0.7rem 1rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; margin-bottom:0.5rem; }
@@ -55,6 +56,7 @@
     <button id="tab-random">Random Quiz</button>
     <button id="tab-focus">Focused Quiz</button>
     <button id="tab-mc">Multiple Choice</button>
+    <a class="tab-link" id="tab-upload" href="./upload.html">📄 Upload &amp; Quiz</a>
   </div>
   <div id="ref-controls">
     <input type="search" id="search" placeholder="Search projections, extremities, or CR locations..." autocomplete="off">
