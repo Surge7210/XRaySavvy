@@ -68,7 +68,7 @@ The Worker link (`https://xraysavvy-ai.opsab10.workers.dev`) is **already added*
 `upload.html`, so there's nothing to paste here. This link is **not** secret.
 
 1. Open **https://xraysavvy-ai.opsab10.workers.dev** in your browser. You should see something like
-   `{"ok":true,"service":"XRaySavvy quiz worker", ... "keySet":true,"actions":["questions","section","explain","ask"]}`.
+   `{"ok":true,"service":"XRaySavvy quiz worker", ... "keySet":true,"actions":["questions","section","explain","ask","ocr"]}`.
 2. Open the Upload page. The box at the top checks the Worker every time the page loads:
 
 | What the Upload page says | What it means | Fix |

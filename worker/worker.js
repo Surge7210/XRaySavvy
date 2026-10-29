@@ -5,7 +5,9 @@
 //   'questions' (default) {text, count, type, focus}      -> {questions[]}
 //   'section'   {text, title, count, type}               -> {title, summary, keyPoints[], questions[]}
 //   'explain'   {text, style:'simple'|'detail', summary} -> {explanation}
-//   'ask'       {text, question, context}                -> {answer, inNotes} The Gemini key lives ONLY in the Worker
+//   'ask'       {text, question, context}                -> {answer, inNotes}
+//   'ocr'       {images:[{data, mimeType}]}  (base64, 1-4) -> {text, pages[]}  reads photos/screenshots
+// The Gemini key lives ONLY in the Worker
 // secret GEMINI_API_KEY (Settings > Variables and Secrets). Never paste it here.
 
 // ---- Settings you might change ----
@@ -22,7 +24,15 @@ const MAX_FOCUS_CHARS = 300;
 const MAX_QUESTION_CHARS = 500;     // 'ask' question length
 const MAX_SUMMARY_CHARS = 4000;     // summary sent back with 'explain'
 const MAX_SECTION_QUESTIONS = 6;
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent';
+// Photo reading ('ocr'): the page shrinks each photo to ~1600px JPEG (~150-600 KB) before sending.
+const MAX_OCR_BODY_BYTES = 8 * 1024 * 1024;   // whole 'ocr' request body
+const MAX_OCR_IMAGES = 4;                     // photos per request (the page sends 1 at a time)
+const MAX_IMAGE_B64_CHARS = 4 * 1024 * 1024;  // ~3 MB per photo after base64
+const OCR_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const ACTIONS = ['questions', 'section', 'explain', 'ask', 'ocr'];
+// Tried only when MODEL is overloaded/unavailable (HTTP 5xx or 404).
+const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+const geminiUrl = m => 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent';
 
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -84,6 +94,7 @@ function buildPrompt(text, count, type, focus) {
     focusRule,
     'For multiple choice: wrong choices must be plausible but clearly wrong according to the text; vary the position of the correct answer; answer must equal choices[answerIndex].',
     'Each explanation: 1-2 sentences using the text. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the text if present, otherwise a short topic name.',
+    TERM_LIST_RULE,
     'No duplicate questions. Do not ask about slide numbers, file names, or formatting.',
     '',
     '=== STUDY NOTES START ===',
@@ -166,6 +177,9 @@ const ASK_SCHEMA = {
   propertyOrdering: ['inNotes', 'answer']
 };
 
+// Extra guidance for vocabulary handouts (e.g. "Term -- definition" lines from a photographed handout).
+const TERM_LIST_RULE = 'If the notes are (or include) a terminology/vocabulary list of term-definition pairs, quiz the pairs in both directions: "Which term means <definition>?" and "What does <term> mean?" / "Define <term>". For those multiple choice questions, take the wrong choices from OTHER terms (or other definitions) on the same list so they are plausible. Short answer questions on a term list must give the definition and ask for the term (answer = just the term); never make a short answer question whose answer is a whole definition. Spread questions across different terms instead of repeating a term.';
+
 const NOTES_ONLY = 'IMPORTANT: Use ONLY facts stated in the provided notes. Do not add outside knowledge or invent numbers, angles or steps. Keep medical and technical accuracy: never change a fact to make it simpler.';
 
 function notesBlock(text, label) {
@@ -189,6 +203,7 @@ function buildSectionPrompt(text, title, count, type) {
     '- questions: exactly ' + count + ' quiz questions covering the most testable facts in THIS section only. ' + typeRule,
     'For multiple choice: wrong choices must be plausible but clearly wrong according to the notes; vary the position of the correct answer; answer must equal choices[answerIndex].',
     'Each explanation: 1-2 sentences using the notes. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the notes if present.',
+    TERM_LIST_RULE,
     'Do not ask about slide numbers, file names, or formatting.',
     notesBlock(text, 'SECTION NOTES')
   ].filter(Boolean).join('\n');
@@ -230,6 +245,40 @@ function buildAskPrompt(text, question, context) {
   ].filter(Boolean).join('\n');
 }
 
+const OCR_PROMPT = [
+  'You are transcribing a photo or screenshot of a radiologic technology student\'s study material (handout, slide, notes or textbook page).',
+  'Transcribe ALL of the readable text faithfully, in normal reading order (top to bottom; for multiple columns, finish the left column before the right).',
+  'Copy the words exactly as written: keep medical spelling, numbers, units, abbreviations and symbols. Do not summarize, explain, correct, translate or add anything.',
+  'Keep the structure with plain-text lines: titles/headings on their own line, list items on their own line starting with "- ", and paragraphs as paragraphs.',
+  'For a terminology/vocabulary list or a table of term + definition, write each pair on ONE line as "Term -- definition" (even if the original uses a colon, dash, columns or bold), in the original order.',
+  'For other tables, write one row per line with cells separated by " | ".',
+  'If a word is truly unreadable write [illegible]. Ignore phone status bars, app buttons and other screen chrome that is not part of the material.',
+  'If the image has no readable study text at all, reply with exactly: NO_TEXT',
+  'Reply with only the transcription (no preamble, no markdown code fences).'
+].join('\n');
+
+// Validates body.images (or a single body.image) -> {images} or {error}.
+function readImages(body) {
+  let list = Array.isArray(body.images) ? body.images : body.image ? [{ data: body.image, mimeType: body.mimeType }] : [];
+  if (!list.length) return { error: ['no_image', 'No photo was sent.'] };
+  if (list.length > MAX_OCR_IMAGES) return { error: ['too_many', 'Send at most ' + MAX_OCR_IMAGES + ' photos per request.'] };
+  const out = [];
+  for (const it of list) {
+    let data = typeof it === 'string' ? it : it && typeof it.data === 'string' ? it.data : '';
+    let mime = (it && typeof it.mimeType === 'string' ? it.mimeType : '').toLowerCase();
+    const m = /^data:([^;,]+);base64,/.exec(data);
+    if (m) { if (!mime) mime = m[1].toLowerCase(); data = data.slice(m[0].length); }
+    data = data.replace(/\s+/g, '');
+    if (!mime) mime = 'image/jpeg';
+    if (mime === 'image/jpg') mime = 'image/jpeg';
+    if (!OCR_MIME.includes(mime)) return { error: ['bad_image', 'That photo type (' + cleanStr(mime, 40) + ') is not supported. Use a JPEG, PNG or screenshot.'] };
+    if (data.length < 100 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return { error: ['bad_image', 'The photo data was empty or damaged. Try picking it again.'] };
+    if (data.length > MAX_IMAGE_B64_CHARS) return { error: ['too_large', 'That photo is too big (over ~3 MB after shrinking). Try a screenshot or a smaller photo.'] };
+    out.push({ inline_data: { mime_type: mime, data } });
+  }
+  return { images: out };
+}
+
 // Multi-line text cleanup (keeps paragraph breaks and "- " bullets).
 function cleanText(v, max) {
   return (typeof v === 'string' ? v : v == null ? '' : String(v))
@@ -239,23 +288,28 @@ function cleanText(v, max) {
 // Calls Gemini and returns either {parsed} or {error: Response}.
 async function callGemini(env, cors, prompt, schema, opts) {
   opts = opts || {};
+  const models = [MODEL, FALLBACK_MODEL].filter((m, i, a) => m && a.indexOf(m) === i);
   let gRes;
+  for (let mi = 0; mi < models.length; mi++) {
+  const last = mi === models.length - 1;
   try {
-    gRes = await fetch(GEMINI_URL, {
+    gRes = await fetch(geminiUrl(models[mi]), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: schema,
+        contents: [{ role: 'user', parts: (opts.parts || []).concat([{ text: prompt }]) }],
+        generationConfig: Object.assign(schema ? { responseMimeType: 'application/json', responseSchema: schema } : { responseMimeType: 'text/plain' }, {
           temperature: opts.temperature == null ? 0.4 : opts.temperature,
           maxOutputTokens: opts.maxOutputTokens || 16384
-        }
+        })
       })
     });
   } catch (e) {
+    if (!last) continue;
     return { error: json({ error: 'network', message: 'Could not reach Google Gemini. Try again in a moment.' }, 502, cors) };
+  }
+  if (!last && (gRes.status >= 500 || gRes.status === 404)) continue; // overloaded or retired: try the fallback model
+  break;
   }
 
   if (gRes.status === 429) {
@@ -292,7 +346,9 @@ async function callGemini(env, cors, prompt, schema, opts) {
         status: gRes.status,
         message: keyProblem
           ? 'Google rejected the API key. Check the GEMINI_API_KEY secret in the Worker settings.'
-          : 'Gemini returned an error (' + gRes.status + '). ' + detail.slice(0, 200)
+          : gRes.status === 503 || /high demand|overloaded/i.test(detail)
+            ? "Google's Gemini AI is overloaded right now (on Google's side). Wait a minute and try again."
+            : 'Gemini returned an error (' + gRes.status + '). ' + detail.slice(0, 200)
       }, 502, cors)
     };
   }
@@ -304,6 +360,13 @@ async function callGemini(env, cors, prompt, schema, opts) {
   const cand = data.candidates && data.candidates[0];
   const out = cand && cand.content && Array.isArray(cand.content.parts)
     ? cand.content.parts.filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('') : '';
+  if (!schema) {
+    const reason = cand && cand.finishReason;
+    if (!out.trim() && (reason === 'SAFETY' || reason === 'PROHIBITED_CONTENT' || (data.promptFeedback && data.promptFeedback.blockReason))) {
+      return { error: json({ error: 'blocked', message: 'Gemini refused to read this image (safety filter). Try a different photo.' }, 422, cors) };
+    }
+    return { raw: out, finishReason: reason };
+  }
   try { return { parsed: JSON.parse(out) }; } catch (e) {
     const reason = cand && cand.finishReason;
     return {
@@ -326,7 +389,7 @@ export default {
       return new Response(null, { status: cors.ok ? 204 : 403, headers: cors.headers });
     }
     if (request.method === 'GET') {
-      return json({ ok: true, service: 'XRaySavvy quiz worker', model: MODEL, keySet: !!env.GEMINI_API_KEY, actions: ['questions', 'section', 'explain', 'ask'] }, 200, cors);
+      return json({ ok: true, service: 'XRaySavvy quiz worker', model: MODEL, keySet: !!env.GEMINI_API_KEY, actions: ACTIONS }, 200, cors);
     }
     if (request.method !== 'POST') return json({ error: 'method', message: 'Use POST.' }, 405, cors);
     if (origin && !cors.ok) return json({ error: 'origin', message: 'This site is not allowed to use this Worker.' }, 403, cors);
@@ -335,13 +398,15 @@ export default {
       return json({ error: 'no_key', message: 'The Worker is missing its GEMINI_API_KEY secret. Add it under Settings > Variables and Secrets, then Deploy.' }, 500, cors);
     }
 
+    // Photos ('ocr') may be up to MAX_OCR_BODY_BYTES; every other action keeps the small text limit (checked below).
     const len = Number(request.headers.get('Content-Length') || 0);
-    if (len > MAX_BODY_BYTES) return json({ error: 'too_large', message: 'That chunk is too big. Try a smaller file.' }, 413, cors);
+    if (len > MAX_OCR_BODY_BYTES) return json({ error: 'too_large', message: 'That upload is too big. Send fewer or smaller photos at a time.' }, 413, cors);
 
-    let body;
+    let body, rawLen = 0;
     try {
       const raw = await request.text();
-      if (raw.length > MAX_BODY_BYTES) return json({ error: 'too_large', message: 'That chunk is too big. Try a smaller file.' }, 413, cors);
+      rawLen = raw.length;
+      if (rawLen > MAX_OCR_BODY_BYTES) return json({ error: 'too_large', message: 'That upload is too big. Send fewer or smaller photos at a time.' }, 413, cors);
       body = JSON.parse(raw);
     } catch (e) {
       return json({ error: 'bad_json', message: 'Request was not valid JSON.' }, 400, cors);
@@ -349,9 +414,23 @@ export default {
     if (!body || typeof body !== 'object') return json({ error: 'bad_json', message: 'Request was not valid JSON.' }, 400, cors);
 
     const action = body.action == null || body.action === '' ? 'questions' : body.action;
-    if (!['questions', 'section', 'explain', 'ask'].includes(action)) {
+    if (!ACTIONS.includes(action)) {
       return json({ error: 'bad_action', message: 'Unknown action "' + cleanStr(action, 40) + '".' }, 400, cors);
     }
+
+    // ---- Photo / screenshot reading: returns the text, which the page then treats like a slide ----
+    if (action === 'ocr') {
+      const im = readImages(body);
+      if (im.error) return json({ error: im.error[0], message: im.error[1] }, im.error[0] === 'too_large' ? 413 : 400, cors);
+      const r = await callGemini(env, cors, OCR_PROMPT, null, { parts: im.images, temperature: 0, maxOutputTokens: 8192 });
+      if (r.error) return r.error;
+      let out = cleanText(r.raw.replace(/^```[a-z]*\n?|\n?```\s*$/gi, ''), MAX_TEXT_CHARS);
+      if (!out || /^NO_TEXT\.?$/i.test(out) || out.replace(/\[illegible\]|NO_TEXT/gi, '').replace(/[^a-z0-9]/gi, '').length < 10) {
+        return json({ error: 'no_text', message: 'No readable text was found in that photo. Make sure the words are in focus and not too small.' }, 422, cors);
+      }
+      return json({ text: out, truncated: r.finishReason === 'MAX_TOKENS', model: MODEL }, 200, cors);
+    }
+    if (rawLen > MAX_BODY_BYTES) return json({ error: 'too_large', message: 'That chunk is too big. Try a smaller file.' }, 413, cors);
 
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     if (text.length < MIN_TEXT_CHARS) return json({ error: 'too_short', message: 'Not enough text to work with.' }, 400, cors);
