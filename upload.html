@@ -16,6 +16,11 @@ h1{font-size:1.35rem;margin:0}
 .back{color:var(--accent);text-decoration:none;font-size:0.9rem;white-space:nowrap}
 .tabs{display:flex;gap:0.5rem;max-width:800px;margin:0.7rem auto 0;overflow-x:auto}
 .tabs button,.tabs a.tab-pill{text-decoration:none;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:999px;padding:0.45rem 1rem;font-size:0.9rem;cursor:pointer;white-space:nowrap}
+.range-box{margin:0 0 0.8rem;padding:0.7rem 0.8rem;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.range-row{display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;margin-top:0.4rem}
+.range-row{flex-wrap:nowrap}
+#rangeBox .range-row input{width:4.8rem;flex:0 0 auto;margin:0;padding:0.55rem 0.5rem;font-size:16px;text-align:center;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text)}
+.range-row .btn{min-height:40px}
 .tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff}
 main{max-width:800px;margin:0 auto;padding:1rem}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem;margin-bottom:1rem}
@@ -166,6 +171,19 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 
   <div class="card hidden" id="modeCard">
     <h2 id="modeTitle">2. How do you want to study?</h2>
+    <div id="rangeBox" class="range-box hidden">
+      <div id="rangeFound" style="font-weight:600"></div>
+      <div id="rangeLbl" style="margin-top:0.35rem">Slides to study:</div>
+      <div class="range-row">
+        <label for="rangeFrom">from</label>
+        <input type="number" id="rangeFrom" inputmode="numeric" pattern="[0-9]*" min="1" step="1" aria-label="First slide">
+        <label for="rangeTo">to</label>
+        <input type="number" id="rangeTo" inputmode="numeric" pattern="[0-9]*" min="1" step="1" aria-label="Last slide">
+        <button type="button" class="btn btn-secondary btn-sm" id="rangeAll">All</button>
+      </div>
+      <div class="muted small" id="rangeSummary" style="margin-top:0.4rem"></div>
+      <div class="small hidden" id="rangeErr" style="color:#ffd700;margin-top:0.3rem"></div>
+    </div>
     <button class="mode-btn rec" id="learnBtn"><div class="t">📖 Learn (in order) <span class="rec-badge">Recommended</span></div><div class="d" id="learnDesc">Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
     <button class="mode-btn" id="cramBtn"><div class="t">⚡ Exam Cram (everything)</div><div class="d" id="cramDesc">One big quiz on the whole file, 10 to 200 questions.</div></button>
     <div id="ctxExtras" class="ctx-extras ctx-only"></div>
@@ -1175,7 +1193,7 @@ function updateGenBtn() {
 }
 
 function resetUpload(msg) {
-  showError(''); extracted = null; updateGenBtn();
+  showError(''); extracted = null; updateGenBtn(); renderRangeBox();
   $('modeCard').classList.add('hidden'); $('learnPreview').classList.add('hidden');
   const info = $('fileInfo');
   info.classList.remove('hidden');
@@ -1185,14 +1203,15 @@ function resetUpload(msg) {
 // Shared by files and photos: turn extracted parts into chunks + Learn sections and show the summary.
 function useExtracted(r, fileName, displayName, icon) {
   const info = $('fileInfo');
-  const text = r.parts.join('\n\n');
-  const chunks = makeChunks(r.parts);
-  const sections = makeSections(makeUnits(r));
-  extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, parts: r.parts, text, chunks, sections };
+  extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, paragraphs: r.paragraphs, allParts: r.parts };
+  extracted.range = fullRange(extracted);
+  applyRange(extracted);
+  const text = r.parts.join('\n\n'), sections = extracted.sections;
   info.innerHTML = '';
-  const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
+  const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) + ' found' : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
   info.append(el('div', null, (icon || '📄') + ' ', el('b', null, displayName || fileName)));
-  info.append(el('div', { class: 'muted' }, [unitsTxt, fmtNum(text.length) + ' characters', sections.length + ' learn section' + (sections.length === 1 ? '' : 's')].filter(Boolean).join(' · ')));
+  info.append(el('div', { class: 'muted' }, [unitsTxt, fmtNum(text.length) + ' characters', extracted.range ? '' : sections.length + ' learn section' + (sections.length === 1 ? '' : 's')].filter(Boolean).join(' · ')));
+  renderRangeBox();
   if (r.kind !== 'photo' && text.replace(/--- (Slide|Page|Photo) \d+ ---|\(no text\)/g, '').trim().length < 200) {
     info.append(el('div', { style: 'color:#ffd700;margin-top:0.3rem' }, 'Very little text found. If this is a scanned PDF or slides that are just pictures, take screenshots of the pages and use 📷 Add photos / screenshots instead.'));
   }
@@ -1449,9 +1468,10 @@ $('genBtn').addEventListener('click', async () => {
   if (stopMsg) showError(stopMsg + ' Kept the ' + all.length + ' questions made so far.');
   const deck = await saveDeckSafe({
     id: DeckStore.newId(),
-    name: extracted.deckName || extracted.fileName.replace(/\.[^.]+$/, ''),
+    name: deckNameFor(extracted),
     createdAt: new Date().toISOString(),
     source: { fileName: extracted.fileName, kind: extracted.kind, units: extracted.units, chars: extracted.text.length },
+    range: rangeForDeck(extracted),
     src: srcFromExtracted(extracted), learnId: extracted.learnId || null,
     settings: { count: total, type: genOpts.type, focus },
     questions: shuffle(all).slice(0, total).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }, q)),
@@ -1459,6 +1479,7 @@ $('genBtn').addEventListener('click', async () => {
   });
   extracted.cramId = deck.id;
   if (studyCtx) studyCtx.cram = deck;
+  if (studyCtx && !studyCtx.learn && !studyCtx.origLearn) studyCtx.name = deck.name;
   if (extracted.learnId) setDeckLink(extracted.learnId, 'cramId', deck.id);
   startQuiz(deck, null, 'all');
 });
@@ -1857,7 +1878,8 @@ function makeUnits(r) {
     const common = new Set(Object.keys(freq).filter(k => r.parts.length >= 6 && freq[k] >= Math.max(3, r.parts.length * 0.25)));
     return r.parts.map((p, i) => {
       const ls = lineSets[i]; const chars = ls.join(' ').length;
-      return { word, n: i + 1, text: p, title: unitTitle(ls, common), heading: chars > 0 && chars < 160 && ls.length <= 4 };
+      const hn = /^--- (?:Slide|Page) (\d+) ---/.exec(p); // original number, even when only a range is used
+      return { word, n: hn ? parseInt(hn[1], 10) : i + 1, text: p, title: unitTitle(ls, common), heading: chars > 0 && chars < 160 && ls.length <= 4 };
     });
   }
   // .docx / .txt: group paragraphs into "parts" of ~1800 characters, starting a new part at headings.
@@ -1943,8 +1965,9 @@ function makeSections(units) {
 function newLearnDeck(x) {
   return {
     id: DeckStore.newId(), mode: 'learn',
-    name: x.deckName || x.fileName.replace(/\.[^.]+$/, ''), createdAt: new Date().toISOString(), cramId: x.cramId || null,
+    name: deckNameFor(x), createdAt: new Date().toISOString(), cramId: x.cramId || null,
     source: { fileName: x.fileName, kind: x.kind, units: x.units, chars: x.text.length },
+    range: rangeForDeck(x), src: srcFromExtracted(x),
     settings: { type: 'mix' }, questions: [], missed: [], attempts: [],
     learn: {
       current: 0, finalLast: null,
@@ -2336,6 +2359,94 @@ function sampleAnswer(s, qText) {
   return { q: qText, a: 'This is the sample deck, so there\'s no AI here yet. Once the Worker is connected, Gemini answers questions like this from your own notes — and tells you if your notes don\'t cover it. (In section 1, try: "Why does the anode spin?")', inNotes: false };
 }
 
+// ===================== SLIDE / PAGE RANGE =====================
+// Study only part of a file. Works for PDFs (pages), PowerPoints (slides) and photos — every part starts
+// with "--- Slide N ---" (or Page/Photo), and N always stays the ORIGINAL number, so section labels and
+// 📍 source hints match the real slides. Only the chosen range is sent to the AI (fewer Gemini calls).
+// Each range gets its own deck; changing the range never touches another deck's Learn progress.
+function unitNum(p) { const m = /^--- (?:Slide|Page|Photo) (\d+)/.exec(p || ''); return m ? parseInt(m[1], 10) : null; }
+function unitWord(x) { return x.kind === 'pptx' ? 'slides' : x.kind === 'photo' ? 'photos' : 'pages'; }
+function fullRange(x) {
+  const all = x && x.allParts;
+  if (!all || all.length < 2 || !['pptx', 'pdf', 'photo'].includes(x.kind)) return null;
+  const nums = all.map(unitNum);
+  if (nums.some(n => n == null)) return null;
+  const min = Math.min(...nums), max = Math.max(...nums);
+  return { from: min, to: max, min, max, count: all.length, unit: unitWord(x) };
+}
+function clampRange(base, from, to, which) {
+  const notes = [];
+  from = parseInt(from, 10); to = parseInt(to, 10);
+  if (isNaN(from)) from = base.min;
+  if (isNaN(to)) to = base.max;
+  const c = v => Math.min(base.max, Math.max(base.min, v));
+  if (c(from) !== from || c(to) !== to) notes.push('This file has ' + base.unit + ' ' + base.min + '–' + base.max + ', so it was adjusted.');
+  from = c(from); to = c(to);
+  if (from > to) {
+    // Typing "from" past "to" moves "to" along (and vice versa), so filling one box at a time just works.
+    if (which === 'from') { to = from; notes.push('“To” moved to ' + to + ' — change it if you want more.'); }
+    else if (which === 'to') { from = to; notes.push('“From” moved to ' + from + ' — change it if you want more.'); }
+    else { const t = from; from = to; to = t; notes.push('Swapped them so the range goes from ' + from + ' to ' + to + '.'); }
+  }
+  return { r: Object.assign({}, base, { from, to }), note: notes.join(' ') };
+}
+function isFullRange(r) { return !r || (r.from === r.min && r.to === r.max); }
+function rangeKey(r) { return r ? r.from + '-' + r.to : 'all'; }
+function rangeText(r) { return r ? r.unit + ' ' + r.from + (r.to !== r.from ? '–' + r.to : '') : ''; }
+function rangeForDeck(x) { const r = x && x.range; return r && !isFullRange(r) ? { from: r.from, to: r.to, of: r.max, unit: r.unit } : null; }
+function deckNameFor(x) {
+  const base = (x.deckName || x.fileName.replace(/\.[^.]+$/, '')).replace(/\s*\((?:slides|pages|photos) \d+(?:–\d+)?\)$/, '');
+  return isFullRange(x.range) ? base : base + ' (' + rangeText(x.range) + ')';
+}
+function applyRange(x) {
+  const all = x.allParts || x.parts || [];
+  const r = x.range;
+  const parts = r && !isFullRange(r) ? all.filter(p => { const n = unitNum(p); return n != null && n >= r.from && n <= r.to; }) : all;
+  x.parts = parts;
+  x.text = parts.join('\n\n');
+  x.chunks = makeChunks(parts);
+  x.sections = makeSections(makeUnits({ kind: x.kind, parts, units: x.units, unitName: x.unitName, paragraphs: x.paragraphs }));
+}
+function renderRangeBox() {
+  const box = $('rangeBox'), x = extracted, r = x && x.range;
+  if (!r) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const U = r.unit[0].toUpperCase() + r.unit.slice(1);
+  $('rangeFound').textContent = '📑 ' + fmtNum(r.count) + ' ' + r.unit + ' found';
+  $('rangeLbl').textContent = U + ' to study:';
+  for (const id of ['rangeFrom', 'rangeTo']) { const i = $(id); i.min = r.min; i.max = r.max; }
+  $('rangeFrom').value = r.from; $('rangeTo').value = r.to;
+  $('rangeFrom').setAttribute('aria-label', 'First ' + r.unit.replace(/s$/, '')); $('rangeTo').setAttribute('aria-label', 'Last ' + r.unit.replace(/s$/, ''));
+  $('rangeAll').disabled = isFullRange(r);
+  const n = x.parts.length, secs = x.sections.length;
+  let sum = (isFullRange(r) ? 'Using all ' : 'Using ' + rangeText(r) + ': ') + n + ' ' + (n === 1 ? r.unit.replace(/s$/, '') : r.unit) + ' · ' + fmtNum(x.text.length) + ' characters · ' + secs + ' learn section' + (secs === 1 ? '' : 's');
+  if (studyCtx && !studyCtx.learn && !studyCtx.cram && (studyCtx.origLearn || studyCtx.origCram)) sum += '. A different range makes a NEW deck — your other deck and its progress are kept.';
+  $('rangeSummary').textContent = sum;
+}
+function setRange(from, to, which) {
+  const x = extracted; if (!x || !x.range) return;
+  const { r, note } = clampRange(x.range, from, to, which);
+  const err = $('rangeErr'); err.textContent = note; err.classList.toggle('hidden', !note);
+  if (rangeKey(r) !== rangeKey(x.range)) {
+    // Remember which decks belong to the old range; pick up the ones for the new range (if any).
+    x.byRange = x.byRange || {};
+    if (studyCtx && !studyCtx.origLearn && !studyCtx.origCram) { studyCtx.origLearn = studyCtx.learn; studyCtx.origCram = studyCtx.cram; }
+    x.byRange[rangeKey(x.range)] = { learnId: x.learnId || null, cramId: x.cramId || null, learn: studyCtx ? studyCtx.learn : null, cram: studyCtx ? studyCtx.cram : null };
+    const b = x.byRange[rangeKey(r)] || {};
+    x.learnId = b.learnId || null; x.cramId = b.cramId || null;
+    x.range = r;
+    applyRange(x);
+    if (studyCtx) { studyCtx.learn = b.learn || null; studyCtx.cram = b.cram || null; renderDeckCtx(); }
+    else { pickMode(null); $('learnPreview').classList.add('hidden'); }
+  }
+  renderRangeBox();
+  updateGenBtn();
+}
+$('rangeFrom').addEventListener('change', () => setRange($('rangeFrom').value, $('rangeTo').value, 'from'));
+$('rangeTo').addEventListener('change', () => setRange($('rangeFrom').value, $('rangeTo').value, 'to'));
+for (const id of ['rangeFrom', 'rangeTo']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }); // blur fires "change"
+$('rangeAll').addEventListener('click', () => { if (extracted && extracted.range) setRange(extracted.range.min, extracted.range.max); });
+
 // ===================== SWITCH MODE (same deck, no re-upload) =====================
 // A deck can be studied either way. Learn decks keep their section text; Exam Cram decks keep the
 // extracted notes (src) when they're not huge. Linked decks point at each other (learnId / cramId),
@@ -2343,11 +2454,22 @@ function sampleAnswer(s, qText) {
 const SRC_KEEP_CHARS = 150000;
 const ORIG = { learnDesc: $('learnDesc').innerHTML, cramDesc: $('cramDesc').innerHTML, modeTitle: $('modeTitle').textContent, cramTitle: $('cramTitle').textContent, makeTitle: $('makeTitle').textContent };
 function srcFromExtracted(x) {
-  return x && Array.isArray(x.parts) && x.text.length <= SRC_KEEP_CHARS ? { parts: x.parts, kind: x.kind, units: x.units, unitName: x.unitName } : null;
+  if (!x || !Array.isArray(x.parts)) return null;
+  const all = x.allParts || x.parts;
+  if (all.reduce((n, p) => n + p.length + 2, 0) <= SRC_KEEP_CHARS) return { parts: all, kind: x.kind, units: x.units, unitName: x.unitName, paragraphs: x.paragraphs };
+  return x.text.length <= SRC_KEEP_CHARS ? { parts: x.parts, kind: x.kind, units: x.units, unitName: x.unitName, paragraphs: x.paragraphs } : null;
 }
 function extractedFromDeck(d) {
   if (!d) return null;
   const fileName = (d.source && d.source.fileName) || d.name;
+  if (d.src && Array.isArray(d.src.parts) && d.src.parts.length) {
+    const r = d.src;
+    const x = { fileName, deckName: d.name, kind: r.kind, units: r.units, unitName: r.unitName, paragraphs: r.paragraphs, allParts: r.parts };
+    const full = fullRange(x);
+    x.range = full && d.range ? clampRange(full, d.range.from, d.range.to).r : full;
+    applyRange(x);
+    return x;
+  }
   if (d.mode === 'learn' && d.learn && d.learn.sections.length) {
     const parts = d.learn.sections.map(s => s.text || '').filter(t => t.trim());
     if (!parts.length) return null;
@@ -2376,11 +2498,12 @@ async function openModes(deck, then) {
   const cram = deck.mode !== 'learn' ? deck : (deck.cramId ? await DeckStore.get(deck.cramId) : null);
   const useLearn = learn && learn.learn ? learn : null, useCram = cram && cram.mode !== 'learn' ? cram : null;
   let x = extracted && ((useLearn && extracted.learnId === useLearn.id) || (useCram && extracted.cramId === useCram.id)) ? extracted : null;
-  if (!x) x = extractedFromDeck(useLearn) || extractedFromDeck(useCram);
+  if (!x) x = (useLearn && useLearn.src ? extractedFromDeck(useLearn) : null) || (useCram && useCram.src ? extractedFromDeck(useCram) : null) || extractedFromDeck(useLearn) || extractedFromDeck(useCram);
   const name = (useLearn || useCram || deck).name;
   if (x) { x.learnId = useLearn ? useLearn.id : null; x.cramId = useCram ? useCram.id : null; x.deckName = name; }
   extracted = x;
   studyCtx = { learn: useLearn, cram: useCram, name };
+  if (x) x.byRange = {};
   renderDeckCtx();
   showScreen('upload');
   if (then === 'learn') $('learnBtn').click();
@@ -2390,7 +2513,7 @@ function renderDeckCtx() {
   const c = studyCtx, lr = c.learn, cr = c.cram;
   $('screen-upload').classList.add('deckctx');
   showError(''); pickMode(null);
-  $('ctxName').textContent = c.name;
+  $('ctxName').textContent = (lr || cr || !extracted) ? c.name : deckNameFor(extracted);
   const info = [];
   if (lr) info.push('📖 Learn: ' + doneCount(lr) + ' of ' + lr.learn.sections.length + ' sections done');
   if (cr) info.push('⚡ Exam Cram: ' + cr.questions.length + ' questions');
@@ -2413,6 +2536,7 @@ function renderDeckCtx() {
   if (lr && lr.questions.length) ex.append(el('button', { class: 'btn btn-secondary', onclick: () => { L = L && L.deck === lr ? L : { deck: lr, pending: {} }; startQuiz(lr, null, 'all'); } }, '🔀 Quiz me on all Learn questions so far (' + lr.questions.length + ')'));
   $('modeCard').classList.remove('hidden');
   $('learnPreview').classList.add('hidden');
+  renderRangeBox();
   updateGenBtn();
 }
 function exitDeckCtx() {
@@ -2428,6 +2552,7 @@ function exitDeckCtx() {
     const info = $('fileInfo'); info.classList.remove('hidden'); info.innerHTML = '';
     info.append(el('div', null, '📚 ', el('b', null, extracted.deckName || extracted.fileName)), el('div', { class: 'muted' }, fmtNum(extracted.text.length) + ' characters · ' + extracted.sections.length + ' learn sections'));
   } else $('modeCard').classList.add('hidden');
+  renderRangeBox();
   updateGenBtn();
 }
 $('ctxNewBtn').addEventListener('click', () => { exitDeckCtx(); resetUpload(''); $('fileInfo').classList.add('hidden'); showScreen('upload'); });
