@@ -30,7 +30,7 @@ const MAX_OCR_IMAGES = 4;                     // photos per request (the page se
 const MAX_IMAGE_B64_CHARS = 4 * 1024 * 1024;  // ~3 MB per photo after base64
 const OCR_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 const ACTIONS = ['questions', 'section', 'explain', 'ask', 'ocr'];
-// Tried only when MODEL is overloaded/unavailable (HTTP 5xx or 404).
+// Tried when MODEL is overloaded/unavailable (HTTP 5xx or 404) or out of quota (HTTP 429).
 const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 const geminiUrl = m => 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent';
 
@@ -308,7 +308,7 @@ async function callGemini(env, cors, prompt, schema, opts) {
     if (!last) continue;
     return { error: json({ error: 'network', message: 'Could not reach Google Gemini. Try again in a moment.' }, 502, cors) };
   }
-  if (!last && (gRes.status >= 500 || gRes.status === 404)) continue; // overloaded or retired: try the fallback model
+  if (!last && (gRes.status >= 500 || gRes.status === 404 || gRes.status === 429)) continue; // overloaded, retired, or over its daily/minute limit: try the fallback model (it has its own separate quota)
   break;
   }
 
@@ -330,7 +330,7 @@ async function callGemini(env, cors, prompt, schema, opts) {
         perDay,
         retryAfterSeconds,
         message: perDay
-          ? "Gemini's free daily limit is used up. It resets at midnight Pacific time (2 AM Central). Your progress so far is kept."
+          ? "Gemini's free daily limit is used up. It resets at midnight Pacific time. Your progress so far is kept."
           : "Gemini's free tier is busy (too many requests per minute). Wait about a minute and try again."
       }, 429, cors)
     };
