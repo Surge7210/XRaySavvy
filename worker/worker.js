@@ -95,7 +95,7 @@ function buildPrompt(text, count, type, focus) {
     'For multiple choice: wrong choices must be plausible but clearly wrong according to the text; vary the position of the correct answer; answer must equal choices[answerIndex].',
     'Each explanation: 1-2 sentences using the text. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the text if present, otherwise a short topic name.',
     TERM_LIST_RULE,
-    'No duplicate questions. Do not ask about slide numbers, file names, or formatting.',
+    'No duplicate questions. Do not ask about slide numbers, file names, or formatting. Every question must stand on its own: never mention or point to a slide, page, figure, image, or "the notes" (no "on slide 3", "in this image", "as shown"); the student cannot see the source while answering, so name the anatomy or topic directly.',
     '',
     '=== STUDY NOTES START ===',
     text,
@@ -204,7 +204,7 @@ function buildSectionPrompt(text, title, count, type) {
     'For multiple choice: wrong choices must be plausible but clearly wrong according to the notes; vary the position of the correct answer; answer must equal choices[answerIndex].',
     'Each explanation: 1-2 sentences using the notes. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the notes if present.',
     TERM_LIST_RULE,
-    'Do not ask about slide numbers, file names, or formatting.',
+    'Do not ask about slide numbers, file names, or formatting. Every question must stand on its own: never mention or point to a slide, page, figure, image, or "the notes" (no "on slide 3", "in this image", "as shown"); the student cannot see the source while answering, so name the anatomy or topic directly.',
     notesBlock(text, 'SECTION NOTES')
   ].filter(Boolean).join('\n');
 }
