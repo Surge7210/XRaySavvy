@@ -7,6 +7,8 @@
 //   'explain'   {text, style:'simple'|'detail', summary} -> {explanation}
 //   'ask'       {text, question, context}                -> {answer, inNotes}
 //   'ocr'       {images:[{data, mimeType}]}  (base64, 1-4) -> {text, pages[]}  reads photos/screenshots
+//   'projections' {text}                                 -> {projections[]}  positioning projections found in the notes
+//                 (every field is copied from the notes; anything not stated is exactly "not on slides")
 // The Gemini key lives ONLY in the Worker
 // secret GEMINI_API_KEY (Settings > Variables and Secrets). Never paste it here.
 
@@ -29,7 +31,7 @@ const MAX_OCR_BODY_BYTES = 8 * 1024 * 1024;   // whole 'ocr' request body
 const MAX_OCR_IMAGES = 4;                     // photos per request (the page sends 1 at a time)
 const MAX_IMAGE_B64_CHARS = 4 * 1024 * 1024;  // ~3 MB per photo after base64
 const OCR_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-const ACTIONS = ['questions', 'section', 'explain', 'ask', 'ocr'];
+const ACTIONS = ['questions', 'section', 'explain', 'ask', 'ocr', 'projections'];
 // Tried when MODEL is overloaded/unavailable (HTTP 5xx or 404) or out of quota (HTTP 429).
 const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 const geminiUrl = m => 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent';
@@ -380,6 +382,123 @@ async function callGemini(env, cors, prompt, schema, opts) {
   }
 }
 
+// ---- 'projections': positioning projections described in the notes (no outside knowledge) ----
+const NOS = 'not on slides';
+const MAX_PROJECTIONS = 60;
+const PROJ_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    projections: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          name: { type: 'STRING', description: 'Projection name as the notes say it, e.g. "AP Ankle", "Lateral L-spine"' },
+          bodyPart: { type: 'STRING', description: 'Body part / exam, e.g. "Ankle", or "not on slides"' },
+          crAngleDirection: { type: 'STRING', description: 'Central ray angle and direction exactly as stated, e.g. "Perpendicular" or "15° cephalad", or "not on slides"' },
+          crLocation: { type: 'STRING', description: 'Where the central ray is centered / enters, as stated, or "not on slides"' },
+          rotation: { type: 'STRING', description: 'Body part / patient rotation or obliquity as stated, e.g. "15–20° medial rotation", or "not on slides"' },
+          notes: { type: 'STRING', description: 'Optional short extra detail stated in the notes (under 120 characters), or ""' },
+          sourceHint: { type: 'STRING', description: 'Slide/page it came from, e.g. "Slide 12" or "Slides 3, 7"; "" if the notes have no slide markers' },
+          nonRoutine: { type: 'BOOLEAN', description: 'true ONLY if the notes call it trauma, non-routine, special, optional or supplemental' }
+        },
+        required: ['name', 'bodyPart', 'crAngleDirection', 'crLocation', 'rotation', 'notes', 'sourceHint', 'nonRoutine'],
+        propertyOrdering: ['name', 'bodyPart', 'crAngleDirection', 'crLocation', 'rotation', 'notes', 'sourceHint', 'nonRoutine']
+      }
+    }
+  },
+  required: ['projections']
+};
+
+function buildProjectionsPrompt(text) {
+  return [
+    'You read a radiologic technology student\'s class notes (slide text). Each slide starts with a marker like "--- Slide 12 ---" (or "--- Page 3 ---" / "--- Photo 2 ---"). List every radiographic PROJECTION (a named positioning view of a body part, e.g. "AP ankle", "PA oblique hand", "lateral L-spine") that the notes describe.',
+    'STRICT RULES:',
+    '- Copy ONLY what the notes state. Never fill in a field from your own knowledge, a textbook, or what is "usually" done, even if you are sure. If a field is not stated in the notes, write exactly "not on slides".',
+    '- Keep the notes\' own wording, numbers and units (inches, cm, degrees). Never invent, convert or round a measurement or angle.',
+    '- crAngleDirection = the central ray (CR) angle and its direction (e.g. "Perpendicular", "15° cephalad", "10° caudal"). crLocation = where the CR is centered or enters. rotation = how much the body part or patient is rotated/obliqued (e.g. "45° medial rotation"); if the notes say there is no rotation, write what they say; if rotation is not mentioned, "not on slides".',
+    '- A slide that names a projection but gives no CR details still counts: list it with "not on slides" for the missing fields.',
+    '- The same projection on several slides is ONE entry: merge the fields and list all its slides in sourceHint. Treat cephalic = cephalad and caudal = caudad as the same.',
+    '- nonRoutine is true ONLY when the notes call the projection trauma, non-routine, special, optional or supplemental; otherwise false.',
+    '- notes: optional, a short fact from the notes about this projection (e.g. what it shows); "" if none. Do not repeat the other fields.',
+    '- If the notes contain no projections (vocabulary, terminology, anatomy, physics, patient care, etc.), return an empty list. Do not turn anatomy terms or general rules into projections.',
+    '',
+    'NOTES:',
+    '"""',
+    text,
+    '"""'
+  ].join('\n');
+}
+
+// Numbers stated in the notes ("third" counts as 3), so the Worker can drop any value with a number the notes never mention.
+const NUM_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, first: 1, second: 2, third: 3, fourth: 4, fifth: 5, half: 2 };
+function numbersIn(str) {
+  const s = String(str || '').toLowerCase();
+  const out = new Set((s.match(/\d+(?:\.\d+)?/g) || []).map(n => String(Number(n))));
+  s.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|half)\b/g, w => { out.add(String(NUM_WORDS[w])); if (w === 'half') out.add('1'); return w; });
+  return out;
+}
+function isNos(v) { return !v || /^(not (on|in) (the )?(slides?|notes)|not stated|not given|n\/?a|unknown|none given)\.?$/i.test(String(v).trim()); }
+const PROJ_STOP = new Set(['projection', 'projections', 'view', 'views', 'the', 'of', 'and', 'a', 'an', 'for', 'position', 'method']);
+function projWords(str) {
+  return String(str || '').toLowerCase()
+    .replace(/\bceph(?:alic|alad)\b/g, 'cephalad').replace(/\bcaud(?:al|ad)\b/g, 'caudad')
+    .replace(/\blat\b/g, 'lateral').replace(/\bobl\b/g, 'oblique')
+    .replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(w => w && !PROJ_STOP.has(w));
+}
+function projKey(p) {
+  const nm = projWords(p.name), bp = isNos(p.bodyPart) ? [] : projWords(p.bodyPart);
+  const words = new Set(nm);
+  for (const w of bp) words.add(w);
+  return [...words].sort().join(' ');
+}
+function slideNums(h) { return (String(h || '').match(/\d+/g) || []).map(Number); }
+function mergeHints(a, b) {
+  const word = (/\b(page|photo)s?\b/i.exec(a + ' ' + b) || [null, 'slide'])[1].toLowerCase();
+  const nums = [...new Set(slideNums(a).concat(slideNums(b)))].sort((x, y) => x - y);
+  if (!nums.length) return cleanStr(a || b, 80);
+  const W = word[0].toUpperCase() + word.slice(1);
+  return nums.length === 1 ? W + ' ' + nums[0] : W + 's ' + nums.join(', ');
+}
+function sanitizeProjections(list, text) {
+  if (!Array.isArray(list)) return [];
+  const textNums = numbersIn(text);
+  const perp = /perpendicular|\bperp\b/i.test(text);
+  const lowText = ' ' + projWords(text).join(' ') + ' ';
+  const grounded = v => [...numbersIn(v)].every(n => textNums.has(n) || ((n === '0' || n === '90') && perp));
+  const field = (v, max) => { const t = cleanStr(v, max); return isNos(t) || !grounded(t) ? NOS : t; };
+  const byKey = new Map();
+  for (const raw of list.slice(0, MAX_PROJECTIONS * 2)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const name = cleanStr(raw.name, 120);
+    if (!name || isNos(name)) continue;
+    // The projection's own words must be in the notes (stops a "standard" view the notes never mention).
+    const nw = projWords(name).filter(w => w.length > 1);
+    const found = nw.filter(w => lowText.includes(' ' + w + ' ')).length;
+    if (!nw.length || found / nw.length < 0.5) continue;
+    let notes = cleanStr(raw.notes, 200);
+    if (isNos(notes) || !grounded(notes)) notes = '';
+    const p = {
+      name,
+      bodyPart: field(raw.bodyPart, 80),
+      crAngleDirection: field(raw.crAngleDirection, 200),
+      crLocation: field(raw.crLocation, 240),
+      rotation: field(raw.rotation, 160),
+      notes,
+      sourceHint: cleanStr(raw.sourceHint, 80).replace(/^(not on slides|n\/a)$/i, ''),
+      nonRoutine: raw.nonRoutine === true
+    };
+    const k = projKey(p);
+    const prev = byKey.get(k);
+    if (!prev) { byKey.set(k, p); continue; }
+    for (const f of ['bodyPart', 'crAngleDirection', 'crLocation', 'rotation']) if (prev[f] === NOS && p[f] !== NOS) prev[f] = p[f];
+    if (p.notes && !prev.notes.toLowerCase().includes(p.notes.toLowerCase())) prev.notes = cleanStr(prev.notes ? prev.notes + ' ' + p.notes : p.notes, 200);
+    prev.sourceHint = mergeHints(prev.sourceHint, p.sourceHint);
+    prev.nonRoutine = prev.nonRoutine || p.nonRoutine;
+  }
+  return [...byKey.values()].slice(0, MAX_PROJECTIONS);
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -475,6 +594,14 @@ export default {
       const explanation = cleanText(r.parsed && r.parsed.explanation, 5000);
       if (!explanation) return json({ error: 'empty', message: 'Gemini did not send an explanation. Try again.' }, 502, cors);
       return json({ style, explanation, model: MODEL }, 200, cors);
+    }
+
+    // ---- Projections: positioning facts copied from the notes (temperature 0, nothing filled in) ----
+    if (action === 'projections') {
+      const r = await callGemini(env, cors, buildProjectionsPrompt(text), PROJ_SCHEMA, { temperature: 0, maxOutputTokens: 16384 });
+      if (r.error) return r.error;
+      const projections = sanitizeProjections(r.parsed && (Array.isArray(r.parsed) ? r.parsed : r.parsed.projections), text);
+      return json({ projections, model: MODEL }, 200, cors);
     }
 
     // ---- Learn mode: "Ask a question" (answered only from the notes) ----
