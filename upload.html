@@ -121,6 +121,9 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .ai-resp ul{margin:0.2rem 0 0.6rem;padding-left:1.2rem}
 .ai-resp>:last-child,.ai-resp p:last-child{margin-bottom:0}
 .ai-resp.notin{border-left-color:#ffd700}
+.ask-h{font-size:0.8rem;font-weight:600;color:var(--muted);margin:0.3rem 0 0.2rem}
+.ask-beyond{margin-top:0.5rem;padding:0.5rem 0.6rem;border-radius:8px;background:rgba(29,155,240,0.08);border-left:3px solid var(--accent)}
+.ask-beyond .ask-h{color:#8ecdf8}
 .ai-resp.flash{animation:flash 1s}
 @keyframes flash{from{background:#2a4a6a}to{background:#1e2a3a}}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;margin-right:0.45rem}
@@ -2142,7 +2145,7 @@ function renderSummary(card, s, i) {
   const askBox = el('div', { class: 'hidden', style: 'margin-top:0.7rem' });
   const askInput = el('input', { type: 'text', id: 'askInput', maxlength: '500', placeholder: 'e.g. Why does the anode spin?' });
   const askGo = el('button', { class: 'btn btn-primary', style: 'margin-top:0.5rem' }, 'Ask');
-  askBox.append(askInput, askGo, el('div', { class: 'muted small', style: 'margin-top:0.3rem' }, 'Answered only from your notes. If your notes don\'t cover it, it will say so.'));
+  askBox.append(askInput, askGo, el('div', { class: 'muted small', style: 'margin-top:0.3rem' }, 'Answers from your notes first, then general X-ray knowledge (clearly labeled). Never type patient info.'));
   card.append(askBox);
   const out = el('div', { id: 'aiOut' });
   card.append(out);
@@ -2160,7 +2163,20 @@ function renderSummary(card, s, i) {
   function loading(key, heading) { const p = panel(key, heading, null); p.append(el('div', { class: 'muted' }, el('span', { class: 'spinner' }), 'Thinking…')); return p; }
   const HEAD = { simple: 'Dumbed down', detail: 'More detail' };
   function showExplain(style) { panel(style, HEAD[style], s.extras[style]); }
-  function showAsk(a, idx) { panel('ask' + idx, 'You asked: ' + a.q, (a.inNotes ? '' : '⚠️ ') + a.a, a.inNotes ? '' : 'notin'); }
+  function showAsk(a, idx) {
+    if (a.fromNotes == null && a.beyondNotes == null) { panel('ask' + idx, 'You asked: ' + a.q, (a.inNotes ? '' : '⚠️ ') + a.a, a.inNotes ? '' : 'notin'); return; } // older saved answers
+    const p = panel('ask' + idx, 'You asked: ' + a.q, null, a.fromNotes ? '' : 'notin');
+    if (a.blocked) { p.append(htmlDiv('', md('⚠️ ' + (a.beyondNotes || 'Please don\'t include patient information. Ask about the topic in general instead.')))); return; }
+    if (a.fromNotes) p.append(el('div', { class: 'ask-h' }, '📝 From your notes'), htmlDiv('', md(a.fromNotes)));
+    else p.append(el('div', { class: 'muted small', style: 'margin:0.2rem 0 0.4rem' }, 'Your notes don\'t cover this.'));
+    if (a.beyondNotes) {
+      const b = el('div', { class: 'ask-beyond' }, el('div', { class: 'ask-h' }, '📚 Beyond your notes (general X-ray knowledge, double-check with your instructor/textbook)'));
+      b.append(htmlDiv('', md(a.beyondNotes)));
+      if (a.unsure) b.append(el('div', { class: 'muted small' }, '⚠️ Not fully sure about this part.'));
+      p.append(b);
+    }
+    if (a.masterList) p.append(el('div', { class: 'proj-master' }, el('div', { class: 'mh' }, '📘 Class master list (not from your notes)'), htmlDiv('', md(a.masterList))));
+  }
   // cached responses from earlier visits
   if (s.extras.simple) showExplain('simple');
   if (s.extras.detail) showExplain('detail');
@@ -2201,6 +2217,7 @@ function renderSummary(card, s, i) {
         const room = Math.max(0, 58000 - s.text.length);
         const data = await AI.enqueue({ action: 'ask', text: s.text, question: qText, context: others.slice(0, room) }, { onStatus: m => { p.lastChild.textContent = m; } });
         a = { q: qText, a: data.answer, inNotes: !!data.inNotes };
+        if ('fromNotes' in data || 'beyondNotes' in data) Object.assign(a, { fromNotes: data.fromNotes || '', beyondNotes: data.beyondNotes || '', masterList: data.masterList || '', unsure: !!data.unsure, blocked: !!data.blocked });
       }
       s.asks.push(a); persistDeck(deck);
       showAsk(a, idx); askInput.value = '';
@@ -2394,7 +2411,7 @@ async function startDemoLearn() {
 function sampleAnswer(s, qText) {
   const hit = (s.sampleAsks || []).find(a => norm(a.q) === norm(qText) || norm(qText).includes('spin'));
   if (hit) return { q: qText, a: hit.a, inNotes: true };
-  return { q: qText, a: 'This is the sample deck, so there\'s no AI here yet. Once the Worker is connected, Gemini answers questions like this from your own notes — and tells you if your notes don\'t cover it. (In section 1, try: "Why does the anode spin?")', inNotes: false };
+  return { q: qText, a: 'This is the sample deck, so there\'s no AI here yet. Once the Worker is connected, Gemini answers questions like this from your own notes first, then adds general X-ray knowledge in a separate, labeled box. (In section 1, try: "Why does the anode spin?")', inNotes: false };
 }
 
 // ===================== SLIDE / PAGE RANGE =====================
