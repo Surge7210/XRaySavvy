@@ -92,20 +92,6 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .ctx-extras .btn{width:100%;min-height:44px;margin-top:0.5rem;text-align:left}
 .ctx-name{font-size:1.1rem;font-weight:700;word-break:break-word}
 .mode-btn:disabled{opacity:0.5;cursor:default}
-.mode-btn.proj{border-color:#5a4a1e}
-.proj-find{margin-top:0.6rem}
-.proj-group{margin-top:1rem;font-weight:700;color:var(--accent);font-size:0.95rem}
-.proj-card{border:1px solid var(--border);border-radius:12px;padding:0.75rem 0.85rem;margin-top:0.55rem;background:var(--bg)}
-.proj-card .pn{font-weight:700;font-size:1.02rem}
-.proj-card .pf{margin-top:0.4rem}
-.proj-card .pl{color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.02em}
-.proj-card .pv{font-size:0.95rem}
-.proj-card .nos{color:var(--muted);font-style:italic}
-.proj-card .pnotes{margin-top:0.45rem;font-size:0.88rem}
-.proj-card .src{color:var(--muted);font-size:0.8rem;margin-top:0.35rem}
-.proj-master{margin-top:0.55rem;border-left:3px solid #6b5b2a;background:#1e1a10;border-radius:6px;padding:0.45rem 0.6rem;font-size:0.86rem}
-.proj-master .mh{font-weight:600;color:#ffd700;font-size:0.8rem}
-.proj-master summary{cursor:pointer;color:#ffd700;font-size:0.82rem}
 .sec-label{color:var(--muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
 .sec-title{font-size:1.25rem;font-weight:700;margin:0.1rem 0 0.6rem;line-height:1.3}
 .summary{font-size:1rem}
@@ -124,6 +110,8 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .ask-h{font-size:0.8rem;font-weight:600;color:var(--muted);margin:0.3rem 0 0.2rem}
 .ask-beyond{margin-top:0.5rem;padding:0.5rem 0.6rem;border-radius:8px;background:rgba(29,155,240,0.08);border-left:3px solid var(--accent)}
 .ask-beyond .ask-h{color:#8ecdf8}
+.proj-master{margin-top:0.55rem;border-left:3px solid #6b5b2a;background:#1e1a10;border-radius:6px;padding:0.45rem 0.6rem;font-size:0.86rem}
+.proj-master .mh{font-weight:600;color:#ffd700;font-size:0.8rem}
 .ai-resp.flash{animation:flash 1s}
 @keyframes flash{from{background:#2a4a6a}to{background:#1e2a3a}}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;margin-right:0.45rem}
@@ -203,9 +191,6 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
     </div>
     <button class="mode-btn rec" id="learnBtn"><div class="t">📖 Learn (in order) <span class="rec-badge">Recommended</span></div><div class="d" id="learnDesc">Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
     <button class="mode-btn" id="cramBtn"><div class="t">⚡ Exam Cram (everything)</div><div class="d" id="cramDesc">One big quiz on the whole file, 10 to 200 questions.</div></button>
-    <button class="mode-btn proj hidden" id="projBtn"><div class="t">🦴 Projections</div><div class="d" id="projDesc"></div></button>
-    <button class="btn btn-secondary btn-sm proj-find hidden" id="projFindBtn">🦴 Find projections</button>
-    <div class="muted small hidden" id="projFindMsg" style="margin-top:0.4rem"></div>
     <div id="ctxExtras" class="ctx-extras ctx-only"></div>
     <div id="learnPreview" class="hidden" style="margin-top:0.8rem"></div>
   </div>
@@ -301,18 +286,6 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
   <div class="card" id="missedCard">
     <h2>Review what you missed</h2>
     <div id="missedList"></div>
-  </div>
-</section>
-
-<!-- ============ PROJECTIONS ============ -->
-<section id="screen-proj" class="hidden">
-  <div class="card">
-    <div class="learn-top"><h2 style="margin:0">🦴 Projections</h2><button class="btn btn-secondary btn-sm" id="projBackBtn" style="min-height:40px">Back</button></div>
-    <div class="muted small" id="projDeck"></div>
-    <div id="projSummary" style="margin-top:0.4rem;font-weight:600"></div>
-    <div class="muted small" style="margin-top:0.2rem">Copied from your notes only. Anything your notes don't say shows as “not on slides”.</div>
-    <button class="btn btn-primary btn-block" id="projQuizBtn" style="margin-top:0.7rem">Quiz me on these projections</button>
-    <div id="projList"></div>
   </div>
 </section>
 
@@ -915,7 +888,7 @@ function showScreen(name) {
   // Keep one extra history entry while inside a deck, so the iPhone back swipe / browser Back
   // steps back inside the app (see the popstate handler) instead of leaving the page.
   if (!isRootScreen(name) && !histGuard) { try { history.pushState({ xs: 1 }, ''); histGuard = true; } catch (e) { /* ignore */ } }
-  for (const s of ['upload', 'learn', 'map', 'quiz', 'results', 'decks', 'proj']) $('screen-' + s).classList.toggle('hidden', s !== name);
+  for (const s of ['upload', 'learn', 'map', 'quiz', 'results', 'decks']) $('screen-' + s).classList.toggle('hidden', s !== name);
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name || (name !== 'decks' && b.dataset.tab === 'upload' && name === 'upload')));
   window.scrollTo(0, 0);
 }
@@ -1225,7 +1198,7 @@ function updateGenBtn() {
 }
 
 function resetUpload(msg) {
-  showError(''); extracted = null; updateGenBtn(); renderRangeBox(); updateProjUI();
+  showError(''); extracted = null; updateGenBtn(); renderRangeBox();
   $('modeCard').classList.add('hidden'); $('learnPreview').classList.add('hidden');
   const info = $('fileInfo');
   info.classList.remove('hidden');
@@ -1238,8 +1211,6 @@ function useExtracted(r, fileName, displayName, icon) {
   extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, paragraphs: r.paragraphs, allParts: r.parts };
   extracted.range = fullRange(extracted);
   applyRange(extracted);
-  extracted.autoProj = true; // fresh upload: look for projections in the background (see PROJECTIONS)
-  scheduleProj(extracted, 3000);
   const text = r.parts.join('\n\n'), sections = extracted.sections;
   info.innerHTML = '';
   const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) + ' found' : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
@@ -1362,7 +1333,6 @@ function showWorkerState() {
   $('aiStatusExtra').classList.toggle('hidden', workerState === 'ready' || workerState === 'checking');
   $('recheckLink').classList.toggle('hidden', workerState === 'no_url');
   updateGenBtn();
-  try { updateProjUI(); } catch (e) { /* not set up yet */ }
 }
 function setWorkerState(st, model) { workerState = st; workerModel = model || ''; showWorkerState(); return st; }
 function checkWorker() {
@@ -1392,7 +1362,6 @@ $('demoLearnBtn').addEventListener('click', () => startDemoLearn());
 
 // ---- Mode choice: Learn (in order) vs Exam Cram (everything) ----
 function pickMode(m) {
-  if (m && extracted && extracted.autoProj) scheduleProj(extracted, 0);
   $('learnBtn').classList.toggle('active', m === 'learn');
   $('cramBtn').classList.toggle('active', m === 'cram');
   $('cramOptions').classList.toggle('hidden', m !== 'cram');
@@ -1509,7 +1478,6 @@ $('genBtn').addEventListener('click', async () => {
     source: { fileName: extracted.fileName, kind: extracted.kind, units: extracted.units, chars: extracted.text.length },
     range: rangeForDeck(extracted),
     src: srcFromExtracted(extracted), learnId: extracted.learnId || null,
-    ...projFieldsFor(extracted),
     settings: { count: total, type: genOpts.type, focus },
     questions: shuffle(all).slice(0, total).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }, q)),
     missed: [], attempts: []
@@ -1635,9 +1603,8 @@ function startQuiz(deck, onlyIds, mode, opts) {
   if (!items.length) { alert('No questions to show yet.'); return; }
   quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode, opts: opts || {}, round: 1, total: items.length };
   $('qDeckName').textContent = quiz.opts.label || deck.name;
-  $('quizLearnBtn').classList.toggle('hidden', deck.mode === 'learn' || !!deck.demo || !!deck.projQuiz);
-  $('resultsModesBtn').classList.toggle('hidden', !!deck.demo || (deck.projQuiz && !deck.base));
-  $('quizModesBtn').classList.toggle('hidden', !!(deck.projQuiz && !deck.base));
+  $('quizLearnBtn').classList.toggle('hidden', deck.mode === 'learn' || !!deck.demo);
+  $('resultsModesBtn').classList.toggle('hidden', !!deck.demo);
   showScreen('quiz');
   renderQuestion();
 }
@@ -1678,7 +1645,7 @@ function showFeedback(kind, headline, q) {
   fb.className = 'feedback ' + kind; fb.innerHTML = '';
   fb.append(el('div', { style: 'font-weight:600' }, headline));
   const ans = el('div', { class: 'answer' });
-  if (kind !== 'good' || q.pg) ans.append(el('div', null, el('b', null, 'Answer: '), q.answer));
+  if (kind !== 'good') ans.append(el('div', null, el('b', null, 'Answer: '), q.answer));
   if (q.explanation) ans.append(el('div', null, q.explanation));
   if (q.sourceHint) ans.append(el('div', { class: 'src' }, '📍 ' + q.sourceHint));
   fb.append(ans);
@@ -1688,7 +1655,7 @@ function finishAnswer(correct, kind, headline) {
   const q = quiz.current;
   quiz.answered = true;
   if (correct) { quiz.score++; launchConfetti(); }
-  else { quiz.missed.push(q.id); if (kind === 'bad' && !quiz.deck.projQuiz) wrongAnswerEffect(); }
+  else { quiz.missed.push(q.id); if (kind === 'bad') wrongAnswerEffect(); }
   showFeedback(kind, headline, q);
   if (quiz.round === 1) $('qScore').textContent = 'Score: ' + quiz.score;
   $('checkBtn').classList.add('hidden');
@@ -1705,8 +1672,7 @@ function logUploadResult(deck, q, correct, kind) {
     const section = secs && typeof q.section === 'number' && secs[q.section] ? secs[q.section].title : null;
     const ids = XRS.log([{ source: 'upload', field: q.type === 'mc' ? 'mc' : 'short', correct: !!correct,
       result: correct ? 'correct' : kind === 'close' ? 'close' : 'wrong',
-      deck_client_id: deck.demo ? 'demo' : deck.id, deck_name: deck.name,
-      group_label: q.pg ? 'Projections · ' + (PROJ_FIELD_LABEL[q.pg] || q.pg) : section, projection: q.pg ? q.projName : undefined }]);
+      deck_client_id: deck.demo ? 'demo' : deck.id, deck_name: deck.name, group_label: section }]);
     return ids && ids[0];
   } catch (e) { return null; }
 }
@@ -1744,7 +1710,7 @@ function answerShort() {
   const inp = $('shortInput'); const val = inp.value.trim();
   if (!val) { inp.focus(); return; }
   inp.disabled = true;
-  const g = quiz.current.pg ? gradeProj(val, quiz.current) : gradeShort(val, quiz.current.answer);
+  const g = gradeShort(val, quiz.current.answer);
   if (g === 'right') finishAnswer(true, 'good', '✓ Correct!');
   else {
     finishAnswer(false, g === 'close' ? 'close' : 'bad', g === 'close' ? '≈ Close — check the answer' : '✗ Not quite');
@@ -1768,7 +1734,7 @@ $('overrideBtn').addEventListener('click', () => {
 });
 $('quitBtn').addEventListener('click', () => {
   if (quiz.opts.onQuit) { quiz.opts.onQuit(); return; }
-  if (quiz.i === 0 && !quiz.answered) { if (quiz.deck.projQuiz) projBackToView(); else showScreen('upload'); return; }
+  if (quiz.i === 0 && !quiz.answered) { showScreen('upload'); return; }
   showResults(true);
 });
 
@@ -1822,8 +1788,7 @@ function showResults(early) {
 $('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed', quiz.opts.label ? { label: quiz.opts.label } : null));
 $('retakeBtn').addEventListener('click', () => quiz.mode === 'final' ? startFinalReview(quiz.deck) : startQuiz(quiz.deck, null, 'all'));
 $('doneBtn').addEventListener('click', () => {
-  if (quiz.deck.projQuiz) projBackToView();
-  else if (quiz.deck.mode === 'learn') { L = { deck: quiz.deck, pending: {} }; renderMap(); showScreen('map'); }
+  if (quiz.deck.mode === 'learn') { L = { deck: quiz.deck, pending: {} }; renderMap(); showScreen('map'); }
   else if (quiz.deck.demo) showScreen('upload'); else { renderDecks(); showScreen('decks'); }
 });
 $('saveDemoBtn').addEventListener('click', async () => {
@@ -2007,7 +1972,7 @@ function newLearnDeck(x) {
     id: DeckStore.newId(), mode: 'learn',
     name: deckNameFor(x), createdAt: new Date().toISOString(), cramId: x.cramId || null,
     source: { fileName: x.fileName, kind: x.kind, units: x.units, chars: x.text.length },
-    range: rangeForDeck(x), src: srcFromExtracted(x), ...projFieldsFor(x),
+    range: rangeForDeck(x), src: srcFromExtracted(x),
     settings: { type: 'mix' }, questions: [], missed: [], attempts: [],
     learn: {
       current: 0, finalLast: null,
@@ -2337,7 +2302,6 @@ function renderLearnDeckRow(d, row, list) {
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'cram') }, '⚡ Exam Cram'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; renderMap(); showScreen('map'); } }, 'Sections'));
   if (d.questions.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Quiz all (' + d.questions.length + ')'));
-  projDeckButton(d, btns);
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const nm = prompt('Rename deck', d.name); if (nm && nm.trim()) { await DeckStore.rename(d.id, nm.trim()); renderDecks(); } } }, 'Rename'));
   btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
   row.append(btns); list.append(row);
@@ -2493,11 +2457,9 @@ function setRange(from, to, which) {
     applyRange(x);
     if (studyCtx) { studyCtx.learn = b.learn || null; studyCtx.cram = b.cram || null; renderDeckCtx(); }
     else { pickMode(null); $('learnPreview').classList.add('hidden'); }
-    if (x.autoProj) scheduleProj(x, 2500);
   }
   renderRangeBox();
   updateGenBtn();
-  updateProjUI();
 }
 $('rangeFrom').addEventListener('change', () => setRange($('rangeFrom').value, $('rangeTo').value, 'from'));
 $('rangeTo').addEventListener('change', () => setRange($('rangeFrom').value, $('rangeTo').value, 'to'));
@@ -2549,7 +2511,6 @@ async function setDeckLink(id, key, val) {
   } catch (e) { /* linking is a nice-to-have */ }
 }
 async function openModes(deck, then) {
-  if (deck && deck.projQuiz) deck = deck.base;
   if (!deck || deck.demo) { exitDeckCtx(); showScreen('upload'); $('justLookCard').scrollIntoView({ block: 'start' }); return; }
   const live = id => (L && L.deck && L.deck.id === id) ? L.deck : DeckStore.get(id);
   const learn = deck.mode === 'learn' ? ((L && L.deck && L.deck.id === deck.id) ? L.deck : deck) : (deck.learnId ? await live(deck.learnId) : null);
@@ -2561,7 +2522,7 @@ async function openModes(deck, then) {
   if (x) { x.learnId = useLearn ? useLearn.id : null; x.cramId = useCram ? useCram.id : null; x.deckName = name; }
   extracted = x;
   studyCtx = { learn: useLearn, cram: useCram, name };
-  if (x) { x.byRange = {}; projPrefill(x, useLearn, useCram); }
+  if (x) x.byRange = {};
   renderDeckCtx();
   showScreen('upload');
   if (then === 'learn') $('learnBtn').click();
@@ -2596,7 +2557,6 @@ function renderDeckCtx() {
   $('learnPreview').classList.add('hidden');
   renderRangeBox();
   updateGenBtn();
-  updateProjUI();
 }
 function exitDeckCtx() {
   if (!studyCtx) return;
@@ -2613,7 +2573,6 @@ function exitDeckCtx() {
   } else $('modeCard').classList.add('hidden');
   renderRangeBox();
   updateGenBtn();
-  updateProjUI();
 }
 $('ctxNewBtn').addEventListener('click', () => { exitDeckCtx(); resetUpload(''); $('fileInfo').classList.add('hidden'); showScreen('upload'); });
 $('learnModesBtn').addEventListener('click', () => L && openModes(L.deck));
@@ -2630,9 +2589,7 @@ $('resultsModesBtn').addEventListener('click', () => quiz && openModes(quiz.deck
 window.addEventListener('popstate', () => {
   histGuard = false;
   const cur = currentScreen;
-  if ((cur === 'quiz' || cur === 'results') && quiz && quiz.deck.projQuiz) projBackToView();
-  else if (cur === 'proj') projBack();
-  else if (cur === 'quiz' && quiz) {
+  if (cur === 'quiz' && quiz) {
     if (quiz.opts.onQuit) quiz.opts.onQuit();
     else if (quiz.deck.demo) showScreen('upload');
     else if (quiz.deck.mode === 'learn') { L = L && L.deck === quiz.deck ? L : { deck: quiz.deck, pending: {} }; renderMap(); showScreen('map'); }
@@ -2644,371 +2601,6 @@ window.addEventListener('popstate', () => {
   else if (cur === 'upload' && studyCtx) { exitDeckCtx(); renderDecks(); showScreen('decks'); }
   else if (!isRootScreen(cur)) showScreen('upload');
 });
-
-// ===================== PROJECTIONS (🦴) =====================
-// After a fresh upload, ONE quiet background pass (1-2 Worker calls, 'projections') lists the radiographic
-// projections the notes describe: CR angle/direction, CR location and rotation, copied from the notes only
-// ("not on slides" when the notes don't say). The result is saved on the deck (deck.projections +
-// deck.projectionsChecked) so it syncs and is never asked for again. Vocab/physics decks get an empty list
-// and look exactly as before. Older decks show a small "Find projections" button instead of auto-running.
-const PROJ_NOS = 'not on slides';
-const PROJ_CHUNK = 55000, PROJ_MAX_REQ = 4;
-const PROJ_FIELD_LABEL = { degree: 'CR angle', loc: 'CR location', rot: 'Rotation' };
-let projTimer = null, P = null; // P: the open Projections view {items, name, back, base}
-function projSupported() { return workerState === 'ready' && workerActions.includes('projections'); }
-function projIsNos(v) { return !v || /^(not (on|in) (the )?(slides?|notes)|not stated|n\/?a)\.?$/i.test(String(v).trim()); }
-function projEntry(x) { return x && x.projCache ? x.projCache[rangeKey(x.range)] || null : null; }
-function projFieldsFor(x) {
-  const e = projEntry(x);
-  return e && e.state === 'done' ? { projections: e.items, projectionsChecked: e.checked } : {};
-}
-function projWordsOf(str) {
-  return String(str || '').toLowerCase().replace(/\bceph(?:alic|alad)\b/g, 'cephalad').replace(/\bcaud(?:al|ad)\b/g, 'caudad')
-    .replace(/\blat\b/g, 'lateral').replace(/\bobl\b/g, 'oblique').replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
-    .filter(w => w && !['projection', 'projections', 'view', 'views', 'the', 'of', 'and', 'a', 'an', 'for', 'position', 'method'].includes(w));
-}
-function projKey(p) { return [...new Set(projWordsOf(p.name).concat(projIsNos(p.bodyPart) ? [] : projWordsOf(p.bodyPart)))].sort().join(' '); }
-function projMergeHints(a, b) {
-  const word = (/\b(page|photo)s?\b/i.exec(a + ' ' + b) || [null, 'slide'])[1].toLowerCase();
-  const nums = [...new Set((String(a || '') + ' ' + String(b || '')).match(/\d+/g) || [])].map(Number).sort((x, y) => x - y);
-  if (!nums.length) return a || b || '';
-  const W = word[0].toUpperCase() + word.slice(1);
-  return nums.length === 1 ? W + ' ' + nums[0] : W + 's ' + nums.join(', ');
-}
-// Same projection from two chunks -> one card (first stated value wins; slides are combined).
-function projMerge(lists) {
-  const byKey = new Map();
-  for (const raw of [].concat(...lists)) {
-    if (!raw || !raw.name) continue;
-    const p = { name: String(raw.name), bodyPart: raw.bodyPart || PROJ_NOS, crAngleDirection: raw.crAngleDirection || PROJ_NOS, crLocation: raw.crLocation || PROJ_NOS,
-      rotation: raw.rotation || PROJ_NOS, notes: raw.notes || '', sourceHint: raw.sourceHint || '', nonRoutine: raw.nonRoutine === true };
-    const k = projKey(p), prev = byKey.get(k);
-    if (!prev) { byKey.set(k, p); continue; }
-    for (const f of ['bodyPart', 'crAngleDirection', 'crLocation', 'rotation']) if (projIsNos(prev[f]) && !projIsNos(p[f])) prev[f] = p[f];
-    if (p.notes && !prev.notes.toLowerCase().includes(p.notes.toLowerCase())) prev.notes = (prev.notes ? prev.notes + ' ' : '') + p.notes;
-    prev.sourceHint = projMergeHints(prev.sourceHint, p.sourceHint);
-    prev.nonRoutine = prev.nonRoutine || p.nonRoutine;
-  }
-  return [...byKey.values()];
-}
-function projChunks(parts) {
-  const out = []; let cur = '';
-  for (const p of parts || []) {
-    const piece = p.length > PROJ_CHUNK ? p.slice(0, PROJ_CHUNK) : p;
-    if (cur && cur.length + piece.length + 2 > PROJ_CHUNK) { out.push(cur); cur = ''; }
-    cur = cur ? cur + '\n\n' + piece : piece;
-  }
-  if (cur) out.push(cur);
-  return out.filter(t => t.replace(/--- (Slide|Page|Photo) \d+ ---|\(no text\)/g, '').trim().length >= 40);
-}
-function scheduleProj(x, delay) {
-  clearTimeout(projTimer);
-  if (!x) return;
-  projTimer = setTimeout(() => { if (extracted === x) runProj(x, false); }, delay || 0);
-}
-async function runProj(x, manual) {
-  if (!x || !Array.isArray(x.parts)) return;
-  const key = rangeKey(x.range);
-  x.projCache = x.projCache || {};
-  const have = x.projCache[key];
-  if (have && (have.state === 'running' || have.state === 'done' || (have.state === 'error' && !manual))) return;
-  if ((await workerStateNow()) !== 'ready' || !workerActions.includes('projections')) return;
-  const texts = projChunks(x.parts).slice(0, PROJ_MAX_REQ);
-  const entry = { state: 'running', items: [], manual: !!manual };
-  x.projCache[key] = entry;
-  updateProjUI();
-  const lists = [];
-  try {
-    for (let i = 0; i < texts.length; i++) {
-      if (i) await sleep(GAP_MS);
-      let data = null;
-      for (let tries = 0; ; tries++) {
-        try { data = await callWorker({ action: 'projections', text: texts[i] }); break; }
-        catch (e) {
-          const d = e.data || {};
-          if (e.status === 429 && !d.perDay && tries < 2) { await sleep(1000 * Math.min(60, Math.max(20, d.retryAfterSeconds || 45))); continue; }
-          if (!e.status && tries < 1) { await sleep(3000); continue; }
-          throw e;
-        }
-      }
-      lists.push(Array.isArray(data.projections) ? data.projections : []);
-    }
-  } catch (e) {
-    entry.state = 'error'; updateProjUI(); return; // quiet: this is a bonus feature, never block studying
-  }
-  entry.items = projMerge(lists); entry.checked = new Date().toISOString(); entry.state = 'done';
-  projAttach(x, key, entry);
-  updateProjUI();
-}
-// Save the result on the deck(s) for that range (current ones, or the ones remembered by setRange).
-async function setDeckFields(id, fields) {
-  try {
-    for (const d of [studyCtx && studyCtx.learn, studyCtx && studyCtx.cram]) if (d && d.id === id) Object.assign(d, fields);
-    if (L && L.deck && L.deck.id === id) { Object.assign(L.deck, fields); await persistDeck(L.deck); return; }
-    const d = await DeckStore.get(id);
-    if (d && !d.demo) { Object.assign(d, fields); await DeckStore.save(d); }
-  } catch (e) { /* nice-to-have */ }
-}
-function projAttach(x, key, entry) {
-  const b = key === rangeKey(x.range) ? x : (x.byRange && x.byRange[key]) || {};
-  const fields = { projections: entry.items, projectionsChecked: entry.checked };
-  for (const id of [b.learnId, b.cramId]) if (id) setDeckFields(id, fields);
-}
-function projPrefill(x, lr, cr) {
-  const key = rangeKey(x.range);
-  x.projCache = x.projCache || {};
-  const saved = [lr, cr].find(d => d && Array.isArray(d.projections) && d.projectionsChecked);
-  if (saved && !(x.projCache[key] && x.projCache[key].state === 'done')) x.projCache[key] = { state: 'done', items: saved.projections, checked: saved.projectionsChecked };
-  const e = x.projCache[key];
-  if (e && e.state === 'done') for (const d of [lr, cr]) if (d && !d.projectionsChecked) setDeckFields(d.id, { projections: e.items, projectionsChecked: e.checked });
-}
-function updateProjUI() {
-  const x = extracted, e = projEntry(x);
-  const n = e && e.state === 'done' ? e.items.length : 0;
-  $('projBtn').classList.toggle('hidden', !n);
-  if (n) $('projDesc').textContent = n + ' projection' + (n === 1 ? '' : 's') + ' found in your notes — CR angle, CR location and rotation on one card each, plus a quick quiz.';
-  const find = $('projFindBtn'), msg = $('projFindMsg');
-  const showFind = !!(studyCtx && x && Array.isArray(x.parts) && projSupported() && (!e || (e.manual && e.state !== 'done')));
-  find.classList.toggle('hidden', !showFind);
-  find.disabled = !!(e && e.state === 'running');
-  find.textContent = e && e.state === 'running' ? '🦴 Looking for projections…' : '🦴 Find projections';
-  let m = '';
-  if (e && e.manual && e.state === 'done' && !n) m = 'No positioning projections found in these notes.';
-  if (e && e.manual && e.state === 'error') m = 'Couldn\'t check right now — try again in a minute.';
-  msg.textContent = m; msg.classList.toggle('hidden', !m);
-}
-$('projFindBtn').addEventListener('click', () => { if (extracted) runProj(extracted, true); });
-$('projBtn').addEventListener('click', async () => {
-  const x = extracted, e = projEntry(x);
-  if (!x || !e || !e.items.length) return;
-  // Make sure the result lives on a saved deck (a Learn deck costs no AI calls until it's opened).
-  if (!x.learnId && !x.cramId) {
-    const d = await saveDeckSafe(newLearnDeck(x));
-    if (!d.unsaved) { x.learnId = d.id; if (studyCtx) studyCtx.learn = d; }
-  }
-  const base = (studyCtx && (studyCtx.learn || studyCtx.cram)) || (x.learnId && await DeckStore.get(x.learnId)) || (x.cramId && await DeckStore.get(x.cramId)) || null;
-  openProj(e.items, (studyCtx && (studyCtx.learn || studyCtx.cram) ? studyCtx.name : deckNameFor(x)), 'upload', base);
-});
-function projDeckButton(d, btns) {
-  if (!Array.isArray(d.projections) || !d.projections.length) return;
-  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = (await DeckStore.get(d.id)) || d; openProj(x.projections, x.name, 'decks', x); } }, '🦴 Projections (' + d.projections.length + ')'));
-}
-
-// ---- The class master list (index.html), only shown as a separate, labeled line ----
-let projMasterP = null;
-function loadProjMaster() {
-  if (!projMasterP) projMasterP = fetch('./index.html', { cache: 'force-cache' }).then(r => r.text()).then(t => {
-    const s = new DOMParser().parseFromString(t, 'text/html').getElementById('data');
-    const d = JSON.parse(s.textContent); return Array.isArray(d) ? d : [];
-  }).catch(() => []);
-  return projMasterP;
-}
-const PROJ_PARTS = [ // [regex, master list "extremity"] — most specific first
-  [/\b(ac joints?|acromioclavicular)\b/, 'AC Joints'], [/\b(sc joints?|sternoclavicular)\b/, 'Sternoclavicular Articulations'],
-  [/\bsoft tissue neck\b/, 'Soft Tissue Neck'], [/\b(lower leg|tib(ia)?[\s\/-]*fib(ula)?|tibia|fibula)\b/, 'Lower Leg'],
-  [/\b(si joints?|sacroiliac)\b/, 'SI Joints'], [/\bthoracolumbar\b/, 'Thoracolumbar Spine'],
-  [/\b(lumbar|l[\s-]?spine)\b/, 'Lumbar Spine'], [/\b(thoracic|t[\s-]?spine)\b/, 'Thoracic Spine'], [/\b(cervical|c[\s-]?spine)\b/, 'Cervical Spine'],
-  [/\bsacrum\b.*\bcoccyx\b|\bcoccyx\b.*\bsacrum\b/, 'Sacrum and Coccyx'], [/\bsacrum\b/, 'Sacrum'], [/\bcoccyx\b/, 'Coccyx'],
-  [/\b(calcaneus|heel|os calcis)\b/, 'Calcaneus'], [/\b(toes?|great toe|hallux)\b/, 'Toes'], [/\b(foot|feet)\b/, 'Foot'], [/\bankle\b/, 'Ankle'],
-  [/\b(fingers?|digits?)\b/, 'Fingers'], [/\bthumb\b/, 'Thumb'], [/\bwrist\b/, 'Wrist'], [/\bhand\b/, 'Hand'], [/\bforearm\b/, 'Forearm'],
-  [/\belbow\b/, 'Elbow'], [/\bhumerus\b/, 'Humerus'], [/\bshoulder\b/, 'Shoulder'], [/\bscapula\b/, 'Scapula'], [/\bclavicle\b/, 'Clavicle'],
-  [/\bpatella\b/, 'Patella'], [/\bknee\b/, 'Knee'], [/\bfemur\b/, 'Femur'], [/\bpelvis\b/, 'Pelvis'], [/\bhip\b/, 'Hip'],
-  [/\bsternum\b/, 'Sternum'], [/\bribs?\b/, 'Ribs'], [/\bchest\b/, 'Chest'], [/\b(abdomen|kub)\b/, 'Abdomen']
-];
-const PROJ_TYPES = { ap: 'ap', pa: 'pa', lateral: 'lateral', lat: 'lateral', mediolateral: 'lateral', lateromedial: 'lateral', oblique: 'oblique', obl: 'oblique',
-  axial: 'axial', tangential: 'tangential', axiolateral: 'axiolateral', inferosuperior: 'inferosuperior', plantodorsal: 'plantodorsal', swimmer: 'swimmer', swimmers: 'swimmer',
-  mouth: 'mouth', hyperflexion: 'hyperflexion', hyperextension: 'hyperextension', spot: 'spot', upright: 'upright', stress: 'stress', supine: 'supine', prone: 'prone', decubitus: 'decubitus' };
-function projTypeSet(s) {
-  const out = new Set();
-  String(s || '').toLowerCase().replace(/’/g, "'").replace(/'s\b/g, 's').replace(/[^a-z]+/g, ' ').split(' ').forEach(w => { if (PROJ_TYPES[w]) out.add(PROJ_TYPES[w]); });
-  return [...out].sort().join(' ');
-}
-function projRotQual(s) {
-  s = String(s || '').toLowerCase();
-  const med = /\b(medial(ly)?|internal(ly)?)\b/.test(s), lat = /\b(lateral(ly)?|external(ly)?)\s*(rotat|obliq)|\((lateral|external)\b|\b(lateral|external)(ly)?\s*$/.test(s);
-  return med && !lat ? 'med' : lat && !med ? 'lat' : '';
-}
-function projMasterMatch(p, master) {
-  if (!master || !master.length) return null;
-  const bp = projIsNos(p.bodyPart) ? '' : p.bodyPart.toLowerCase();
-  const find = t => { for (const [re, ex] of PROJ_PARTS) if (re.test(t)) return ex; return null; };
-  const ex = (bp && find(bp)) || find(String(p.name).toLowerCase());
-  if (!ex) return null;
-  const rotPhrase = /\b(medial|internal|lateral|external)(ly)?\s+rotat\w*|\((medial|internal|lateral|external)\)/gi;
-  const qual = projRotQual((String(p.name).match(rotPhrase) || []).join(' ') + ' ' + (projIsNos(p.rotation) ? '' : p.rotation));
-  const type = projTypeSet(String(p.name).replace(rotPhrase, ' '));
-  if (!type) return null;
-  const cands = master.filter(m => m.extremity === ex).filter(m => projTypeSet(String(m.projection).replace(/\([^)]*\)/g, ' ').replace(/\s[—–-]\s.*$/, '')) === type);
-  const qualOf = m => projRotQual((String(m.projection).match(/\(([^)]*)\)/) || [, ''])[1]);
-  let pick = cands;
-  if (pick.length > 1 || qual) pick = cands.filter(m => qualOf(m) === qual);
-  if (pick.length !== 1) return null;
-  return pick[0];
-}
-
-// ---- The Projections view ----
-function openProj(items, name, back, base) {
-  P = { items: items || [], name: name || '', back: back || 'upload', base: base || null };
-  renderProj();
-  showScreen('proj');
-  loadProjMaster().then(m => { if (P && currentScreen === 'proj') { P.master = m; renderProj(); } });
-}
-function projBack() {
-  const back = P ? P.back : 'upload';
-  if (back === 'decks') { renderDecks(); showScreen('decks'); } else { showScreen('upload'); updateProjUI(); }
-}
-function projBackToView() { if (P) { renderProj(); showScreen('proj'); } else projBack(); }
-$('projBackBtn').addEventListener('click', projBack);
-function projField(label, val) {
-  const nos = projIsNos(val);
-  return el('div', { class: 'pf' }, el('div', { class: 'pl' }, label), el('div', { class: 'pv' + (nos ? ' nos' : '') }, nos ? PROJ_NOS : val));
-}
-function renderProj() {
-  const items = P.items;
-  $('projDeck').textContent = P.name;
-  $('projSummary').textContent = items.length + ' projection' + (items.length === 1 ? '' : 's') + ' found';
-  $('projQuizBtn').classList.toggle('hidden', !projQuizItems(items).length);
-  const list = $('projList'); list.innerHTML = '';
-  const groups = new Map();
-  for (const p of items) {
-    const g = projIsNos(p.bodyPart) ? '' : p.bodyPart.trim().replace(/^./, c => c.toUpperCase());
-    const k = g.toLowerCase();
-    if (!groups.has(k)) groups.set(k, { label: g || 'Other', items: [] });
-    groups.get(k).items.push(p);
-  }
-  const keys = [...groups.keys()].sort((a, b) => (a === '') - (b === ''));
-  for (const k of keys) {
-    const g = groups.get(k);
-    list.append(el('div', { class: 'proj-group' }, g.label + ' (' + g.items.length + ')'));
-    for (const p of g.items) {
-      const card = el('div', { class: 'proj-card' });
-      const title = el('div', { class: 'pn' }, p.name);
-      if (p.nonRoutine) title.append(el('span', { class: 'badge' }, 'Non-routine / trauma'));
-      card.append(el('div', { class: 'pl' }, 'Projection'), title);
-      card.append(projField('CR Degree and Direction', p.crAngleDirection), projField('CR Location', p.crLocation), projField('Body Part Rotation', p.rotation));
-      if (!projIsNos(p.bodyPart) && !g.label) card.append(projField('Body Part', p.bodyPart));
-      if (p.notes) card.append(el('div', { class: 'pnotes' }, p.notes));
-      if (p.sourceHint) card.append(el('div', { class: 'src' }, '📍 ' + p.sourceHint));
-      const m = projMasterMatch(p, P.master);
-      if (m) {
-        const vals = [['CR Degree and Direction', 'crAngleDirection', m.crDegree], ['CR Location', 'crLocation', m.crLocation], ['Body Part Rotation', 'rotation', m.rotation || 'no rotation listed']];
-        const missing = vals.filter(v => projIsNos(p[v[1]]));
-        const head = '📘 Class master list (not from your slides) — ' + m.extremity + ': ' + m.projection;
-        const box = el('div', { class: 'proj-master' });
-        const lines = arr => arr.map(v => el('div', null, el('b', null, v[0] + ': '), String(v[2])));
-        if (missing.length) { box.append(el('div', { class: 'mh' }, head), ...lines(missing)); }
-        else { const det = el('details'); det.append(el('summary', null, 'Compare with the class master list'), el('div', { class: 'mh', style: 'margin-top:0.3rem' }, head), ...lines(vals)); box.append(det); }
-        card.append(box);
-      }
-      list.append(card);
-    }
-  }
-}
-
-// ---- "Quiz me on these projections": built here, no AI ----
-function projNoRotation(r) { return projIsNos(r) || /^(none|n\/?a|—|-|0°?)$/i.test(String(r).trim()) || /\b(no|without)\b[^.]*\brotat/i.test(r) || /\bnot rotated\b/i.test(r); }
-function projTitle(p) {
-  const bp = projIsNos(p.bodyPart) ? '' : p.bodyPart.trim();
-  return bp && !String(p.name).toLowerCase().includes(bp.toLowerCase()) ? p.name + ' ' + bp : p.name;
-}
-function projQuizItems(items) {
-  const out = [];
-  (items || []).forEach((p, i) => {
-    const t = projTitle(p), base = { type: 'short', sourceHint: p.sourceHint || '', projName: t, explanation: '' };
-    if (!projIsNos(p.crAngleDirection)) out.push(Object.assign({ id: 'pj' + i + 'd', pg: 'degree', question: 'What is the CR angle and direction for the ' + t + '?', answer: p.crAngleDirection }, base));
-    if (!projIsNos(p.crLocation)) out.push(Object.assign({ id: 'pj' + i + 'l', pg: 'loc', question: 'Where is the CR centered for the ' + t + '?', answer: p.crLocation }, base));
-    if (!projNoRotation(p.rotation)) out.push(Object.assign({ id: 'pj' + i + 'r', pg: 'rot', question: 'How much is the body part rotated for the ' + t + '?', answer: p.rotation }, base));
-  });
-  return out;
-}
-$('projQuizBtn').addEventListener('click', () => {
-  if (!P) return;
-  const qs = projQuizItems(P.items);
-  if (!qs.length) return;
-  const b = P.base;
-  startQuiz({ id: b ? b.id : 'proj', name: P.name + ' · Projections', mode: 'proj', projQuiz: true, unsaved: true, base: b, questions: qs, missed: [], attempts: [] }, null, 'all');
-});
-
-// Grading, same rules as the main app (index.html): cephalic = cephalad, caudal = caudad, numbered joints need
-// the number, rotation is graded by its number only, CR location is a lenient keyword match.
-const PJ_ORD = { first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' };
-function pjNormalize(str) {
-  return String(str || '').toLowerCase()
-    .replace(/°|degrees?|deg\b/g, ' degree ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\bceph(?:alic(?:ally)?|alad|alically)?\b/g, 'cephalad')
-    .replace(/\bcaud(?:al(?:ly)?|ad)?\b/g, 'caudad')
-    .replace(/\b(first|second|third|fourth|fifth)\b/g, w => PJ_ORD[w])
-    .replace(/\b([1-5])(?:st|nd|rd|th)?\s*(?=(?:mcp|pip|dip|mtp|ip|cmc|mc|mt|metacarpals?|metatarsals?|digits?|toes?|fingers?)\b)/g, (m, n) => PJ_ORD[n] + ' ')
-    .replace(/\s+/g, ' ').trim();
-}
-function pjLevels(str, expand) {
-  const s = String(str || '').toLowerCase(), levels = new Set();
-  s.replace(/\b([ctls])\s?(\d{1,2})\b(?:\s*(?:-|\u2013|\u2014|to)\s*([ctls])?\s?(\d{1,2})\b)?/g, (m, a, x, b, y) => {
-    levels.add(a + Number(x));
-    if (y) { const b2 = b || a; levels.add(b2 + Number(y)); if (expand && b2 === a) for (let k = Math.min(+x, +y); k <= Math.max(+x, +y); k++) levels.add(a + k); }
-    return m;
-  });
-  return levels;
-}
-function pjNumbered(user, correct) {
-  const ords = s => new Set(pjNormalize(s).match(/\b[1-5](?:st|nd|rd|th)\b/g) || []);
-  const cOrd = ords(correct);
-  if (cOrd.size) { const uOrd = ords(user); if (!uOrd.size || [...uOrd].some(o => !cOrd.has(o))) return 'wrong'; }
-  const cLev = pjLevels(correct, true), uLev = pjLevels(user, false);
-  if (cLev.size && [...uLev].some(l => !cLev.has(l))) return 'wrong';
-  return null;
-}
-function pjCore(str) {
-  const stop = new Set(['entering', 'enters', 'enter', 'at', 'the', 'of', 'on', 'a', 'an', 'to', 'and', 'or', 'for', 'level', 'approximately', 'approx', 'degree', 'degrees', 'cr', 'directed', 'centered', 'center']);
-  return pjNormalize(String(str || '').replace(/\([^)]*\)/g, ' ')).split(' ').filter(w => w.length > 1 && !stop.has(w));
-}
-function pjDegNums(str) {
-  const s = String(str || '').toLowerCase(), ranges = [];
-  s.replace(/(\d+(?:\.\d+)?)\s*(?:°|degrees?|deg)?\s*(?:-|\u2013|\u2014|to)\s*(\d+(?:\.\d+)?)/g, (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
-  return { nums: (s.match(/\d+(?:\.\d+)?/g) || []).map(Number), ranges };
-}
-function pjDirs(str) { const n = ' ' + pjNormalize(str) + ' '; return ['cephalad', 'caudad'].filter(d => n.includes(' ' + d + ' ')); }
-function pjDegree(user, correct) {
-  const c = pjDegNums(correct), u = pjDegNums(user), cD = pjDirs(correct), uD = pjDirs(user);
-  if (!c.nums.length || !u.nums.length || !cD.length) return null;
-  if (uD.some(d => !cD.includes(d))) return 'wrong';
-  const ok = u.nums.every(n => c.nums.includes(n) || c.ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b)));
-  return ok && uD.length ? 'correct' : null;
-}
-function pjMatch(user, correct, field) {
-  if (!user) return 'wrong';
-  const pre = field === 'degree' ? pjDegree(user, correct) : pjNumbered(user, correct);
-  if (pre) return pre;
-  const uNorm = pjNormalize(user), cNorm = pjNormalize(correct), u = pjCore(user), c = pjCore(correct);
-  if (!u.length || !c.length) return 'wrong';
-  const uNums = uNorm.match(/\d+(?:st|nd|rd|th)?/g) || [], cNums = cNorm.match(/\d+(?:st|nd|rd|th)?/g) || [];
-  const numMatch = uNums.length > 0 && cNums.some(n => uNums.includes(n));
-  const hits = u.filter(w => c.some(cw => cw.includes(w) || w.includes(cw))).length;
-  const ratio = hits / Math.max(u.length, Math.min(c.length, 4));
-  if (u.length === 1 && c.some(cw => cw.includes(u[0]) || u[0].includes(cw))) return 'correct';
-  if (uNorm === cNorm || cNorm.includes(uNorm) || uNorm.includes(cNorm)) return 'correct';
-  if (numMatch && hits >= 2 && ratio >= 0.45) return 'correct';
-  if (ratio >= 0.65 && hits >= 2) return 'correct';
-  if (hits >= Math.min(c.length, 3) && hits >= 2) return 'correct';
-  if (ratio >= 0.25 || hits >= 1 || numMatch) return 'close';
-  return 'wrong';
-}
-function pjRotation(user, correct) {
-  if (!user || !String(user).trim()) return 'wrong';
-  const nums = s => (String(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
-  const ranges = [];
-  String(correct).replace(/(\d+(?:\.\d+)?)\s*(?:°|degrees?)?\s*(?:-|\u2013|\u2014|to)\s*(\d+(?:\.\d+)?)/g, (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
-  const cNums = nums(correct);
-  if (!cNums.length) return pjMatch(user, correct);
-  const uNums = nums(user);
-  if (!uNums.length) return 'wrong';
-  return uNums.every(n => cNums.includes(n) || ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b))) ? 'correct' : 'wrong';
-}
-function gradeProj(val, q) {
-  const r = q.pg === 'rot' ? pjRotation(val, q.answer) : pjMatch(val, q.answer, q.pg === 'degree' ? 'degree' : 'loc');
-  return r === 'correct' ? 'right' : r;
-}
 
 // ===================== MY DECKS UI =====================
 async function renderDecks() {
@@ -3027,7 +2619,6 @@ async function renderDecks() {
     if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
     if (d.learnId || (d.src && d.src.parts)) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
     btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
-    projDeckButton(d, btns);
     btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
     btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
     row.append(btns); list.append(row);
