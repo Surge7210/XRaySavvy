@@ -1328,7 +1328,7 @@ const WORKER_MSGS = {
 function aiReady(feature) { return workerState === 'ready' || (feature === 'cram' && workerState === 'old_code'); }
 function showWorkerState() {
   const box = $('notConnected'), m = WORKER_MSGS[workerState] || WORKER_MSGS.no_code;
-  box.className = 'notice ' + m[0];
+  box.className = 'notice ' + m[0] + ((workerState === 'ready' || workerState === 'checking') ? ' hidden' : '');
   $('aiStatusMsg').innerHTML = m[1] + (workerState === 'ready' && workerModel ? ' <span class="muted small">(' + esc(workerModel) + ')</span>' : '');
   $('aiStatusExtra').classList.toggle('hidden', workerState === 'ready' || workerState === 'checking');
   $('recheckLink').classList.toggle('hidden', workerState === 'no_url');
