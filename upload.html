@@ -100,6 +100,21 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .kp-h{font-weight:700;font-size:0.9rem;margin-top:0.4rem}
 .keypoints{margin:0.3rem 0 0;padding-left:1.2rem}
 .keypoints li{margin:0.25rem 0}
+.sec-pics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.5rem;margin:0.2rem 0 0.7rem}
+.sec-pics.one{grid-template-columns:minmax(0,1fr)}
+.sec-pics .pic{display:flex;flex-direction:column;padding:0;margin:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--bg);cursor:zoom-in;font-family:inherit;color:var(--muted);text-align:left}
+.sec-pics .pic img{display:block;width:100%;height:130px;object-fit:contain;background:#0b1016}
+.sec-pics.one .pic img{height:auto;max-height:260px}
+.sec-pics .pic .cap{font-size:0.72rem;padding:0.2rem 0.5rem;border-top:1px solid var(--border)}
+.sec-pics .pic:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.pic-note{font-size:0.78rem;color:var(--muted);margin:0.1rem 0 0.6rem}
+.pic-status{font-size:0.82rem;margin-top:0.25rem}
+.picbox{position:fixed;inset:0;z-index:1000;background:rgba(5,8,12,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3.2rem 0.6rem 1rem;cursor:zoom-out}
+.picbox img{max-width:100%;max-height:calc(100% - 2rem);object-fit:contain;border-radius:8px;background:#fff;cursor:default}
+.picbox-cap{color:var(--muted);font-size:0.85rem;margin-top:0.5rem}
+.picbox-x{position:absolute;top:max(0.6rem,env(safe-area-inset-top));right:0.6rem;width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+body.picbox-open{overflow:hidden}
+@media (min-width:700px){.sec-pics{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}.sec-pics .pic img{height:160px}.sec-pics.one .pic img{max-height:340px}}
 .helpers{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:1rem}
 .helpers .btn{flex:1 1 auto;font-size:0.9rem;padding:0.6rem 0.7rem}
 .ai-resp{margin-top:0.8rem;padding:0.8rem 0.9rem;border-radius:10px;background:#1e2a3a;border-left:3px solid var(--accent);font-size:0.95rem}
@@ -928,8 +943,8 @@ function resolvePath(base, rel) {
   return parts.join('/');
 }
 
-async function extractPptx(buf) {
-  const zip = await JSZip.loadAsync(buf);
+// Slide files in presentation order (shared by text and picture extraction).
+async function pptxSlideOrder(zip) {
   const slideRe = /^ppt\/slides\/slide(\d+)\.xml$/;
   let slidePaths = Object.keys(zip.files).filter(p => slideRe.test(p))
     .sort((a, b) => parseInt(a.match(slideRe)[1], 10) - parseInt(b.match(slideRe)[1], 10));
@@ -943,6 +958,11 @@ async function extractPptx(buf) {
       .map(r => resolvePath('ppt/presentation.xml', r.target)).filter(p => zip.file(p));
     if (ordered.length) slidePaths = ordered;
   } catch (e) { /* fall back to numeric order */ }
+  return slidePaths;
+}
+async function extractPptx(buf) {
+  const zip = await JSZip.loadAsync(buf);
+  const slidePaths = await pptxSlideOrder(zip);
   const parts = [];
   for (let i = 0; i < slidePaths.length; i++) {
     const path = slidePaths[i];
@@ -1228,6 +1248,7 @@ async function handleFile(file) {
   if (file.size > 300 * 1024 * 1024) { info.textContent = 'That file is over 300 MB — too big to read on a phone.'; return; }
   try {
     useExtracted(await extractFile(file), file.name);
+    if (extracted) SlidePics.start(file, extracted.kind, extracted);
   } catch (e) {
     console.error(e);
     info.textContent = 'Could not read that file: ' + (e.message || e);
@@ -1478,6 +1499,7 @@ $('genBtn').addEventListener('click', async () => {
     source: { fileName: extracted.fileName, kind: extracted.kind, units: extracted.units, chars: extracted.text.length },
     range: rangeForDeck(extracted),
     src: srcFromExtracted(extracted), learnId: extracted.learnId || null,
+    pics: picsFor(extracted),
     settings: { count: total, type: genOpts.type, focus },
     questions: shuffle(all).slice(0, total).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }, q)),
     missed: [], attempts: []
@@ -1967,12 +1989,14 @@ function makeSections(units) {
   });
 }
 
+// Tiny pointer to this device's saved pictures (the pictures themselves never leave the device).
+function picsFor(x) { return x && x.picKey ? Object.assign({ key: x.picKey }, x.picUnits ? { units: x.picUnits } : {}) : null; }
 function newLearnDeck(x) {
   return {
     id: DeckStore.newId(), mode: 'learn',
     name: deckNameFor(x), createdAt: new Date().toISOString(), cramId: x.cramId || null,
     source: { fileName: x.fileName, kind: x.kind, units: x.units, chars: x.text.length },
-    range: rangeForDeck(x), src: srcFromExtracted(x),
+    range: rangeForDeck(x), src: srcFromExtracted(x), pics: picsFor(x),
     settings: { type: 'mix' }, questions: [], missed: [], attempts: [],
     learn: {
       current: 0, finalLast: null,
@@ -2096,6 +2120,7 @@ function renderSummary(card, s, i) {
   card.append(el('div', { class: 'sec-label' }, 'Section ' + (i + 1) + ' · ' + s.label));
   card.append(el('div', { class: 'sec-title' }, s.title));
   card.append(htmlDiv('summary', md(s.summary)));
+  card.append(SlidePics.slotFor(deck, i));
   if (s.keyPoints && s.keyPoints.length) {
     const ul = el('ul', { class: 'keypoints' });
     s.keyPoints.forEach(k => ul.append(el('li', null, k)));
@@ -2307,6 +2332,421 @@ function renderLearnDeckRow(d, row, list) {
   row.append(btns); list.append(row);
 }
 
+// ===================== SLIDE / PAGE PICTURES =====================
+// Pictures from the uploaded PPTX/PDF are pulled out in the browser, shrunk, and kept ONLY on this
+// device (IndexedDB, keyed by file). Decks just carry a tiny { key, units } pointer, so nothing heavy
+// goes to Supabase or the Worker, and the AI never sees the images.
+const SlidePics = (() => {
+  const DB = 'xraysavvy-pics', VER = 1, MAX_DIM = 1000, QUALITY = 0.72, PER_UNIT = 4, PER_SECTION = 4;
+  const MIN_BYTES = 8 * 1024;
+  let dbp = null;
+  const pending = {};            // key -> Promise while pictures are being extracted
+  let liveURLs = [];
+  function db() {
+    if (dbp) return dbp;
+    dbp = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error('no indexedDB'));
+      const rq = indexedDB.open(DB, VER);
+      rq.onupgradeneeded = () => {
+        const d = rq.result;
+        if (!d.objectStoreNames.contains('imgs')) d.createObjectStore('imgs', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('files')) d.createObjectStore('files', { keyPath: 'key' });
+      };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+      rq.onblocked = () => rej(new Error('indexedDB blocked'));
+    });
+    dbp.catch(() => { dbp = null; });
+    return dbp;
+  }
+  const done = rq => new Promise((res, rej) => { rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); });
+  const txDone = tx => new Promise((res, rej) => { tx.oncomplete = () => res(); tx.onerror = tx.onabort = () => rej(tx.error || new Error('tx failed')); });
+  const pad = n => String(n).padStart(5, '0');
+  async function getFile(key) {
+    try { const d = await db(); return await done(d.transaction('files').objectStore('files').get(key)); } catch (e) { return null; }
+  }
+  async function getRange(key, a, b) {
+    const d = await db();
+    const range = IDBKeyRange.bound(key + '|' + pad(a), key + '|' + pad(b) + '|~');
+    return await done(d.transaction('imgs').objectStore('imgs').getAll(range));
+  }
+  async function saveAll(key, meta, items) {
+    const d = await db();
+    const tx = d.transaction(['imgs', 'files'], 'readwrite');
+    const imgs = tx.objectStore('imgs');
+    imgs.delete(IDBKeyRange.bound(key + '|', key + '|~'));
+    items.forEach(it => imgs.put({ id: key + '|' + pad(it.n) + '|' + it.k, key, n: it.n, k: it.k, blob: it.blob, w: it.w, h: it.h, area: it.area }));
+    tx.objectStore('files').put(meta);
+    await txDone(tx);
+  }
+  async function removeKey(key) {
+    const d = await db();
+    const tx = d.transaction(['imgs', 'files'], 'readwrite');
+    tx.objectStore('imgs').delete(IDBKeyRange.bound(key + '|', key + '|~'));
+    tx.objectStore('files').delete(key);
+    await txDone(tx);
+  }
+  // Same file name + size => same key, so re-picking a file on this device reuses its pictures.
+  function keyFor(file, kind) {
+    const s = 'v1|' + kind + '|' + file.name + '|' + file.size;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return 'p' + h.toString(36) + file.size.toString(36);
+  }
+
+  // ---------- image helpers ----------
+  async function decode(blob) {
+    if (window.createImageBitmap) { try { return await createImageBitmap(blob); } catch (e) { } }
+    return await new Promise((res, rej) => {
+      const url = URL.createObjectURL(blob), im = new Image();
+      im.onload = () => { URL.revokeObjectURL(url); res(im); };
+      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode failed')); };
+      im.src = url;
+    });
+  }
+  const dims = src => ({ w: src.naturalWidth || src.displayWidth || src.width || 0, h: src.naturalHeight || src.displayHeight || src.height || 0 });   // displayWidth: VideoFrame (pdf.js JPEGs in Chrome)
+  function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  // Shrink to MAX_DIM in halving steps (smoother than one big jump), on white (transparent diagrams stay readable).
+  async function encode(src) {
+    let { w, h } = dims(src);
+    const scale = Math.min(1, MAX_DIM / Math.max(w, h));
+    const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+    let cur = src, cw = w, ch = h;
+    while (cw / 2 > tw * 1.05) {
+      const nw = Math.round(cw / 2), nh = Math.round(ch / 2), c = canvas(nw, nh), x = c.getContext('2d');
+      x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, nw, nh);
+      if (cur !== src && cur.width) { cur.width = 0; cur.height = 0; }
+      cur = c; cw = nw; ch = nh;
+    }
+    const out = canvas(tw, th), ctx = out.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, tw, th);
+    ctx.imageSmoothingQuality = 'high'; ctx.drawImage(cur, 0, 0, tw, th);
+    // 8x8 fingerprint to spot the same picture saved twice (logos, template art).
+    const fp = canvas(8, 8), fx = fp.getContext('2d');
+    fx.drawImage(out, 0, 0, 8, 8);
+    const px = fx.getImageData(0, 0, 8, 8).data;
+    let sig = (w / h).toFixed(2) + ':';
+    for (let i = 0; i < px.length; i += 4) sig += ((px[i] * 3 + px[i + 1] * 6 + px[i + 2]) / 10 >> 5).toString(8);
+    // nearly blank (one flat colour) => skip
+    let mn = 255, mx = 0;
+    for (let i = 0; i < px.length; i += 4) { const g = (px[i] + px[i + 1] + px[i + 2]) / 3; mn = Math.min(mn, g); mx = Math.max(mx, g); }
+    const blob = await new Promise(res => out.toBlob(res, 'image/jpeg', QUALITY));
+    if (cur !== src && cur.width) { cur.width = 0; cur.height = 0; }
+    out.width = 0; out.height = 0;
+    return blob ? { blob, w: tw, h: th, area: w * h, sig, flat: mx - mn < 12 } : null;
+  }
+  const tooSmall = (w, h) => Math.max(w, h) < 150 || Math.min(w, h) < 80;
+  const repeated = (count, total) => count >= 5 || (count >= 3 && count >= total * 0.25);
+  const tick = () => new Promise(r => setTimeout(r, 0));
+
+  // ---------- PPTX ----------
+  const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', jpe: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', webp: 'image/webp', tif: 'image/tiff', tiff: 'image/tiff' };
+  async function fromPptx(buf, progress, alive) {
+    const zip = await JSZip.loadAsync(buf);
+    const slidePaths = await pptxSlideOrder(zip);
+    const total = slidePaths.length, perSlide = [], uses = {};
+    for (let i = 0; i < total; i++) {
+      const p = slidePaths[i], relPath = p.replace(/slides\/(slide\d+\.xml)$/, 'slides/_rels/$1.rels');
+      const relsXml = zip.file(relPath) ? await zip.file(relPath).async('string') : '';
+      const xmlStr = zip.file(p) ? await zip.file(p).async('string') : '';
+      const rels = relTargets(relsXml), list = [];
+      if (xmlStr) {
+        const doc = new DOMParser().parseFromString(xmlStr, 'application/xml');
+        const blips = doc.getElementsByTagNameNS('http://schemas.openxmlformats.org/drawingml/2006/main', 'blip');
+        for (const b of Array.from(blips)) {
+          let inBg = false;
+          for (let a = b.parentNode; a && a.nodeType === 1; a = a.parentNode) if (a.localName === 'bg') { inBg = true; break; }
+          if (inBg) continue;   // slide backgrounds are template art
+          const rid = b.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed');
+          const rel = rid && rels[rid];
+          if (!rel || !/\/image$/.test(rel.type)) continue;
+          const path = resolvePath(p, rel.target);
+          if (!list.includes(path)) list.push(path);
+        }
+      }
+      list.forEach(path => { uses[path] = (uses[path] || 0) + 1; });
+      perSlide.push(list);
+    }
+    const cache = {}, out = [], sigUses = {};
+    for (let i = 0; i < total; i++) {
+      if (!alive()) return null;
+      progress(i + 1, total);
+      for (const path of perSlide[i]) {
+        if (repeated(uses[path], total)) continue;          // logo / template image on many slides
+        if (!(path in cache)) {
+          cache[path] = null;
+          const ext = (path.split('.').pop() || '').toLowerCase();
+          const f = zip.file(path);
+          if (f && MIME[ext]) {                             // EMF/WMF/SVG etc. are skipped
+            try {
+              const u8 = await f.async('uint8array');
+              if (u8.length >= MIN_BYTES) {
+                const src = await decode(new Blob([u8], { type: MIME[ext] }));
+                const { w, h } = dims(src);
+                if (!tooSmall(w, h)) { const e = await encode(src); if (e && !e.flat) cache[path] = e; }
+                if (src.close) src.close();
+              }
+            } catch (e) { /* unreadable picture: skip */ }
+          }
+        }
+        const e = cache[path];
+        if (e) out.push(Object.assign({ n: i + 1, path }, e));
+      }
+      await tick();
+    }
+    return finish(out, total);
+  }
+  // Drop pictures that look identical across many slides/pages (copied logos), dedupe within a unit, cap per unit.
+  function finish(out, total) {
+    const sigUnits = {};
+    out.forEach(e => { (sigUnits[e.sig] = sigUnits[e.sig] || new Set()).add(e.n); });
+    const byUnit = {};
+    out.forEach(e => {
+      if (repeated(sigUnits[e.sig].size, total)) return;
+      const arr = byUnit[e.n] = byUnit[e.n] || [];
+      if (arr.some(x => x.sig === e.sig)) return;
+      arr.push(e);
+    });
+    const items = [];
+    Object.keys(byUnit).forEach(n => {
+      byUnit[n].sort((a, b) => b.area - a.area).slice(0, PER_UNIT).forEach((e, k) => items.push({ n: +n, k, blob: e.blob, w: e.w, h: e.h, area: e.area }));
+    });
+    return items;
+  }
+
+  // ---------- PDF ----------
+  // Pull the embedded pictures from each page (not the whole page), using the page's drawing commands
+  // to skip full-page backgrounds/scans and tiny icons.
+  async function fromPdf(buf, progress, alive) {
+    const lib = await loadPdfjs();
+    const OPS = lib.OPS;
+    const task = lib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false, disableFontFace: true });
+    const out = [];
+    let total = 0;
+    try {
+      const pdf = await task.promise;
+      total = pdf.numPages;
+      for (let n = 1; n <= total; n++) {
+        if (!alive()) return null;
+        progress(n, total);
+        let page;
+        try {
+          page = await pdf.getPage(n);
+          const [x0, y0, x1, y1] = page.view, pw = Math.abs(x1 - x0), ph = Math.abs(y1 - y0);
+          const ol = await page.getOperatorList();
+          const found = [];
+          let ctm = [1, 0, 0, 1, 0, 0];
+          const stack = [];
+          const mul = (m, t) => [m[0] * t[0] + m[2] * t[1], m[1] * t[0] + m[3] * t[1], m[0] * t[2] + m[2] * t[3], m[1] * t[2] + m[3] * t[3], m[0] * t[4] + m[2] * t[5] + m[4], m[1] * t[4] + m[3] * t[5] + m[5]];
+          for (let i = 0; i < ol.fnArray.length; i++) {
+            const fn = ol.fnArray[i], args = ol.argsArray[i];
+            if (fn === OPS.save) stack.push(ctm);
+            else if (fn === OPS.restore) ctm = stack.pop() || ctm;
+            else if (fn === OPS.transform && args) ctm = mul(ctm, args);
+            else if (fn === OPS.paintFormXObjectBegin) { stack.push(ctm); if (args && Array.isArray(args[0]) && args[0].length === 6) ctm = mul(ctm, args[0]); }
+            else if (fn === OPS.paintFormXObjectEnd) ctm = stack.pop() || ctm;
+            else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject) {
+              const dw = Math.hypot(ctm[0], ctm[1]), dh = Math.hypot(ctm[2], ctm[3]);
+              const frac = (dw * dh) / (pw * ph);
+              if (frac > 0.8) continue;                                   // page background / scanned page
+              if (dw < pw * 0.1 && dh < ph * 0.1) continue;               // small icon / bullet
+              found.push({ ref: args && args[0], frac });
+            }
+          }
+          const seen = new Set();
+          for (const f of found.sort((a, b) => b.frac - a.frac).slice(0, PER_UNIT + 2)) {
+            let img = f.ref;
+            if (typeof img === 'string') {
+              if (seen.has(img)) continue; seen.add(img);
+              img = await pdfObj(img.startsWith('g_') ? page.commonObjs : page.objs, img);
+            }
+            if (!img || tooSmall(img.width || 0, img.height || 0)) continue;
+            const src = pdfImgToSource(img);
+            if (!src || tooSmall(dims(src).w, dims(src).h)) continue;
+            const e = await encode(src);
+            if (src !== img.bitmap && src.getContext) { src.width = 0; src.height = 0; }   // only free canvases we made
+            if (e && !e.flat) out.push(Object.assign({ n }, e));
+          }
+        } catch (e) { console.warn('pictures: page ' + n + ' skipped', e); }
+        finally { try { page && page.cleanup(); } catch (e) { } }
+        await tick();
+      }
+    } finally { try { await task.destroy(); } catch (e) { } }
+    return finish(out, total);
+  }
+  function pdfObj(objs, id) {
+    return new Promise(res => {
+      let settled = false;
+      const t = setTimeout(() => { if (!settled) { settled = true; res(null); } }, 4000);
+      try {
+        objs.get(id, v => { if (!settled) { settled = true; clearTimeout(t); res(v); } });
+      } catch (e) { settled = true; clearTimeout(t); res(null); }
+    });
+  }
+  function pdfImgToSource(img) {
+    if (img.bitmap) return img.bitmap;
+    if (img.data && img.width && img.height) {
+      const { width: w, height: h, data } = img;
+      const c = canvas(w, h), x = c.getContext('2d'), id = x.createImageData(w, h), d = id.data;
+      if (img.kind === 3 && data.length >= w * h * 4) d.set(data.subarray(0, w * h * 4));
+      else if (img.kind === 2 && data.length >= w * h * 3) { for (let i = 0, j = 0; i < w * h; i++, j += 3) { d[i * 4] = data[j]; d[i * 4 + 1] = data[j + 1]; d[i * 4 + 2] = data[j + 2]; d[i * 4 + 3] = 255; } }
+      else return null;     // 1-bit masks etc.
+      x.putImageData(id, 0, 0);
+      return c;
+    }
+    return null;
+  }
+
+  // ---------- run after a file is read ----------
+  let runToken = 0;
+  function start(file, kind, x) {
+    if (!x || !(kind === 'pptx' || kind === 'pdf')) return;
+    const key = x.picKey = keyFor(file, kind);
+    const my = ++runToken, alive = () => my === runToken;
+    const status = el('div', { class: 'muted pic-status' });
+    const info = $('fileInfo');
+    const show = t => { status.textContent = t; if (t && !status.isConnected && info && extracted === x) info.append(status); };
+    const p = (async () => {
+      const have = await getFile(key);
+      if (have && have.done) { await attach(key, x, have.units); if (have.count) show('🖼️ ' + have.count + ' picture' + (have.count === 1 ? '' : 's') + ' from this file will show in Learn summaries.'); return have; }
+      await db();   // throws if IndexedDB is unavailable -> feature quietly off
+      show('🖼️ Finding pictures…');
+      const buf = await file.arrayBuffer();
+      const word = kind === 'pdf' ? 'page' : 'slide';
+      const progress = (i, t) => show('🖼️ Finding pictures… ' + word + ' ' + i + ' of ' + t);
+      const items = kind === 'pptx' ? await fromPptx(buf, progress, alive) : await fromPdf(buf, progress, alive);
+      if (!items) return null;   // a newer file was picked
+      const units = Array.from(new Set(items.map(i => i.n))).sort((a, b) => a - b);
+      const meta = { key, fileName: file.name, kind, count: items.length, units, createdAt: Date.now(), done: true };
+      await saveAll(key, meta, items);
+      try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
+      await attach(key, x, units);
+      show(items.length ? '🖼️ ' + items.length + ' picture' + (items.length === 1 ? '' : 's') + ' saved on this device for the Learn summaries.' : '');
+      return meta;
+    })().catch(e => { console.warn('pictures skipped:', e); show(''); return null; })
+      .finally(() => { if (pending[key] === p) delete pending[key]; });
+    pending[key] = p;
+  }
+  // Point decks at the pictures: decks made from this upload, plus older decks of the same file
+  // (so re-picking the file once brings pictures to a deck you're already partway through).
+  async function attach(key, x, units) {
+    const pics = { key, units: units || [] };
+    if (x) x.picUnits = pics.units;
+    const live = [L && L.deck, studyCtx && studyCtx.learn, studyCtx && studyCtx.cram].filter(Boolean);
+    let all = [];
+    try { all = await DeckStore.list(); } catch (e) { }
+    for (const d0 of all) {
+      if (d0.demo || d0.sample) continue;
+      const mine = d0.pics && d0.pics.key === key;
+      const sameFile = !d0.pics && d0.source && d0.source.fileName === x.fileName && d0.source.kind === x.kind;
+      if (!(mine || sameFile) || (mine && JSON.stringify(d0.pics.units) === JSON.stringify(pics.units))) continue;
+      const d = live.find(v => v.id === d0.id) || d0;
+      live.filter(v => v.id === d0.id).forEach(v => { v.pics = pics; });
+      d.pics = pics;
+      try { await DeckStore.save(d); } catch (e) { }
+    }
+    if (L && L.deck && L.deck.pics && L.deck.pics.key === key && learnVisible() && currentScreen === 'learn') {
+      const slot = document.querySelector('#lCard .sec-pics-slot');
+      if (slot) fill(slot, L.deck, L.deck.learn.current);
+    }
+  }
+
+  // ---------- show under a section ----------
+  function unitRange(label) {
+    const m = /^(?:Slides?|Pages?) (\d+)(?:\s*[–-]\s*(\d+))?$/.exec(String(label || '').trim());
+    return m ? [+m[1], +(m[2] || m[1])] : null;
+  }
+  // A section owns its own slides plus any picture-only slides before the next section starts.
+  function sectionUnits(deck, i) {
+    const secs = deck.learn.sections, r = unitRange(secs[i] && secs[i].label);
+    if (!r) return null;
+    const next = secs[i + 1] && unitRange(secs[i + 1].label);
+    return [r[0], next && next[0] > r[1] ? next[0] - 1 : r[1]];
+  }
+  function revoke() { liveURLs.forEach(u => URL.revokeObjectURL(u)); liveURLs = []; }
+  async function fill(slot, deck, i) {
+    slot.innerHTML = '';
+    const pics = deck && deck.pics, r = deck && deck.learn && sectionUnits(deck, i);
+    if (!pics || !pics.key || !r) return;
+    await (pending[pics.key] || null);   // also lets the caller attach the slot first
+    let rows = [];
+    try { rows = await getRange(pics.key, r[0], r[1]); } catch (e) { rows = []; }
+    if (!slot.isConnected) return;
+    slot.innerHTML = '';
+    if (!rows.length) {
+      const expected = (pics.units || []).some(n => n >= r[0] && n <= r[1]);
+      if (expected && !(await getFile(pics.key)) && slot.isConnected) slot.append(el('div', { class: 'pic-note' }, '🖼️ Pictures are saved on the device you uploaded from.'));
+      return;
+    }
+    const pick = rows.slice().sort((a, b) => b.area - a.area).slice(0, PER_SECTION).sort((a, b) => a.n - b.n || a.k - b.k);
+    const word = (deck.source && deck.source.kind) === 'pdf' ? 'Page' : 'Slide';
+    const grid = el('div', { class: 'sec-pics' + (pick.length === 1 ? ' one' : '') });
+    pick.forEach(row => {
+      const url = URL.createObjectURL(row.blob); liveURLs.push(url);
+      const cap = word + ' ' + row.n;
+      const img = el('img', { src: url, alt: 'Picture from ' + cap.toLowerCase(), loading: 'lazy', decoding: 'async' });
+      const fig = el('button', { type: 'button', class: 'pic', 'aria-label': 'Open picture from ' + cap.toLowerCase() }, img, el('span', { class: 'cap' }, cap));
+      img.addEventListener('error', () => fig.remove());
+      fig.addEventListener('click', () => PicBox.open(row.blob, cap));
+      grid.append(fig);
+    });
+    slot.append(grid);
+  }
+  function slotFor(deck, i) {
+    revoke();
+    const slot = el('div', { class: 'sec-pics-slot' });
+    fill(slot, deck, i);
+    return slot;
+  }
+  // Remove pictures no saved deck points at any more (after a day, so a fresh upload has time to become a deck).
+  async function gc() {
+    try {
+      const d = await db();
+      const files = await done(d.transaction('files').objectStore('files').getAll());
+      if (!files.length) return;
+      const used = new Set((await DeckStore.list()).map(x => x.pics && x.pics.key).filter(Boolean));
+      if (extracted && extracted.picKey) used.add(extracted.picKey);
+      for (const f of files) if (!used.has(f.key) && Date.now() - (f.createdAt || 0) > 864e5) await removeKey(f.key);
+    } catch (e) { }
+  }
+  return { start, slotFor, gc, keyFor, _pending: pending };
+})();
+
+// Simple full-screen picture viewer.
+const PicBox = (() => {
+  let box = null, url = null;
+  function build() {
+    box = el('div', { class: 'picbox hidden', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Picture' });
+    const close = el('button', { type: 'button', class: 'picbox-x', 'aria-label': 'Close picture' }, '✕');
+    box.append(close, el('img', { alt: '' }), el('div', { class: 'picbox-cap' }));
+    box.addEventListener('click', e => { if (e.target !== box.querySelector('img')) hide(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) hide(); });
+    document.body.append(box);
+  }
+  function open(blob, cap) {
+    if (!box) build();
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(blob);
+    const img = box.querySelector('img');
+    img.onerror = () => hide();
+    img.src = url; img.alt = 'Picture from ' + cap.toLowerCase();
+    box.querySelector('.picbox-cap').textContent = cap;
+    box.classList.remove('hidden');
+    document.body.classList.add('picbox-open');
+    box.querySelector('.picbox-x').focus({ preventScroll: true });
+  }
+  function hide() {
+    if (!box) return;
+    box.classList.add('hidden');
+    document.body.classList.remove('picbox-open');
+    box.querySelector('img').removeAttribute('src');
+    if (url) { URL.revokeObjectURL(url); url = null; }
+  }
+  const isOpen = () => !!box && !box.classList.contains('hidden');
+  return { open, close: hide, isOpen };
+})();
+setTimeout(() => SlidePics.gc(), 5000);
+
 // ===================== DEMO LEARN DECK =====================
 // Original sample content written for this demo (not from any textbook or class file).
 const DEMO_LEARN = [
@@ -2479,6 +2919,11 @@ function srcFromExtracted(x) {
   return x.text.length <= SRC_KEEP_CHARS ? { parts: x.parts, kind: x.kind, units: x.units, unitName: x.unitName, paragraphs: x.paragraphs } : null;
 }
 function extractedFromDeck(d) {
+  const x = extractedFromDeck0(d);
+  if (x && d.pics && d.pics.key) { x.picKey = d.pics.key; if (d.pics.units) x.picUnits = d.pics.units; }
+  return x;
+}
+function extractedFromDeck0(d) {
   if (!d) return null;
   const fileName = (d.source && d.source.fileName) || d.name;
   if (d.src && Array.isArray(d.src.parts) && d.src.parts.length) {
@@ -2588,6 +3033,7 @@ $('resultsModesBtn').addEventListener('click', () => quiz && openModes(quiz.deck
 // Back swipe / browser Back: step "up" one level inside the app instead of leaving the page.
 window.addEventListener('popstate', () => {
   histGuard = false;
+  if (PicBox.isOpen()) { PicBox.close(); try { history.pushState({ xs: 1 }, ''); histGuard = true; } catch (e) { } return; }
   const cur = currentScreen;
   if (cur === 'quiz' && quiz) {
     if (quiz.opts.onQuit) quiz.opts.onQuit();
