@@ -28,6 +28,14 @@
     } catch (e) { return null; }
   }
 
+  // Remember how we arrived (email links) before supabase-js tidies the URL.
+  var ARRIVAL = (function () {
+    var q = new URLSearchParams(location.search), hsh = new URLSearchParams(location.hash.replace(/^#/, ''));
+    function g(k) { return q.get(k) || hsh.get(k) || ''; }
+    return { tokenHash: q.get('token_hash') || '', type: g('type'), implicit: !!hsh.get('access_token'),
+      error: g('error_description') || g('error'), errorCode: g('error_code') };
+  })();
+
   var listeners = [];
   var XRS = window.XRS = {
     user: storedUser(),
@@ -68,10 +76,52 @@
           setTimeout(emit, 0);
         }
       });
+      handleArrival(sb);
       return sb;
     })();
     clientPromise.catch(function (e) { console.warn('[XRS] login unavailable:', e); clientPromise = null; });
     return clientPromise;
+  }
+  // Email links: ?token_hash=...&type=signup|recovery|email_change|magiclink|invite|email (preferred, set in the
+  // Supabase email templates) or the default #access_token=...&type=... links (handled by supabase-js itself).
+  var arrivalDone = false;
+  function cleanUrl() {
+    try {
+      var u = new URL(location.href);
+      ['token_hash', 'type', 'error', 'error_code', 'error_description', 'next'].forEach(function (k) { u.searchParams.delete(k); });
+      if (/access_token=|error_description=|error=/.test(u.hash)) u.hash = '';
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch (e) { }
+  }
+  var DONE_MSG = { signup: 'Email confirmed — you\'re logged in! 🎉', email: 'Email confirmed — you\'re logged in! 🎉', invite: 'Welcome — you\'re logged in! 🎉',
+    magiclink: 'You\'re logged in! 🎉', email_change: 'Your email address was updated.' };
+  async function handleArrival(sb) {
+    if (arrivalDone) return; arrivalDone = true;
+    var a = ARRIVAL;
+    if (a.error) {
+      cleanUrl();
+      var expired = /expired|invalid|otp_expired/i.test(a.error + ' ' + a.errorCode);
+      return notice('Link problem', expired ? 'That email link has expired or was already used. Request a new one below.' : a.error, false, true);
+    }
+    if (a.tokenHash && a.type) {
+      try {
+        var r = await sb.auth.verifyOtp({ token_hash: a.tokenHash, type: a.type });
+        cleanUrl();
+        if (r.error) throw r.error;
+        if (a.type === 'recovery') openSheet('newpass');
+        else notice('All set', DONE_MSG[a.type] || 'Done — you\'re logged in!', true);
+      } catch (err) {
+        cleanUrl();
+        notice('Link problem', /expired|invalid|otp/i.test((err && (err.code || '')) + ' ' + (err && err.message)) ? 'That email link has expired or was already used. Request a new one below.' : friendly(err), false, true);
+      }
+      return;
+    }
+    if (a.implicit) {
+      // supabase-js reads the #access_token itself; just greet the user once the session is in.
+      try { await sb.auth.getSession(); } catch (e) { }
+      if (a.type === 'recovery') { if (!document.getElementById('xrs-newpass')) openSheet('newpass'); }
+      else if (DONE_MSG[a.type] && XRS.user) notice('All set', DONE_MSG[a.type], true);
+    }
   }
   async function loadProfile(sb) {
     try {
@@ -187,27 +237,38 @@
     var code = err && err.code;
     if (/invalid login credentials/i.test(m)) return 'Wrong email or password.';
     if (/email not confirmed/i.test(m) || code === 'email_not_confirmed') return 'Please confirm your email first (check your inbox), then log in.';
-    if (/not authorized/i.test(m) || code === 'email_address_not_authorized') return 'Sign-up email could not be sent. The site owner needs to turn off "Confirm email" in Supabase (or set up email sending).';
+    if (/not authorized/i.test(m) || code === 'email_address_not_authorized') return 'We couldn\'t send an email to that address right now. Please try again later.';
     if (code === 'email_address_invalid' || /email address .* is invalid/i.test(m)) return 'That email address can\'t be used — please use your real email.';
-    if (/rate limit/i.test(m) || code === 'over_email_send_rate_limit') return 'Too many emails sent in the last hour. Please try again later.';
+    if (/rate limit/i.test(m) || code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') return 'Too many emails sent recently. Please wait a minute and try again.';
+    if (/error sending/i.test(m)) return 'We couldn\'t send the email right now. Please try again in a few minutes.';
+    if (code === 'same_password' || /should be different/i.test(m)) return 'Pick a password different from your old one.';
     if (/already registered|already been registered|user_already_exists/i.test(m)) return 'That email already has an account — try Log in.';
     if (/password should be|weak_password/i.test(m)) return 'Password is too short — use at least 6 characters.';
     if (/fetch|network|load/i.test(m)) return 'No connection right now. Try again in a moment.';
     return m;
   }
 
-  function openSheet(view) {
+  function notice(title, text, ok, offerReset) { openSheet('notice', { title: title, text: text, ok: ok, offerReset: offerReset }); }
+  function openSheet(view, opts) {
     addCss(); closeSheet();
     view = view || (XRS.user ? 'account' : 'login');
     ov = h('div', { class: 'xrs-ov', role: 'dialog', 'aria-modal': 'true' });
     ov.addEventListener('click', function (e) { if (e.target === ov) closeSheet(); });
     var sheet = h('div', { class: 'xrs-sheet', id: 'xrs-sheet' });
     ov.appendChild(sheet); document.body.appendChild(ov); document.body.style.overflow = 'hidden';
-    var titles = { login: 'Log in', signup: 'Create account', forgot: 'Reset password', newpass: 'Set a new password', account: 'Your account' };
+    var titles = { login: 'Log in', signup: 'Create account', forgot: 'Reset password', newpass: 'Set a new password', account: 'Your account', notice: (opts && opts.title) || 'XRaySavvy' };
     sheet.appendChild(h('div', { class: 'xrs-top' }, [h('h2', { text: titles[view] }), h('button', { class: 'xrs-x', 'aria-label': 'Close', onclick: closeSheet, text: '×' })]));
     var msg = h('div', { class: 'xrs-msg hidden', style: 'display:none' });
     function say(t, ok) { msg.textContent = t; msg.className = 'xrs-msg ' + (ok ? 'ok' : 'err'); msg.style.display = t ? 'block' : 'none'; }
 
+    if (view === 'notice') {
+      sheet.appendChild(msg); say(opts.text, opts.ok);
+      if (opts.offerReset) {
+        sheet.appendChild(h('button', { class: 'xrs-go', onclick: function () { openSheet('forgot'); }, text: 'Email me a new reset link' }));
+        sheet.appendChild(h('button', { class: 'xrs-go sec', onclick: function () { openSheet('login'); }, text: 'Log in' }));
+      } else sheet.appendChild(h('button', { class: 'xrs-go', id: 'xrs-ok', onclick: closeSheet, text: 'OK' }));
+      return;
+    }
     if (view === 'login' || view === 'signup') {
       sheet.appendChild(h('div', { class: 'xrs-seg' }, [
         h('button', { class: view === 'login' ? 'on' : '', onclick: function () { openSheet('login'); }, text: 'Log in' }),
@@ -234,9 +295,20 @@
             if (r.error) throw r.error;
             if (r.data.session) { say('Account created — you\'re logged in!', true); setTimeout(closeSheet, 900); }
             else if (r.data.user && r.data.user.identities && r.data.user.identities.length === 0) say('That email already has an account — try Log in.');
-            else say('Almost done! Check your email and tap the confirmation link, then log in here.', true);
+            else { say('Almost done! We emailed a confirmation link to ' + em + '. Tap it (check spam too) and you\'ll be logged in.', true); form.querySelectorAll('input').forEach(function (i) { i.disabled = true; }); go.style.display = 'none'; }
           } else {
             r = await sb.auth.signInWithPassword({ email: em, password: pw });
+            if (r.error && (r.error.code === 'email_not_confirmed' || /email not confirmed/i.test(r.error.message || ''))) {
+              say(friendly(r.error));
+              var again = h('button', { type: 'button', class: 'xrs-go sec', id: 'xrs-resend', text: 'Resend confirmation email' });
+              again.onclick = async function () {
+                again.disabled = true;
+                try { var rr = await sb.auth.resend({ type: 'signup', email: em, options: { emailRedirectTo: pageUrl() } }); if (rr.error) throw rr.error; say('Sent! Check your inbox (and spam) for the XRaySavvy email.', true); again.remove(); }
+                catch (e2) { say(friendly(e2)); again.disabled = false; }
+              };
+              if (!document.getElementById('xrs-resend')) form.appendChild(again);
+              return;
+            }
             if (r.error) throw r.error;
             say('Logged in!', true); setTimeout(closeSheet, 600);
           }
@@ -253,13 +325,14 @@
       go2.onclick = async function () {
         var em = em2.value.trim(); if (!/^\S+@\S+\.\S+$/.test(em)) return say('Enter a valid email.');
         go2.disabled = true;
-        try { var sb = await loadClient(); var r = await sb.auth.resetPasswordForEmail(em, { redirectTo: pageUrl() }); if (r.error) throw r.error; say('If that email has an account, a reset link is on its way. Open it on this device.', true); }
+        try { var sb = await loadClient(); var r = await sb.auth.resetPasswordForEmail(em, { redirectTo: pageUrl() }); if (r.error) throw r.error; say('If that email has an account, a reset link is on its way. Check your inbox (and spam), then tap the link.', true); }
         catch (err) { say(friendly(err)); } finally { go2.disabled = false; }
       };
       sheet.appendChild(h('label', { for: 'xrs-email', text: 'Email' })); sheet.appendChild(em2); sheet.appendChild(go2); sheet.appendChild(msg);
       sheet.appendChild(h('button', { class: 'xrs-link', onclick: function () { openSheet('login'); }, text: '← Back to log in' }));
     } else if (view === 'newpass') {
       var np = h('input', { type: 'password', id: 'xrs-pass', autocomplete: 'new-password', minlength: '6' });
+      sheet.setAttribute('data-view', 'newpass'); np.id = 'xrs-newpass';
       var go3 = h('button', { class: 'xrs-go', text: 'Save new password' });
       go3.onclick = async function () {
         if (np.value.length < 6) return say('Password needs at least 6 characters.');
@@ -267,7 +340,7 @@
         try { var sb = await loadClient(); var r = await sb.auth.updateUser({ password: np.value }); if (r.error) throw r.error; say('Password updated. You\'re logged in.', true); setTimeout(closeSheet, 1200); }
         catch (err) { say(friendly(err)); } finally { go3.disabled = false; }
       };
-      sheet.appendChild(h('label', { for: 'xrs-pass', text: 'New password (at least 6 characters)' })); sheet.appendChild(np); sheet.appendChild(go3); sheet.appendChild(msg);
+      sheet.appendChild(h('label', { for: 'xrs-newpass', text: 'New password (at least 6 characters)' })); sheet.appendChild(np); sheet.appendChild(go3); sheet.appendChild(msg);
     } else {
       var u = XRS.user || {};
       sheet.appendChild(h('div', { style: 'display:flex;gap:0.7rem;align-items:center' }, [
@@ -294,7 +367,7 @@
     addCss(); renderButton();
     // Load the library right away only when someone is logged in or arriving from an email link;
     // otherwise wait until the page is idle so logged-out visitors pay nothing up front.
-    var fromLink = /access_token=|type=recovery|type=signup|error_description=/.test(location.hash + location.search);
+    var fromLink = !!(ARRIVAL.tokenHash || ARRIVAL.implicit || ARRIVAL.error) || /type=recovery|type=signup/.test(location.hash + location.search);
     if (XRS.user || fromLink) loadClient().catch(function () { });
     else setTimeout(function () { loadClient().catch(function () { }); }, 2500);
   }
