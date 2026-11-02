@@ -17,7 +17,7 @@
 // Free-tier Flash-Lite model (see https://ai.google.dev/gemini-api/docs/models).
 // If Google retires it, swap in another free-tier model id, e.g. 'gemini-3.1-flash-lite'.
 const MODEL = 'gemini-3.5-flash-lite';
-const ALLOWED_ORIGINS = ['https://surge7210.github.io'];
+const ALLOWED_ORIGINS = ['https://surge7210.github.io', 'https://xraysavvy.com', 'https://www.xraysavvy.com'];
 const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 const MAX_BODY_BYTES = 300 * 1024;  // whole request body
 const MAX_TEXT_CHARS = 60000;       // text per request (the page sends ~25-40k chunks)
