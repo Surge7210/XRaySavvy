@@ -146,6 +146,11 @@
   #xrs-splash .sp-sub { margin:.6rem 0 0; color:var(--muted); font-size:1.05rem; }
   #xrs-splash .sp-f100 { margin:1.2rem auto 0; display:inline-block; max-width:340px; padding:.55rem .9rem; border-radius:14px; background:rgba(29,155,240,.14); border:1px solid rgba(29,155,240,.45); font-size:.9rem; line-height:1.35; }
   #xrs-splash .sp-skip { position:absolute; left:0; right:0; bottom:max(1.2rem, env(safe-area-inset-bottom)); color:var(--muted); font-size:.8rem; opacity:.8; }
+  #xrs-splash .sp-load { margin:1.6rem auto 0; width:min(260px, 70vw); }
+  #xrs-splash .sp-track { height:6px; border-radius:99px; background:rgba(255,255,255,.12); overflow:hidden; }
+  #xrs-splash .sp-bar { height:100%; width:0; border-radius:99px; background:linear-gradient(90deg, var(--accent), #6cc4ff); box-shadow:0 0 12px rgba(29,155,240,.6); animation:sp-fill 4s linear forwards; }
+  #xrs-splash .sp-pct { margin-top:.45rem; color:var(--muted); font-size:.8rem; font-variant-numeric:tabular-nums; }
+  @keyframes sp-fill { from { width:0; } to { width:100%; } }
   @keyframes sp-rise { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }
   @media (prefers-reduced-motion: reduce) { #xrs-splash, #xrs-splash .sp-in { transition:none; animation:none; } }
 </style>
@@ -168,6 +173,8 @@
     '<p class="sp-brand">XRaySavvy</p><h2>Study smarter.</h2>' +
     '<p class="sp-sub">Made by current students, for students.</p></div>' +
     '<div class="sp-skip">Tap to skip</div>';
+  var load = document.createElement('div'); load.className = 'sp-load';
+  load.innerHTML = '<div class="sp-track"><div class="sp-bar"></div></div><div class="sp-pct">Loading\u2026 0%</div>';
   // Founding 100 line: signed-out only, only while spots remain; never waits on the network.
   var signedOut = !(window.XRS && XRS.user);
   var cached = signedOut && window.XRS && XRS.foundingSpotsCached ? XRS.foundingSpotsCached() : null;
@@ -181,6 +188,13 @@
     el.querySelector('.sp-in').appendChild(line);
     if (window.XRS && XRS.foundingSpots) XRS.foundingSpots().then(function (n) { if (n !== null && el.parentNode) set(n); });
   }
+  el.querySelector('.sp-in').appendChild(load);
+  var pct = load.querySelector('.sp-pct'), t0 = Date.now();
+  (function tick() {
+    var n = Math.min(100, Math.round((Date.now() - t0) / 40));
+    pct.textContent = n < 100 ? 'Loading\u2026 ' + n + '%' : 'Ready!';
+    if (n < 100 && el.parentNode) requestAnimationFrame(tick);
+  })();
   var done = false;
   function hide() {
     if (done) return; done = true;
