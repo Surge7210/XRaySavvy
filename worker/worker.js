@@ -1,3 +1,4 @@
+import { DurableObject } from 'cloudflare:workers';
 // XRaySavvy study helper - Cloudflare Worker (module syntax)
 // Receives study-note text from upload.html and asks Google Gemini (free tier)
 // to write quiz questions, section summaries and explanations from it.
@@ -10,6 +11,8 @@
 //   'ocr'       {images:[{data, mimeType}]}  (base64, 1-4) -> {text, pages[]}  reads photos/screenshots
 //   'projections' {text}                                 -> {projections[]}  positioning projections found in the notes
 //                 (every field is copied from the notes; anything not stated is exactly "not on slides")
+// GET ?action=usage (Authorization: Bearer <Supabase access token>) -> owner-only usage counts.
+//   Every request is counted in the UsageCounter Durable Object (SQLite, hourly UTC buckets, one row write per request).
 // The Gemini key lives ONLY in the Worker
 // secret GEMINI_API_KEY (Settings > Variables and Secrets). Never paste it here.
 
@@ -35,6 +38,10 @@ const OCR_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/
 const ACTIONS = ['questions', 'section', 'explain', 'ask', 'ocr', 'projections'];
 // Tried when MODEL is overloaded/unavailable (HTTP 5xx or 404) or out of quota (HTTP 429).
 const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+// Usage dashboard (admin.html). These are public values: the publishable key is already in auth.js.
+const SUPABASE_URL = 'https://fnopntlihakgrydvwdge.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_e59T3yCSuMGmLxunWtdTbw_B1KGGsMs';
+const OWNER_ID = 'd08e9b9c-3e14-45f5-8ad0-44df864ff0ee';
 const geminiUrl = m => 'https://generativelanguage.googleapis.com/v1beta/models/' + m + ':generateContent';
 
 const RESPONSE_SCHEMA = {
@@ -65,7 +72,7 @@ function corsHeaders(origin) {
   const ok = origin && (ALLOWED_ORIGINS.includes(origin) || LOCALHOST_RE.test(origin));
   const h = {
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
   };
@@ -305,6 +312,7 @@ async function callGemini(env, cors, prompt, schema, opts) {
   let gRes;
   for (let mi = 0; mi < models.length; mi++) {
   const last = mi === models.length - 1;
+  if (cors.tally) cors.tally.push('gemini:' + models[mi]); // per-request list, counted after the response
   try {
     gRes = await fetch(geminiUrl(models[mi]), {
       method: 'POST',
@@ -333,7 +341,11 @@ async function callGemini(env, cors, prompt, schema, opts) {
       for (const d of details) {
         if (d['@type'] && d['@type'].includes('RetryInfo') && d.retryDelay) retryAfterSeconds = Math.ceil(parseFloat(d.retryDelay));
         if (d['@type'] && d['@type'].includes('QuotaFailure')) {
-          for (const v of d.violations || []) if (/PerDay/i.test(v.quotaId || '')) perDay = true;
+          for (const v of d.violations || []) {
+            if (/PerDay/i.test(v.quotaId || '')) perDay = true;
+            // Google puts the real limit in the 429 ("quotaValue"); keep it for the usage page.
+            if (cors.quota && v.quotaId && v.quotaValue) cors.quota.push({ model: (v.quotaDimensions && v.quotaDimensions.model) || '', id: String(v.quotaId).slice(0, 120), value: String(v.quotaValue).slice(0, 20) });
+          }
         }
       }
     } catch (e) { /* ignore */ }
@@ -510,13 +522,109 @@ function sanitizeProjections(list, text) {
   return [...byKey.values()].slice(0, MAX_PROJECTIONS);
 }
 
+// ---------------- Usage counting ----------------
+// One Durable Object instance ("global") holds a tiny SQLite table: (hour bucket UTC, key) -> count.
+// Each Worker request = 1 DO call + 1 upsert per key (usually 2-3 small rows). Atomic, no lost increments.
+export class UsageCounter extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    this.sql.exec('CREATE TABLE IF NOT EXISTS counts (hour TEXT NOT NULL, k TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (hour, k)) WITHOUT ROWID');
+    // Limits Google reported in 429 responses (quotaId + model -> value), newest wins.
+    this.sql.exec('CREATE TABLE IF NOT EXISTS quotas (model TEXT NOT NULL, id TEXT NOT NULL, value TEXT NOT NULL, seen TEXT NOT NULL, PRIMARY KEY (model, id)) WITHOUT ROWID');
+  }
+  add(hour, keys, quotas) {
+    for (const k of keys) this.sql.exec('INSERT INTO counts (hour, k, n) VALUES (?, ?, 1) ON CONFLICT (hour, k) DO UPDATE SET n = n + 1', hour, k);
+    for (const q of quotas || []) this.sql.exec('INSERT INTO quotas (model, id, value, seen) VALUES (?, ?, ?, ?) ON CONFLICT (model, id) DO UPDATE SET value = excluded.value, seen = excluded.seen', q.model, q.id, q.value, new Date().toISOString());
+  }
+  // Sums per key over [fromHour, now]. Hour strings are 'YYYY-MM-DDTHH' (UTC), so they sort as text.
+  sums(fromHour) {
+    const out = {};
+    for (const r of this.sql.exec('SELECT k, SUM(n) AS n FROM counts WHERE hour >= ? GROUP BY k', fromHour)) out[r.k] = r.n;
+    return out;
+  }
+  report(bounds) {
+    const out = {};
+    for (const name of Object.keys(bounds)) out[name] = this.sums(bounds[name]);
+    const first = [...this.sql.exec('SELECT MIN(hour) AS h FROM counts')][0];
+    out.countingSince = first && first.h ? first.h + ':00Z' : null;
+    out.googleQuotas = [...this.sql.exec('SELECT model, id, value, seen FROM quotas ORDER BY model, id')].map(r => ({ model: r.model, id: r.id, value: r.value, seen: r.seen }));
+    return out;
+  }
+}
+
+const hourKey = d => d.toISOString().slice(0, 13);
+// Start of "today" in America/Los_Angeles (Gemini's daily quota resets at midnight Pacific), as a UTC hour key.
+function pacificMidnightHour(now) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit' })
+    .formatToParts(now).map(p => [p.type, p.value]));
+  const hoursSinceMidnight = parseInt(parts.hour, 10) % 24;
+  return hourKey(new Date(Math.floor(now.getTime() / 3600000) * 3600000 - hoursSinceMidnight * 3600000));
+}
+
+function counter(env) {
+  return env.USAGE ? env.USAGE.get(env.USAGE.idFromName('global')) : null;
+}
+
+function recordUsage(env, ctx, keys, quotas) {
+  const c = counter(env);
+  if (!c || !ctx) return;
+  ctx.waitUntil(c.add(hourKey(new Date()), keys, quotas).catch(() => { /* counting must never break the app */ }));
+}
+
+async function usageResponse(request, env, cors) {
+  const auth = request.headers.get('Authorization') || '';
+  const token = /^Bearer\s+(\S+)$/i.exec(auth);
+  if (!token) return json({ error: 'unauthorized', message: 'This page is private.' }, 401, cors);
+  let user = null;
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/user', { headers: { Authorization: 'Bearer ' + token[1], apikey: SUPABASE_PUBLISHABLE_KEY } });
+    if (r.ok) user = await r.json();
+  } catch (e) { /* treated as unauthorized */ }
+  if (!user || !user.id) return json({ error: 'unauthorized', message: 'This page is private.' }, 401, cors);
+  if (user.id !== OWNER_ID) return json({ error: 'forbidden', message: 'This page is private.' }, 403, cors);
+  const c = counter(env);
+  if (!c) return json({ error: 'no_counter', message: 'Usage counter is not bound to this Worker.' }, 500, cors);
+  const now = new Date();
+  const utcDay = now.toISOString().slice(0, 10) + 'T00';
+  const utcMonth = now.toISOString().slice(0, 7) + '-01T00';
+  const data = await c.report({ todayUtc: utcDay, todayPacific: pacificMidnightHour(now), monthUtc: utcMonth, last30d: hourKey(new Date(now.getTime() - 30 * 86400000)) });
+  return json(Object.assign({ ok: true, now: now.toISOString(), model: MODEL, fallbackModel: FALLBACK_MODEL }, data), 200, Object.assign({}, cors, { headers: Object.assign({ 'Cache-Control': 'no-store' }, cors.headers) }));
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
     const cors = corsHeaders(origin);
+    cors.tally = []; cors.quota = [];
+    let res, label = 'other';
+    try {
+      const r = await handle(request, env, cors);
+      res = r.res; label = r.label || label;
+    } catch (e) {
+      console.error('worker error', e && e.stack || e);
+      label = 'error';
+      res = json({ error: 'server', message: 'Something went wrong in the Worker. Try again.' }, 500, cors);
+    }
+    recordUsage(env, ctx, ['req:' + label, ...cors.tally], cors.quota);
+    return res;
+  }
+};
 
+async function handle(request, env, cors) {
+  const r = await route(request, env, cors);
+  return r instanceof Response ? { res: r, label: cors.label } : r;
+}
+
+async function route(request, env, cors) {
+    const origin = request.headers.get('Origin') || '';
+    cors.label = request.method.toLowerCase();
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: cors.ok ? 204 : 403, headers: cors.headers });
+    }
+    if (request.method === 'GET' && new URL(request.url).searchParams.get('action') === 'usage') {
+      cors.label = 'usage';
+      return usageResponse(request, env, cors);
     }
     if (request.method === 'GET') {
       return json({ ok: true, service: 'XRaySavvy quiz worker', model: MODEL, keySet: !!env.GEMINI_API_KEY, actions: ACTIONS }, 200, cors);
@@ -544,6 +652,8 @@ export default {
     if (!body || typeof body !== 'object') return json({ error: 'bad_json', message: 'Request was not valid JSON.' }, 400, cors);
 
     const action = body.action == null || body.action === '' ? 'questions' : body.action;
+    if (ACTIONS.includes(action)) cors.label = action === 'explain' ? (body.style === 'detail' ? 'explain:detail' : 'explain:simple') : action;
+    else cors.label = 'bad_action';
     if (!ACTIONS.includes(action)) {
       return json({ error: 'bad_action', message: 'Unknown action "' + cleanStr(action, 40) + '".' }, 400, cors);
     }
@@ -632,5 +742,4 @@ export default {
     // 'answer' + 'inNotes' kept for older pages.
     const answer = fromNotes || beyondNotes || masterList;
     return json({ question, fromNotes, beyondNotes, masterList, unsure: pr.unsure === true, blocked, answer, inNotes: !!fromNotes, model: MODEL }, 200, cors);
-  }
-};
+}

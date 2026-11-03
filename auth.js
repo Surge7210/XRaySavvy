@@ -8,6 +8,7 @@
   'use strict';
   var SUPABASE_URL = 'https://fnopntlihakgrydvwdge.supabase.co';
   var SUPABASE_KEY = 'sb_publishable_e59T3yCSuMGmLxunWtdTbw_B1KGGsMs';
+  var OWNER_ID = 'd08e9b9c-3e14-45f5-8ad0-44df864ff0ee'; // shows the discreet Usage link; not a secret
   var STORAGE_KEY = 'xraysavvy-auth';
   var QUEUE_KEY = 'xraysavvy.pendingResults.v1';
   var CDNS = [
@@ -359,6 +360,8 @@
       };
       sheet.appendChild(out); sheet.appendChild(msg);
       sheet.appendChild(h('div', { class: 'xrs-note', text: 'Logging out keeps the decks saved on this device. ' + PRIVACY }));
+      // Owner only (the usage page and its data are also locked server-side).
+      if (u.id === OWNER_ID) sheet.appendChild(h('div', { style: 'text-align:center;margin-top:0.4rem' }, [h('a', { href: './admin.html', id: 'xrs-usage', style: 'color:var(--muted,#8b98a5);font-size:0.8rem;text-decoration:none', text: 'Usage' })]));
     }
   }
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });

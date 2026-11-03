@@ -1,0 +1,12 @@
+name = "xraysavvy-ai"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# Usage counter for admin.html (owner-only). SQLite-backed Durable Object = available on Workers Free.
+[[durable_objects.bindings]]
+name = "USAGE"
+class_name = "UsageCounter"
+
+[[migrations]]
+tag = "v1-usage-counter"
+new_sqlite_classes = ["UsageCounter"]

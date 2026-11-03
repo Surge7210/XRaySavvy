@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Usage · XRaySavvy</title>
+<script src="./auth.js?v=2"></script>
+<style>
+  :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --warn:#ffd400; --bad:#f4212e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+  header { padding:max(0.9rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.6rem max(1rem, env(safe-area-inset-left)); border-bottom:1px solid var(--border); }
+  .wrap { max-width:640px; margin:0 auto; }
+  .hdr-top { display:flex; justify-content:space-between; align-items:center; gap:0.6rem; }
+  h1 { margin:0; font-size:1.3rem; }
+  a.back { color:var(--accent); text-decoration:none; font-size:0.9rem; }
+  main { padding:1rem max(1rem, env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
+  .sub { color:var(--muted); font-size:0.85rem; margin:0.25rem 0 0; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:0.95rem 1rem; margin-bottom:0.85rem; }
+  .card h2 { margin:0 0 0.15rem; font-size:1rem; display:flex; align-items:center; gap:0.45rem; }
+  .card .src { color:var(--muted); font-size:0.78rem; margin:0 0 0.6rem; }
+  .meter { margin:0.55rem 0 0.2rem; }
+  .meter .row { display:flex; justify-content:space-between; align-items:baseline; gap:0.5rem; font-size:0.92rem; }
+  .meter .row b { font-variant-numeric:tabular-nums; }
+  .meter .pct { font-weight:700; font-variant-numeric:tabular-nums; }
+  .bar { height:10px; background:#0b0f14; border:1px solid var(--border); border-radius:999px; overflow:hidden; margin-top:0.3rem; }
+  .bar > i { display:block; height:100%; width:0; border-radius:999px; transition:width .4s; }
+  .ok > i { background:var(--good); } .ok .pct, .pct.ok { color:var(--good); }
+  .mid > i { background:var(--warn); } .pct.mid { color:var(--warn); }
+  .hi > i { background:var(--bad); } .pct.hi { color:var(--bad); }
+  .raw { color:var(--muted); font-size:0.82rem; margin-top:0.2rem; }
+  .stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:0.5rem; margin-top:0.7rem; }
+  .stat { background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:0.55rem 0.6rem; }
+  .stat .n { font-size:1.2rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .stat .l { color:var(--muted); font-size:0.75rem; }
+  table { width:100%; border-collapse:collapse; margin-top:0.6rem; font-size:0.88rem; }
+  th, td { text-align:left; padding:0.35rem 0; border-top:1px solid var(--border); }
+  th { color:var(--muted); font-weight:500; font-size:0.78rem; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .note { color:var(--muted); font-size:0.8rem; margin-top:0.55rem; }
+  .private { text-align:center; padding:3rem 1rem; color:var(--muted); }
+  .private h2 { color:var(--text); font-size:1.2rem; margin:0 0 0.4rem; }
+  .btn { background:var(--accent); color:#fff; border:0; border-radius:999px; padding:0.6rem 1.1rem; font-size:0.95rem; font-weight:600; cursor:pointer; margin-top:1rem; }
+  .btn.sec { background:transparent; color:var(--accent); border:1px solid var(--border); }
+  .err { color:#ff8a8a; font-size:0.85rem; margin-top:0.4rem; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hdr-top">
+    <div><a class="back" href="./index.html">&larr; XRaySavvy</a><h1>Usage</h1></div>
+    <span id="acct-slot"></span>
+  </div>
+</header>
+<main class="wrap">
+  <div id="loading" class="private">Loading…</div>
+  <div id="private" class="private hidden">
+    <h2>This page is private.</h2>
+    <div>Head back to <a class="back" href="./index.html">XRaySavvy</a> to keep studying.</div>
+  </div>
+  <div id="dash" class="hidden">
+    <p class="sub" id="updated"></p>
+    <div id="cards"></div>
+    <button class="btn sec" id="refresh" type="button">Refresh</button>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var WORKER_URL = 'https://xraysavvy-ai.opsab10.workers.dev';
+  var OWNER_ID = 'd08e9b9c-3e14-45f5-8ad0-44df864ff0ee'; // only hides/shows UI; the Worker and the RPC check it server-side
+  // Free-tier limits (checked 2026-11-02 on each provider's pricing/limits page).
+  var LIMITS = {
+    workerPerDay: 100000,          // developers.cloudflare.com/workers/platform/limits (Workers Free, per account, resets 00:00 UTC)
+    dbBytes: 500 * 1024 * 1024,    // supabase.com/pricing (Free: 500 MB database size)
+    mau: 50000,                    // supabase.com/pricing (Free: 50,000 monthly active users)
+    emailsPerMonth: 3000,          // resend.com/pricing (Free: 3,000 emails / mo)
+    emailsPerDay: 100              // resend.com/pricing (Free: 100 emails a day)
+  };
+  var FEATURES = [
+    ['questions', 'Quiz questions (Exam Cram)'],
+    ['section', 'Summaries (Learn)'],
+    ['explain:simple', 'ELI5 ("dumb it down")'],
+    ['explain:detail', 'More detail'],
+    ['ask', 'Ask a question'],
+    ['ocr', 'Photo reading'],
+    ['projections', 'Projection extraction']
+  ];
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function fmt(n) { return (n || 0).toLocaleString('en-US'); }
+  function level(p) { return p > 85 ? 'hi' : p > 60 ? 'mid' : 'ok'; }
+  function sum(obj, prefix) { var t = 0; for (var k in obj) if (k.indexOf(prefix) === 0) t += obj[k] || 0; return t; }
+  function mb(b) { return (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB'; }
+
+  function meter(label, used, limit, opts) {
+    opts = opts || {};
+    var m = el('div', 'meter');
+    var row = el('div', 'row');
+    var left = el('span'); left.appendChild(document.createTextNode(label + ' '));
+    var b = el('b', '', opts.usedText || fmt(used)); left.appendChild(b);
+    if (limit) left.appendChild(document.createTextNode(' / ' + (opts.limitText || fmt(limit))));
+    row.appendChild(left);
+    if (limit) {
+      var p = Math.max(0, used / limit * 100);
+      var pct = el('span', 'pct ' + level(p), (p > 0 && p < 1 ? '<1' : Math.round(p)) + '%');
+      row.appendChild(pct);
+      m.appendChild(row);
+      var bar = el('div', 'bar ' + level(p)), fill = el('i'); fill.style.width = Math.min(100, Math.max(p, used > 0 ? 1.5 : 0)) + '%'; bar.appendChild(fill);
+      bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuenow', Math.round(p)); bar.setAttribute('aria-valuemin', 0); bar.setAttribute('aria-valuemax', 100);
+      m.appendChild(bar);
+    } else {
+      m.appendChild(row);
+      m.appendChild(el('div', 'raw', opts.noLimit || 'limit: check Google AI Studio'));
+    }
+    return m;
+  }
+  function card(title, src) {
+    var c = el('section', 'card'); c.appendChild(el('h2', '', title)); if (src) c.appendChild(el('p', 'src', src)); return c;
+  }
+
+  function render(w, db, errs) {
+    var cards = $('cards'); cards.textContent = '';
+    var now = new Date();
+    $('updated').textContent = 'Updated ' + now.toLocaleString('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' CT' +
+      (w && w.countingSince ? ' · counting since ' + new Date(w.countingSince).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', year: 'numeric' }) : '');
+
+    // ---- AI (Gemini) ----
+    var ai = card('🤖 AI requests (Gemini)', w ? 'Model ' + w.model + ' (fallback ' + w.fallbackModel + '). Daily quota resets at midnight Pacific.' : '');
+    if (w) {
+      [w.model, w.fallbackModel].forEach(function (model, i) {
+        var today = w.todayPacific['gemini:' + model] || 0, month = w.monthUtc['gemini:' + model] || 0;
+        if (i === 1 && !today && !month) return;
+        var q = (w.googleQuotas || []).filter(function (x) { return x.model === model && /PerDay/i.test(x.id); })[0];
+        var lim = q ? parseInt(q.value, 10) : 0;
+        var m = meter((i ? 'Fallback ' : '') + 'Today', today, lim);
+        if (q) m.appendChild(el('div', 'raw', 'limit: ' + fmt(lim) + '/day for ' + model + ', reported by Google in a 429 on ' + new Date(q.seen).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })));
+        else if (i === 0) m.lastChild.textContent = 'limit: check Google AI Studio (Google no longer publishes free-tier numbers)';
+        ai.appendChild(m);
+        ai.appendChild(el('div', 'raw', 'This month: ' + fmt(month) + ' calls to ' + model));
+      });
+      var t = el('table'), hr = el('tr');
+      hr.appendChild(el('th', '', 'Feature')); hr.appendChild(el('th', 'num', 'Today')); hr.appendChild(el('th', 'num', 'Month')); t.appendChild(hr);
+      var tt = 0, tm = 0;
+      FEATURES.forEach(function (f) {
+        var a = w.todayPacific['req:' + f[0]] || 0, b = w.monthUtc['req:' + f[0]] || 0; tt += a; tm += b;
+        var tr = el('tr'); tr.appendChild(el('td', '', f[1])); tr.appendChild(el('td', 'num', fmt(a))); tr.appendChild(el('td', 'num', fmt(b))); t.appendChild(tr);
+      });
+      var tr2 = el('tr'); tr2.appendChild(el('td', '', 'All AI features')); tr2.appendChild(el('td', 'num', fmt(tt))); tr2.appendChild(el('td', 'num', fmt(tm))); tr2.style.fontWeight = '700'; t.appendChild(tr2);
+      ai.appendChild(t);
+      ai.appendChild(el('div', 'note', 'Feature rows count requests to the Worker; the meter counts actual Gemini calls (a fallback retry is a second call). Today = since midnight Pacific; Month = calendar month (UTC).'));
+    } else ai.appendChild(el('div', 'err', errs.worker || 'Worker counts unavailable.'));
+    cards.appendChild(ai);
+
+    // ---- Database ----
+    var dbc = card('🗄️ Database & accounts (Supabase)', 'Free plan: 500 MB database, 50,000 monthly active users.');
+    if (db) {
+      dbc.appendChild(meter('Storage', db.db_size_bytes, LIMITS.dbBytes, { usedText: mb(db.db_size_bytes), limitText: '500 MB' }));
+      dbc.appendChild(meter('Accounts', db.accounts_total, LIMITS.mau));
+      dbc.appendChild(el('div', 'raw', 'Total accounts shown against the 50,000 MAU limit (MAU is always ≤ accounts).'));
+      var s = el('div', 'stats');
+      [[db.accounts_new_7d, 'New (7 days)'], [db.accounts_unconfirmed, 'Unconfirmed'], [db.accounts_total, 'Accounts'], [db.decks_active, 'Decks (' + fmt(db.decks) + ' incl. deleted)'], [db.quiz_results, 'Quiz answers'], [mb(db.db_size_bytes), 'DB size']].forEach(function (x) {
+        var st = el('div', 'stat'); st.appendChild(el('div', 'n', typeof x[0] === 'number' ? fmt(x[0]) : x[0])); st.appendChild(el('div', 'l', x[1])); s.appendChild(st);
+      });
+      dbc.appendChild(s);
+    } else dbc.appendChild(el('div', 'err', errs.db || 'Database stats unavailable.'));
+    cards.appendChild(dbc);
+
+    // ---- Email ----
+    var em = card('✉️ Auth emails (Resend via Supabase SMTP)', 'Resend Free: 3,000 emails / month and 100 emails / day.');
+    if (db) {
+      em.appendChild(meter('This month', db.emails_month_min, LIMITS.emailsPerMonth));
+      em.appendChild(meter('Today (UTC)', db.emails_today_min, LIMITS.emailsPerDay));
+      em.appendChild(el('div', 'note', 'Minimum count: Supabase keeps only the latest confirmation / reset / email-change send per user, so repeat sends to the same person are missed. The exact number is on the Resend dashboard.'));
+    } else em.appendChild(el('div', 'err', errs.db || 'Email stats unavailable.'));
+    cards.appendChild(em);
+
+    // ---- Worker ----
+    var wk = card('⚡ Worker requests (Cloudflare)', 'Workers Free: 100,000 requests / day per account, resets at midnight UTC.');
+    if (w) {
+      var dayAll = sum(w.todayUtc, 'req:');
+      wk.appendChild(meter('Today (UTC)', dayAll, LIMITS.workerPerDay));
+      wk.appendChild(el('div', 'raw', 'This month: ' + fmt(sum(w.monthUtc, 'req:')) + ' requests'));
+      wk.appendChild(el('div', 'note', 'Counts every call to xraysavvy-ai, including browser pre-flight (OPTIONS) checks and connection checks: ' + fmt(w.todayUtc['req:options']) + ' pre-flight, ' + fmt(w.todayUtc['req:get']) + ' checks, ' + fmt(w.todayUtc['req:usage']) + ' from this page today. Other Workers on the account share the same 100,000.'));
+    } else wk.appendChild(el('div', 'err', errs.worker || 'Worker counts unavailable.'));
+    cards.appendChild(wk);
+  }
+
+  function show(which) { ['loading', 'private', 'dash'].forEach(function (id) { $(id).classList.toggle('hidden', id !== which); }); }
+
+  // window.__USAGE_MOCK lets a test render the page without a live session.
+  async function load() {
+    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); return; }
+    var sb, session;
+    try { sb = await XRS.client(); session = (await sb.auth.getSession()).data.session; } catch (e) { session = null; }
+    if (!session || !session.user || session.user.id !== OWNER_ID) { show('private'); return; }
+    var errs = {};
+    var wP = fetch(WORKER_URL + '/?action=usage', { headers: { Authorization: 'Bearer ' + session.access_token }, cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || ('HTTP ' + r.status)); return j; }); })
+      .catch(function (e) { errs.worker = 'Worker counts unavailable: ' + e.message; return null; });
+    var dP = sb.rpc('admin_usage').then(function (r) { if (r.error) throw r.error; return r.data; })
+      .catch(function (e) { errs.db = 'Database stats unavailable: ' + (e.message || e); return null; });
+    var res = await Promise.all([wP, dP]);
+    if (!res[0] && !res[1] && /private|not allowed/i.test((errs.worker || '') + (errs.db || ''))) { show('private'); return; }
+    show('dash'); render(res[0], res[1], errs);
+  }
+  $('refresh').onclick = load;
+  var lastUid = XRS.user && XRS.user.id;
+  XRS.on(function (u) { var id = u && u.id; if (id !== lastUid) { lastUid = id; show('loading'); load(); } });
+  load();
+})();
+</script>
+</body>
+</html>
