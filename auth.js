@@ -51,7 +51,10 @@
     flush: flush,
     openAuth: openAuth,
     nudge: nudge,
-    nudgeAllowed: nudgeAllowed
+    nudgeAllowed: nudgeAllowed,
+    founding: false,
+    foundingSpots: foundingSpots,
+    foundingSpotsCached: foundingSpotsCached
   };
   function emit() { if (XRS.user) { markHasAccount(); hideNudge(); } listeners.slice().forEach(function (cb) { try { cb(XRS.user); } catch (e) { console.error(e); } }); renderButton(); }
 
@@ -131,10 +134,45 @@
   }
   async function loadProfile(sb) {
     try {
-      var r = await sb.from('profiles').select('display_name').maybeSingle();
+      var r = await sb.from('profiles').select('display_name, founding_member').maybeSingle();
       XRS.profileName = (r.data && r.data.display_name) || (XRS.user && XRS.user.meta.display_name) || '';
+      XRS.founding = !!(r.data && r.data.founding_member);
       renderButton();
+      var fb = document.getElementById('xrs-founding');
+      if (fb) fb.style.display = XRS.founding ? '' : 'none';
     } catch (e) { }
+  }
+
+  // ---------------- Founding 100 (spots left; public count only, no personal data) ----------------
+  // One tiny anonymous RPC call (no supabase-js needed). Cached for this session; the last known value is
+  // kept so a fast page can show/hide the offer before the network answers. Never throws.
+  var SPOTS_KEY = 'xraysavvy.foundingSpots.v1', spotsPromise = null;
+  function foundingSpotsCached() {
+    try { var c = JSON.parse(lsGet(SPOTS_KEY) || 'null'); return c && typeof c.n === 'number' ? c : null; } catch (e) { return null; }
+  }
+  function foundingSpots() {
+    if (spotsPromise) return spotsPromise;
+    var c = foundingSpotsCached();
+    if (c && Date.now() - c.t < 5 * 60 * 1000) return (spotsPromise = Promise.resolve(c.n));
+    spotsPromise = fetch(SUPABASE_URL + '/rest/v1/rpc/founding_spots_left', {
+      method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: '{}'
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (n) { n = Math.max(0, parseInt(n, 10) || 0); lsSet(SPOTS_KEY, JSON.stringify({ n: n, t: Date.now() })); return n; })
+      .catch(function () { spotsPromise = null; return c ? c.n : null; });
+    return spotsPromise;
+  }
+  // A small "First 100" line element; hidden when spots are known to be gone. Fills in the count when it arrives.
+  function foundingLine(cls, id) {
+    var c = foundingSpotsCached();
+    if (c && c.n <= 0) return null;
+    var el = h('div', { class: cls, id: id });
+    function set(n) {
+      if (n === 0) { el.style.display = 'none'; return; }
+      el.textContent = '🎖️ First 100 to sign up get free lifetime Pro' + (typeof n === 'number' ? ' — ' + n + (n === 1 ? ' spot' : ' spots') + ' left' : '');
+    }
+    set(c ? c.n : null);
+    foundingSpots().then(function (n) { if (n !== null) set(n); });
+    return el;
   }
 
   // ---------------- result logging (async, never blocks the quiz) ----------------
@@ -231,6 +269,10 @@
     '.xrs-nudge-go{background:var(--accent,#1d9bf0);border:1px solid var(--accent,#1d9bf0);color:#fff}' +
     '.xrs-nudge-later{background:none;border:1px solid var(--border,#38444d);color:var(--muted,#8b98a5)}' +
     '.xrs-nudge-x{position:absolute;top:0.3rem;right:0.35rem;background:none;border:none;color:var(--muted,#8b98a5);font-size:1.3rem;line-height:1;cursor:pointer;padding:0.3rem 0.45rem}' +
+    '.xrs-f100{margin:0.15rem 0 0.7rem;padding:0.45rem 0.7rem;border-radius:10px;background:rgba(29,155,240,.12);border:1px solid rgba(29,155,240,.35);color:var(--text,#e7e9ea);font-size:0.85rem;line-height:1.35}' +
+    '.xrs-nudge .xrs-f100{margin:-0.3rem 0 0.65rem;font-size:0.85rem}' +
+    '.xrs-badge{margin-top:0.8rem;padding:0.65rem 0.8rem;border-radius:12px;background:linear-gradient(135deg,rgba(29,155,240,.18),rgba(0,186,124,.12));border:1px solid rgba(29,155,240,.45)}' +
+    '.xrs-badge b{display:block;font-size:1rem}.xrs-badge span{display:block;color:var(--muted,#8b98a5);font-size:0.85rem;margin-top:0.15rem}' +
     '@keyframes xrs-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}' +
     '@media (prefers-reduced-motion:reduce){.xrs-nudge{animation:none}}';
   function addCss() { if (document.getElementById('xrs-css')) return; var s = document.createElement('style'); s.id = 'xrs-css'; s.textContent = css; document.head.appendChild(s); }
@@ -299,6 +341,7 @@
       sheet.appendChild(h('div', { class: 'xrs-seg' }, [
         h('button', { class: view === 'login' ? 'on' : '', onclick: function () { openSheet('login'); }, text: 'Log in' }),
         h('button', { class: view === 'signup' ? 'on' : '', onclick: function () { openSheet('signup'); }, text: 'Sign up' })]));
+      if (view === 'signup') { var f100 = foundingLine('xrs-f100', 'xrs-f100-signup'); if (f100) sheet.appendChild(f100); }
       var form = h('form', { id: 'xrs-form', novalidate: '' });
       var name = null;
       if (view === 'signup') { name = h('input', { type: 'text', id: 'xrs-name', autocomplete: 'nickname', maxlength: '60', placeholder: 'e.g. Sam' }); form.appendChild(h('label', { for: 'xrs-name', text: 'Name (optional, shown as your initials)' })); form.appendChild(name); }
@@ -373,6 +416,11 @@
       sheet.appendChild(h('div', { style: 'display:flex;gap:0.7rem;align-items:center' }, [
         h('div', { class: 'xrs-acct in', style: 'font-size:1rem;min-width:42px;min-height:42px;display:flex;align-items:center;justify-content:center', text: initials() }),
         h('div', {}, [h('div', { style: 'font-weight:600', text: XRS.profileName || 'Logged in' }), h('div', { style: 'color:var(--muted,#8b98a5);font-size:0.9rem;word-break:break-all', id: 'xrs-email-shown', text: u.email || '' })])]));
+      // Founding Member (first 100 accounts). Number is kept internally only; not shown yet.
+      var badge = h('div', { class: 'xrs-badge', id: 'xrs-founding', style: XRS.founding ? '' : 'display:none' }, [
+        h('b', { text: '🎖️ Founding Member' }),
+        h('span', { text: 'You\'ll get free lifetime Pro when Pro features launch.' })]);
+      sheet.appendChild(badge);
       sheet.appendChild(h('div', { class: 'xrs-note', text: 'Your decks sync to this account and every answer counts toward your 📊 Progress.' }));
       var onIndex = /index\.html$|\/$/.test(location.pathname);
       sheet.appendChild(h('button', { class: 'xrs-go', onclick: function () { closeSheet(); if (onIndex && window.showProgressTab) window.showProgressTab(); else location.href = './index.html#progress'; }, text: '📊 See my progress' }));
@@ -382,7 +430,7 @@
         try { await flush(); } catch (e) { }
         try { var sb = await loadClient(); await sb.auth.signOut(); } catch (e) { }
         try { localStorage.removeItem(STORAGE_KEY); } catch (e) { }
-        XRS.user = null; XRS.profileName = ''; emit(); closeSheet();
+        XRS.user = null; XRS.profileName = ''; XRS.founding = false; emit(); closeSheet();
       };
       sheet.appendChild(out); sheet.appendChild(msg);
       sheet.appendChild(h('div', { class: 'xrs-note', text: 'Logging out keeps the decks saved on this device. ' + PRIVACY }));
@@ -420,6 +468,7 @@
       ssSet(NUDGE_SESSION, '1');
       var card = h('div', { class: 'xrs-nudge', id: 'xrs-nudge', role: 'status', 'aria-live': 'polite' }, [
         h('p', { id: 'xrs-nudge-text', text: (opts.text || 'Nice work! 🎉') + ' Make a free account to save your progress on every device.' }),
+        foundingLine('xrs-f100', 'xrs-nudge-f100'),
         h('div', { class: 'xrs-nudge-row' }, [
           h('button', { type: 'button', class: 'xrs-nudge-go', id: 'xrs-nudge-go', text: 'Create free account', onclick: function () { hideNudge(); openAuth('signup'); } }),
           h('button', { type: 'button', class: 'xrs-nudge-later', id: 'xrs-nudge-later', text: 'Not now', onclick: snooze })]),

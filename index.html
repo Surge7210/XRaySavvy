@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
-<script src="./auth.js?v=4"></script>
+<script src="./auth.js?v=5"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -134,9 +134,64 @@
   .pg-good { background:var(--good); } .pg-mid { background:#ffd700; } .pg-low { background:var(--bad); }
   .pg-h { font-size:1rem; margin:0 0 0.4rem; }
   .pg-note { color:var(--muted); font-size:0.8rem; }
+
+  /* ---- Intro splash (once per browser session; tap to skip; never blocks the app underneath) ---- */
+  #xrs-splash { position:fixed; inset:0; z-index:20000; display:flex; align-items:center; justify-content:center; text-align:center; padding:max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left)); background:radial-gradient(ellipse at 50% 35%, #16324a 0%, var(--bg) 62%); color:var(--text); cursor:pointer; -webkit-tap-highlight-color:transparent; opacity:1; transition:opacity .45s ease; }
+  #xrs-splash.out { opacity:0; pointer-events:none; }
+  #xrs-splash .sp-in { max-width:420px; animation:sp-rise .6s ease-out both; }
+  #xrs-splash .sp-logo { width:64px; height:64px; margin:0 auto 1rem; border-radius:18px; background:var(--accent); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 30px rgba(29,155,240,.35); }
+  #xrs-splash .sp-logo svg { width:38px; height:38px; }
+  #xrs-splash .sp-brand { color:var(--accent); font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:.8rem; margin:0 0 .35rem; }
+  #xrs-splash h2 { margin:0; font-size:clamp(2rem, 9vw, 2.8rem); line-height:1.1; font-weight:800; }
+  #xrs-splash .sp-sub { margin:.6rem 0 0; color:var(--muted); font-size:1.05rem; }
+  #xrs-splash .sp-f100 { margin:1.2rem auto 0; display:inline-block; max-width:340px; padding:.55rem .9rem; border-radius:14px; background:rgba(29,155,240,.14); border:1px solid rgba(29,155,240,.45); font-size:.9rem; line-height:1.35; }
+  #xrs-splash .sp-skip { position:absolute; left:0; right:0; bottom:max(1.2rem, env(safe-area-inset-bottom)); color:var(--muted); font-size:.8rem; opacity:.8; }
+  @keyframes sp-rise { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) { #xrs-splash, #xrs-splash .sp-in { transition:none; animation:none; } }
 </style>
 </head>
 <body>
+<script>
+/* Intro splash: ~1.5 s branded overlay, then fades. Once per browser session (sessionStorage), tap to skip,
+   respects prefers-reduced-motion, skipped for share links. It is only an overlay: the app below loads as normal. */
+(function () {
+  try {
+    if (new URLSearchParams(location.search).has('share')) return;
+    if (sessionStorage.getItem('xraysavvy.splash.shown')) return;
+    sessionStorage.setItem('xraysavvy.splash.shown', '1');
+  } catch (e) { return; }
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var el = document.createElement('div');
+  el.id = 'xrs-splash'; el.setAttribute('role', 'presentation');
+  el.innerHTML = '<div class="sp-in">' +
+    '<div class="sp-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7c-2 1-3 2-3 4"/><path d="M16 7c2 1 3 2 3 4"/><path d="M7 13c-1.5.7-2 1.8-2 3"/><path d="M17 13c1.5.7 2 1.8 2 3"/><path d="M9 10h6M9 14h6"/></svg></div>' +
+    '<p class="sp-brand">XRaySavvy</p><h2>Study smarter.</h2>' +
+    '<p class="sp-sub">Made by current students, for students.</p></div>' +
+    '<div class="sp-skip">Tap to skip</div>';
+  // Founding 100 line: signed-out only, only while spots remain; never waits on the network.
+  var signedOut = !(window.XRS && XRS.user);
+  var cached = signedOut && window.XRS && XRS.foundingSpotsCached ? XRS.foundingSpotsCached() : null;
+  if (signedOut && !(cached && cached.n <= 0)) {
+    var line = document.createElement('p'); line.className = 'sp-f100';
+    var set = function (n) {
+      if (n === 0) { line.style.display = 'none'; return; }
+      line.textContent = '\u{1F396}\uFE0F First 100 to sign up get free lifetime Pro' + (typeof n === 'number' ? ' \u2014 ' + n + (n === 1 ? ' spot' : ' spots') + ' left' : '');
+    };
+    set(cached ? cached.n : null);
+    el.querySelector('.sp-in').appendChild(line);
+    if (window.XRS && XRS.foundingSpots) XRS.foundingSpots().then(function (n) { if (n !== null && el.parentNode) set(n); });
+  }
+  var done = false;
+  function hide() {
+    if (done) return; done = true;
+    if (reduce) { el.remove(); return; }
+    el.classList.add('out'); setTimeout(function () { el.remove(); }, 500);
+  }
+  el.addEventListener('click', hide);
+  document.body.appendChild(el);
+  setTimeout(hide, 1500);
+})();
+</script>
 <canvas id="confetti-canvas"></canvas>
 
 <header>
