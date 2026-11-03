@@ -48,9 +48,12 @@
     mark: mark,
     openSheet: openSheet,
     initials: initials,
-    flush: flush
+    flush: flush,
+    openAuth: openAuth,
+    nudge: nudge,
+    nudgeAllowed: nudgeAllowed
   };
-  function emit() { listeners.slice().forEach(function (cb) { try { cb(XRS.user); } catch (e) { console.error(e); } }); renderButton(); }
+  function emit() { if (XRS.user) { markHasAccount(); hideNudge(); } listeners.slice().forEach(function (cb) { try { cb(XRS.user); } catch (e) { console.error(e); } }); renderButton(); }
 
   // ---------------- client ----------------
   var clientPromise = null;
@@ -207,7 +210,15 @@
     '.xrs-go.sec{background:#38444d}.xrs-go:disabled{opacity:.6}' +
     '.xrs-link{background:none;border:none;color:var(--accent,#1d9bf0);cursor:pointer;font-size:0.9rem;padding:0.5rem 0;font-family:inherit}' +
     '.xrs-msg{margin-top:0.7rem;padding:0.6rem 0.8rem;border-radius:8px;font-size:0.9rem}.xrs-msg.err{background:#3d1a1c;color:#ff8a92}.xrs-msg.ok{background:#0d3d2e;color:#00ba7c}' +
-    '.xrs-note{color:var(--muted,#8b98a5);font-size:0.8rem;margin-top:0.8rem}';
+    '.xrs-note{color:var(--muted,#8b98a5);font-size:0.8rem;margin-top:0.8rem}' +
+    '.xrs-nudge{position:relative;margin:0.8rem 0 0;padding:0.8rem 2.2rem 0.8rem 0.9rem;border-radius:12px;background:var(--card,#1a2332);border:1px solid var(--border,#38444d);border-left:4px solid var(--accent,#1d9bf0);color:var(--text,#e7e9ea);font-size:0.95rem;line-height:1.4;text-align:left;animation:xrs-in .25s ease-out}' +
+    '.xrs-nudge p{margin:0 0 0.65rem}.xrs-nudge-row{display:flex;gap:0.5rem;flex-wrap:wrap}' +
+    '.xrs-nudge-row button{min-height:40px;padding:0.5rem 1rem;border-radius:999px;font-size:0.92rem;font-weight:600;cursor:pointer;font-family:inherit}' +
+    '.xrs-nudge-go{background:var(--accent,#1d9bf0);border:1px solid var(--accent,#1d9bf0);color:#fff}' +
+    '.xrs-nudge-later{background:none;border:1px solid var(--border,#38444d);color:var(--muted,#8b98a5)}' +
+    '.xrs-nudge-x{position:absolute;top:0.3rem;right:0.35rem;background:none;border:none;color:var(--muted,#8b98a5);font-size:1.3rem;line-height:1;cursor:pointer;padding:0.3rem 0.45rem}' +
+    '@keyframes xrs-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}' +
+    '@media (prefers-reduced-motion:reduce){.xrs-nudge{animation:none}}';
   function addCss() { if (document.getElementById('xrs-css')) return; var s = document.createElement('style'); s.id = 'xrs-css'; s.textContent = css; document.head.appendChild(s); }
 
   function initials() {
@@ -294,6 +305,7 @@
           if (view === 'signup') {
             r = await sb.auth.signUp({ email: em, password: pw, options: { emailRedirectTo: pageUrl(), data: name && name.value.trim() ? { display_name: name.value.trim().slice(0, 60) } : {} } });
             if (r.error) throw r.error;
+            if (r.data.user) markHasAccount();
             if (r.data.session) { say('Account created — you\'re logged in!', true); setTimeout(closeSheet, 900); }
             else if (r.data.user && r.data.user.identities && r.data.user.identities.length === 0) say('That email already has an account — try Log in.');
             else { say('Almost done! We emailed a confirmation link to ' + em + '. Tap it (check spam too) and you\'ll be logged in.', true); form.querySelectorAll('input').forEach(function (i) { i.disabled = true; }); go.style.display = 'none'; }
@@ -366,8 +378,47 @@
   }
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
 
+  // Open the login sheet straight in a mode: openAuth('signup') or openAuth('login').
+  function openAuth(mode) { openSheet(mode === 'login' ? 'login' : mode === 'signup' ? 'signup' : undefined); }
+
+  // ---------------- friendly sign-up nudge (signed-out only; never blocks anything) ----------------
+  // At most once per browser session, snoozed 3 days after "Not now", never again once this device has
+  // seen an account (logged in here, or signed up here).
+  var NUDGE_KEY = 'xraysavvy.signupNudge.v1', HAS_ACCT_KEY = 'xraysavvy.hasAccount', NUDGE_SESSION = 'xraysavvy.signupNudge.shown';
+  var SNOOZE_MS = 3 * 24 * 60 * 60 * 1000;
+  function markHasAccount() { lsSet(HAS_ACCT_KEY, '1'); }
+  function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { } }
+  function nudgeAllowed() {
+    if (XRS.user || storedUser() || lsGet(HAS_ACCT_KEY)) return false;
+    if (ssGet(NUDGE_SESSION)) return false;
+    try { var st = JSON.parse(lsGet(NUDGE_KEY) || '{}') || {}; if (st.snoozeUntil && Date.now() < st.snoozeUntil) return false; } catch (e) { }
+    if (ov || document.getElementById('xrs-nudge')) return false;
+    return true;
+  }
+  function hideNudge() { var n = document.getElementById('xrs-nudge'); if (n) n.remove(); }
+  // nudge({ after: element to place the card right after, text: 'Nice, 8 correct! 🎉' }) -> true if shown
+  function nudge(opts) {
+    try {
+      opts = opts || {};
+      if (!nudgeAllowed() || !opts.after || !opts.after.parentNode) return false;
+      addCss();
+      ssSet(NUDGE_SESSION, '1');
+      var card = h('div', { class: 'xrs-nudge', id: 'xrs-nudge', role: 'status', 'aria-live': 'polite' }, [
+        h('p', { id: 'xrs-nudge-text', text: (opts.text || 'Nice work! 🎉') + ' Make a free account to save your progress on every device.' }),
+        h('div', { class: 'xrs-nudge-row' }, [
+          h('button', { type: 'button', class: 'xrs-nudge-go', id: 'xrs-nudge-go', text: 'Create free account', onclick: function () { hideNudge(); openAuth('signup'); } }),
+          h('button', { type: 'button', class: 'xrs-nudge-later', id: 'xrs-nudge-later', text: 'Not now', onclick: snooze })]),
+        h('button', { type: 'button', class: 'xrs-nudge-x', 'aria-label': 'Dismiss', text: '×', onclick: snooze })]);
+      opts.after.parentNode.insertBefore(card, opts.after.nextSibling);
+      return true;
+    } catch (e) { return false; }
+  }
+  function snooze() { lsSet(NUDGE_KEY, JSON.stringify({ snoozeUntil: Date.now() + SNOOZE_MS })); hideNudge(); }
+
   function boot() {
     addCss(); renderButton();
+    if (XRS.user) markHasAccount();
     // Load the library right away only when someone is logged in or arriving from an email link;
     // otherwise wait until the page is idle so logged-out visitors pay nothing up front.
     var fromLink = !!(ARRIVAL.tokenHash || ARRIVAL.implicit || ARRIVAL.error) || /type=recovery|type=signup/.test(location.hash + location.search);

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload &amp; Quiz – X-Ray Projections</title>
-<script src="./auth.js?v=2"></script>
+<script src="./auth.js?v=3"></script>
 <style>
 :root{--bg:#0f1419;--card:#1a2332;--text:#e7e9ea;--muted:#8b98a5;--accent:#1d9bf0;--border:#38444d;--good:#00ba7c;--bad:#f4212e}
 *{box-sizing:border-box}
@@ -1777,6 +1777,15 @@ function nextQuestion() {
   showResults(false);
 }
 
+// Friendly sign-up nudge when a quiz finishes with a decent score (signed-out only; auth.js decides if it may show).
+const NUDGE_MIN_CORRECT = 3, NUDGE_MIN_PCT = 0.6;
+function uploadNudge(score, total, anchor) {
+  try {
+    const old = document.getElementById('xrs-nudge'); if (old) old.remove();
+    if (!anchor || !total || score < NUDGE_MIN_CORRECT || score / total < NUDGE_MIN_PCT) return;
+    if (window.XRS && XRS.nudge && !XRS.user) XRS.nudge({ after: anchor, text: 'Nice, ' + score + ' of ' + total + ' correct! 🎉' });
+  } catch (e) {}
+}
 function showResults(early) {
   const answered = quiz.i + (quiz.answered ? 1 : 0);
   const total = early ? answered : quiz.items.length;
@@ -1806,6 +1815,7 @@ function showResults(early) {
   }
   quiz.lastMissed = missedQs.map(q => q.id);
   showScreen('results');
+  uploadNudge(quiz.score, total, early ? null : $('rPct'));
 }
 $('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed', quiz.opts.label ? { label: quiz.opts.label } : null));
 $('retakeBtn').addEventListener('click', () => quiz.mode === 'final' ? startFinalReview(quiz.deck) : startQuiz(quiz.deck, null, 'all'));
@@ -2257,6 +2267,8 @@ function finishSection(i, r) {
   card.append(el('div', { class: 'row', style: 'margin-top:0.5rem' },
     el('button', { class: 'btn btn-secondary', onclick: () => { deck.learn.current = i; renderSection(); } }, 'Review summary'),
     el('button', { class: 'btn btn-secondary', onclick: () => { renderMap(); showScreen('map'); } }, 'Sections')));
+  const sc = card.querySelector('.score-big');
+  uploadNudge(r.firstScore, r.total, sc && sc.nextSibling);
   prefetchNext();
 }
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
-<script src="./auth.js?v=2"></script>
+<script src="./auth.js?v=3"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -1718,6 +1718,21 @@ function selectMC(btn, selected) {
     : `<div class="feedback bad">Wrong. Correct answer: ${currentMC.crLocation}</div>`;
   if (isCorrect) launchConfetti(); else wrongAnswerEffect();
   logResults([{ field: 'mc', correct: isCorrect, result: isCorrect ? 'correct' : 'wrong' }], currentMC);
+  nudgeOnAnswer(isCorrect, mcFeedback);
+}
+
+// ---- Friendly sign-up nudge (signed-out only; auth.js decides if it may show). Never affects grading. ----
+const NUDGE_AT_CORRECT = 5, NUDGE_AT_STREAK = 5, NUDGE_FOCUS_PCT = 0.6;
+let sessionCorrect = 0, sessionStreak = 0, nudgeSerial = -1;
+function nudgeOnAnswer(ok, anchor) {
+  try {
+    if (ok) { sessionCorrect++; sessionStreak++; } else { sessionStreak = 0; return; }
+    if (!window.XRS || !XRS.nudge || XRS.user) return;
+    if (sessionCorrect >= NUDGE_AT_CORRECT || sessionStreak >= NUDGE_AT_STREAK) {
+      const text = sessionStreak >= NUDGE_AT_STREAK && sessionStreak === sessionCorrect ? `Nice, ${sessionStreak} in a row! 🎉` : `Nice, ${sessionCorrect} correct! 🎉`;
+      XRS.nudge({ after: anchor, text });
+    }
+  } catch (e) {}
 }
 
 // ---- Optional account: log each graded answer (async; never blocks the quiz) ----
@@ -1999,6 +2014,11 @@ function checkAnswer() {
     const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
     if (degreeOk && locOk && rotOk) launchConfetti(); else wrongAnswerEffect();
   }
+  if (nudgeSerial !== quizSerial && currentQuiz) {
+    nudgeSerial = quizSerial;
+    const ok = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct' && scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct' && (!hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct');
+    nudgeOnAnswer(ok, quizFeedback);
+  }
 }
 
 // ---- Bottom tab bar + quiz chooser (layout/navigation only) ----
@@ -2174,6 +2194,10 @@ function showFocusDone() {
   document.getElementById('fd-score').innerHTML = `<strong>${focusCorrect} of ${total}</strong> fully correct across ${focusGroups.length} body part${focusGroups.length > 1 ? 's' : ''}`;
   document.getElementById('fd-list').innerHTML = focusGroups.map(g => pgBar(g.label, g.items.length ? (g.correct / g.items.length) * 100 : 0, g.correct + ' of ' + g.items.length + ' correct')).join('');
   window.scrollTo(0, 0);
+  try {
+    const old = document.getElementById('xrs-nudge'); if (old && !document.getElementById('focus-done').contains(old)) old.remove();
+    if (total && focusCorrect / total >= NUDGE_FOCUS_PCT && window.XRS && XRS.nudge) XRS.nudge({ after: document.getElementById('fd-list'), text: `Nice, ${focusCorrect} of ${total} correct! 🎉` });
+  } catch (e) {}
 }
 
 fpStart.onclick = () => {
@@ -2240,9 +2264,12 @@ async function renderProgress() {
       <h3 style="margin:0.3rem 0;">Log in to track your progress</h3>
       <p style="color:var(--muted); margin:0.3rem 0 1rem;">See your % correct by body area, your most-missed projections, your day streak, and sync your Upload &amp; Quiz decks across devices. Totally optional — everything else works without an account.</p>
       <button class="btn-primary" id="pg-login" style="padding:0.7rem 1.4rem; border:none; border-radius:10px; font-size:1rem; cursor:pointer;">Log in / Sign up</button>
+      <p style="margin:0.8rem 0 0;"><button type="button" id="pg-signup-link" style="background:none; border:none; padding:0.3rem; color:var(--accent); font:inherit; font-size:0.92rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px;">Make a free account to keep your progress safe and on all your devices</button></p>
       <p class="pg-note" style="margin-top:1rem;">${PRIVACY_NOTE}</p></div>`;
     const b = document.getElementById('pg-login');
     if (b) b.onclick = () => window.XRS ? XRS.openSheet('login') : alert('Login is not available right now. Check your connection and reload.');
+    const sl = document.getElementById('pg-signup-link');
+    if (sl) sl.onclick = () => window.XRS ? (XRS.openAuth ? XRS.openAuth('signup') : XRS.openSheet('signup')) : alert('Sign-up is not available right now. Check your connection and reload.');
     return;
   }
   if (!lastProgress) progressBody.innerHTML = '<div class="empty">Loading your progress…</div>';
