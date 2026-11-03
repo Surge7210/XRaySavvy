@@ -105,6 +105,12 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .mode-btn.active{background:#132a3d;box-shadow:0 0 0 2px var(--accent) inset}
 .mode-btn .t{font-weight:700}
 .mode-btn .d{color:var(--muted);font-size:0.85rem;margin-top:0.15rem}
+.type-pill{display:inline-block;font-size:0.68rem;font-weight:700;border-radius:999px;padding:0.05rem 0.5rem;margin-left:0.4rem;vertical-align:middle;background:#16324a;color:#7cc4fa}
+.type-pill.cram{background:#3d331a;color:#ffd700}
+.pick-note{font-size:0.78rem;color:#7cc4fa;margin-top:0.35rem;font-weight:600}
+.mode-btn .t2{font-weight:500;color:var(--muted)}
+.fin-bar{height:8px;border-radius:999px;background:var(--border);overflow:hidden;margin:0.6rem 0 0.4rem}
+.fin-bar>div{height:100%;width:0;background:var(--accent);transition:width .3s}
 .rec-badge{font-size:0.7rem;background:var(--accent);color:#fff;border-radius:999px;padding:0.05rem 0.5rem;margin-left:0.3rem;vertical-align:middle;font-weight:600}
 .sample-banner{background:#3d331a;color:#ffd700;border-radius:8px;padding:0.35rem 0.7rem;font-size:0.8rem;font-weight:700;margin-bottom:0.7rem}
 .learn-top{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.3rem}
@@ -218,7 +224,7 @@ body.picbox-open{overflow:hidden}
   </div>
 
   <div class="card hidden" id="modeCard">
-    <h2 id="modeTitle">2. How do you want to study?</h2>
+    <h2 id="modeTitle">2. What kind of deck is this?</h2>
     <div id="rangeBox" class="range-box hidden">
       <div id="rangeFound" style="font-weight:600"></div>
       <div id="rangeLbl" style="margin-top:0.35rem">Slides to study:</div>
@@ -232,8 +238,9 @@ body.picbox-open{overflow:hidden}
       <div class="muted small" id="rangeSummary" style="margin-top:0.4rem"></div>
       <div class="small hidden" id="rangeErr" style="color:#ffd700;margin-top:0.3rem"></div>
     </div>
-    <button class="mode-btn rec" id="learnBtn"><div class="t">📖 Learn (in order) <span class="rec-badge">Recommended</span></div><div class="d" id="learnDesc">Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
-    <button class="mode-btn" id="cramBtn"><div class="t">⚡ Exam Cram (everything)</div><div class="d" id="cramDesc">One big quiz on the whole file, 10 to 200 questions.</div></button>
+    <button class="mode-btn" id="learnBtn"><div class="t" id="learnT">📖 Learn + Quiz <span class="t2">– summaries plus quizzes</span></div><div class="d" id="learnDesc">Best for slides &amp; notes. Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
+    <button class="mode-btn" id="cramBtn"><div class="t" id="cramT">⚡ Cram only <span class="t2">– straight to quiz questions</span></div><div class="d" id="cramDesc">Best for vocab lists &amp; review questions. No summaries — one quiz on the whole file, 10 to 200 questions.</div></button>
+    <button class="btn btn-primary btn-block hidden upload-only" id="learnGoBtn" style="margin-top:0.7rem">Start Learn + Quiz →</button>
     <div id="ctxExtras" class="ctx-extras ctx-only"></div>
     <div id="learnPreview" class="hidden" style="margin-top:0.8rem"></div>
   </div>
@@ -1020,14 +1027,18 @@ async function extractPptx(buf) {
 async function extractDocx(buf) {
   if (!window.mammoth) throw new Error('Word reader failed to load. Check your internet and reload.');
   const res = await mammoth.extractRawText({ arrayBuffer: buf });
-  let pages = null;
+  let pages = null, termRows = 0;
   try {
     const zip = await JSZip.loadAsync(buf);
     const app = zip.file('docProps/app.xml');
     if (app) { const m = (await app.async('string')).match(/<Pages>(\d+)<\/Pages>/); if (m) pages = parseInt(m[1], 10); }
+    // Two-column table rows (term | definition) — only used to guess the deck type.
+    const doc = zip.file('word/document.xml');
+    if (doc) termRows = (await doc.async('string')).split(/<w:tr[\s>]/).slice(1)
+      .filter(row => (row.split('</w:tr>')[0].match(/<w:tc[\s>]/g) || []).length === 2).length;
   } catch (e) { /* page count is optional */ }
   const paras = res.value.split(/\n+/).map(s => s.trim()).filter(Boolean);
-  return { units: pages, unitName: 'pages', parts: paras, paragraphs: paras.length };
+  return { units: pages, unitName: 'pages', parts: paras, paragraphs: paras.length, termRows };
 }
 
 // ---- PDF (pdf.js) ----
@@ -1264,9 +1275,11 @@ function resetUpload(msg) {
 // Shared by files and photos: turn extracted parts into chunks + Learn sections and show the summary.
 function useExtracted(r, fileName, displayName, icon) {
   const info = $('fileInfo');
-  extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, paragraphs: r.paragraphs, allParts: r.parts };
+  extracted = { fileName, kind: r.kind, units: r.units, unitName: r.unitName, paragraphs: r.paragraphs, allParts: r.parts, termRows: r.termRows || 0 };
   extracted.range = fullRange(extracted);
   applyRange(extracted);
+  extracted.detected = detectDeckType(extracted); // on the whole file, not re-run when the range changes
+  presetType();
   const text = r.parts.join('\n\n'), sections = extracted.sections;
   info.innerHTML = '';
   const unitsTxt = r.units ? fmtNum(r.units) + ' ' + (r.units === 1 ? r.unitName.replace(/s$/, '') : r.unitName) + ' found' : (r.kind === 'docx' ? fmtNum(r.paragraphs) + ' paragraphs' : '');
@@ -1423,8 +1436,29 @@ function pickMode(m) {
   $('cramBtn').classList.toggle('active', m === 'cram');
   $('cramOptions').classList.toggle('hidden', m !== 'cram');
   if (m !== 'learn') $('learnPreview').classList.add('hidden');
+  if (m && extracted && !studyCtx) extracted.chosenType = m; // the deck type picked for this upload
+  $('learnGoBtn').classList.toggle('hidden', !(m === 'learn' && extracted && !studyCtx));
+  paintTypeNote();
+}
+// Fresh upload: preselect the type we detected (the student can tap the other one to change it).
+function paintTypeNote() {
+  document.querySelectorAll('#modeCard .pick-note').forEach(n => n.remove());
+  const x = extracted;
+  for (const b of ['learnBtn', 'cramBtn']) $(b).classList.remove('rec');
+  if (!x || !x.detected || studyCtx) return;
+  const det = x.detected, btn = $(det.type === 'cram' ? 'cramBtn' : 'learnBtn');
+  const why = det.type === 'cram' ? (det.reason === 'questions' ? 'looks like review questions' : 'looks like a vocab / term list')
+    : (x.kind === 'pptx' ? 'looks like slides' : 'looks like notes');
+  btn.classList.add('rec');
+  btn.append(el('div', { class: 'pick-note', id: 'typeNote' }, '✨ We picked this based on your file (' + why + ')' + ((x.chosenType || det.type) === det.type ? ' — tap the other one to change it.' : '.')));
+}
+function presetType() {
+  if (!extracted || studyCtx) return;
+  if (!extracted.detected) extracted.detected = detectDeckType(extracted);
+  pickMode(extracted.chosenType || extracted.detected.type);
 }
 $('cramBtn').addEventListener('click', () => { pickMode('cram'); $('cramOptions').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('learnGoBtn').addEventListener('click', () => $('learnBtn').click());
 $('learnBtn').addEventListener('click', async () => {
   // Already have a Learn deck for these notes? Resume it (progress kept) instead of starting over.
   const lid = (studyCtx && studyCtx.learn && studyCtx.learn.id) || (extracted && extracted.learnId);
@@ -1434,6 +1468,7 @@ $('learnBtn').addEventListener('click', async () => {
   }
   if (!extracted) return;
   pickMode('learn');
+  $('learnGoBtn').classList.add('hidden');
   const secs = extracted.sections || [];
   const pv = $('learnPreview'); pv.innerHTML = ''; pv.classList.remove('hidden');
   if (!secs.length) { pv.append(el('div', { class: 'notice err' }, 'No readable text was found to split into sections.')); return; }
@@ -1535,7 +1570,7 @@ $('genBtn').addEventListener('click', async () => {
     source: { fileName: extracted.fileName, kind: extracted.kind, units: extracted.units, chars: extracted.text.length },
     range: rangeForDeck(extracted),
     src: srcFromExtracted(extracted), learnId: extracted.learnId || null,
-    pics: picsFor(extracted),
+    pics: picsFor(extracted), deckType: 'cram',
     settings: { count: total, type: genOpts.type, focus },
     questions: shuffle(all).slice(0, total).map(q => Object.assign({ id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }, q)),
     missed: [], attempts: []
@@ -1661,7 +1696,7 @@ function startQuiz(deck, onlyIds, mode, opts) {
   if (!items.length) { alert('No questions to show yet.'); return; }
   quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode, opts: opts || {}, round: 1, total: items.length };
   $('qDeckName').textContent = quiz.opts.label || deck.name;
-  $('quizLearnBtn').classList.toggle('hidden', deck.mode === 'learn' || !!deck.demo || !!deck.shared);
+  $('quizLearnBtn').classList.toggle('hidden', deck.mode === 'learn' || !!deck.demo || !!deck.shared || isCramOnly(deck));
   $('resultsModesBtn').classList.toggle('hidden', !!deck.demo);
   showScreen('quiz');
   renderQuestion();
@@ -1936,6 +1971,53 @@ function unitTitle(lines, common) {
 const TERM_RE = /^(?:[-•*]\s*)?(\S.{0,60}?)\s+(?:--|–|—)\s+(?=.*[a-z])(.{3,})$/;
 function isTermLine(l) { return TERM_RE.test(l); }
 function termName(l) { const m = TERM_RE.exec(l || ''); return m ? m[1].trim() : ''; }
+
+// ---- Deck type guess: "Learn + Quiz" (slides / notes) vs "Cram only" (vocab lists / review questions) ----
+// Cheap local heuristics, no AI. Only preselects the choice; the student can always switch.
+// Detection-only patterns (TERM_RE above is left exactly as-is for section splitting).
+const DT_DASH = /^(?:[-•*]\s*|\d{1,3}[.)]\s+)?([^\s].{0,58}?)\s+(?:-{1,2}|–|—|=)\s+(?=.*[a-z])(.{3,})$/;
+const DT_COLON = /^(?:[-•*]\s*|\d{1,3}[.)]\s+)?([A-Za-z(][^:]{0,45}?)\s*:\s+(?=.*[a-z])(\S+(?:\s+\S+){2,})$/;
+const DT_TAB = /^[^\t]{1,60}\t+\S.{2,}$/;
+const DT_Q = /^(?:(?:Q(?:uestion)?\s*\d*\s*[.:)-]|\d{1,3}\s*[.)])\s*)?\S.{6,}\?\s*$/i;
+const DT_A = /^(?:A|Ans(?:wer)?)\s*\d*\s*[.:)-]\s*\S/i;
+const DT_OPT = /^\(?[a-eA-E][.)]\s+\S/;
+const DT_HINT = /\b(vocab(ulary)?|terms?|terminology|glossary|definitions?|flash ?cards?|review questions|practice questions|study guide|q ?& ?a)\b/i;
+function dtWords(t) { return t.trim().split(/\s+/).length; }
+function dtLine(l) {
+  if (isTermLine(l)) return 'pair';
+  let m = DT_DASH.exec(l); if (m && dtWords(m[1]) <= 6) return 'pair';
+  if (DT_TAB.test(l)) return 'pair';
+  m = DT_COLON.exec(l); if (m && dtWords(m[1]) <= 5) return 'colon';
+  if (DT_Q.test(l)) return 'q';
+  if (DT_A.test(l) || DT_OPT.test(l)) return 'extra';
+  return '';
+}
+function detectDeckType(x) {
+  const parts = x.allParts || x.parts || [];
+  const c = { lines: 0, pair: 0, colon: 0, q: 0, extra: 0, slides: 0, listSlides: 0 };
+  for (const p of parts) {
+    let ls = cleanLines(String(p).replace(/^--- (?:Slide|Page|Photo) \d+ ---\s*/, ''));
+    if (x.kind === 'pptx' && ls.length > 1) ls = ls.slice(1); // a slide's first line is its title
+    let hit = 0;
+    for (const l of ls) { const k = dtLine(l); c.lines++; if (k) { c[k]++; if (k !== 'extra') hit++; } }
+    if (x.kind === 'pptx' && ls.length) { c.slides++; if (hit && hit / ls.length >= 0.6) c.listSlides++; }
+  }
+  const rows = x.termRows || 0;               // .docx two-column tables (term | definition)
+  c.pair += rows; c.extra += rows;           // mammoth gives 2 paragraphs (term, definition) per row: both are covered
+  const items = c.pair + c.colon + c.q, ratio = c.lines ? (items + c.extra) / c.lines : 0;
+  const head = (x.fileName || '') + ' ' + parts.slice(0, 2).join(' ').slice(0, 300);
+  const hint = DT_HINT.test(head);
+  let need = c.colon > (c.pair + c.q) ? 0.6 : 0.5;   // "CR: …" style notes use colons a lot, so ask for more
+  if (hint) need -= 0.15;
+  let cram;
+  if (x.kind === 'pptx') cram = items >= 12 && c.slides > 0 && c.listSlides / c.slides >= 0.7 && ratio >= 0.6;
+  else cram = items >= (hint ? 6 : 8) && ratio >= need;
+  return { type: cram ? 'cram' : 'learn', reason: c.q > c.pair + c.colon ? 'questions' : 'terms', counts: c, ratio: Math.round(ratio * 100) / 100, hint };
+}
+// Deck type of a saved deck. Older decks have no deckType: Learn if they have sections.
+function deckTypeOf(d) { return d && d.mode === 'learn' && d.learn ? 'learn' : 'cram'; }
+function isCramOnly(d) { return !!d && d.mode !== 'learn' && d.deckType === 'cram' && !d.learnId; }
+function typePill(d) { const t = deckTypeOf(d); return el('span', { class: 'type-pill ' + t, title: t === 'learn' ? 'Learn + Quiz deck' : 'Cram-only deck' }, t === 'learn' ? 'Learn' : 'Cram'); }
 function makeUnits(r) {
   if (r.kind === 'photo') {
     return r.parts.map((p, i) => {
@@ -2041,7 +2123,7 @@ function makeSections(units) {
 function picsFor(x) { return x && x.picKey ? Object.assign({ key: x.picKey }, x.picUnits ? { units: x.picUnits } : {}) : null; }
 function newLearnDeck(x) {
   return {
-    id: DeckStore.newId(), mode: 'learn',
+    id: DeckStore.newId(), mode: 'learn', deckType: 'learn',
     name: deckNameFor(x), createdAt: new Date().toISOString(), cramId: x.cramId || null,
     source: { fileName: x.fileName, kind: x.kind, units: x.units, chars: x.text.length },
     range: rangeForDeck(x), src: srcFromExtracted(x), pics: picsFor(x),
@@ -2095,14 +2177,15 @@ function openLearn(deck, idx) {
 }
 
 // Makes sure section i has its summary + questions (one Worker call, deduped).
-function ensureSection(i, background, onStatus) {
-  const s = sec(i);
+function ensureSection(i, background, onStatus) { return ensureDeckSection(L.deck, L.pending, i, background, onStatus); }
+// Same per-section call for any Learn deck (the open one, or one being finished before sharing).
+function ensureDeckSection(deck, pending, i, background, onStatus) {
+  const s = deck.learn.sections[i];
   if (s.summary) return Promise.resolve(s);
-  if (L.deck.sample) return Promise.reject(new Error('Sample section is missing.'));
-  if (L.deck.shared) return Promise.reject(new Error('This section isn\'t included in the shared deck.'));
-  if (!L.pending[i]) {
-    const deck = L.deck;
-    L.pending[i] = AI.enqueue({ action: 'section', text: s.text, title: s.title, count: sectionQuestionCount(s.text), type: 'mix' }, { background, onStatus })
+  if (deck.sample) return Promise.reject(new Error('Sample section is missing.'));
+  if (deck.shared) return Promise.reject(new Error('This section isn\'t included in the shared deck.'));
+  if (!pending[i]) {
+    pending[i] = AI.enqueue({ action: 'section', text: s.text, title: s.title, count: sectionQuestionCount(s.text), type: 'mix' }, { background, onStatus })
       .then(data => {
         if (data.title) s.title = data.title;
         s.summary = data.summary; s.keyPoints = data.keyPoints || [];
@@ -2112,11 +2195,11 @@ function ensureSection(i, background, onStatus) {
         persistDeck(deck);
         return s;
       })
-      .finally(() => { if (L && L.deck === deck) delete L.pending[i]; });
+      .finally(() => { delete pending[i]; });
   } else if (!background && onStatus) {
     onStatus('Already working on this section…');
   }
-  return L.pending[i];
+  return pending[i];
 }
 function prefetchNext() {
   if (!L || L.deck.sample || L.deck.shared || workerState !== 'ready') return;
@@ -2372,8 +2455,8 @@ $('mapBackBtn').addEventListener('click', () => { showScreen('learn'); renderSec
 
 function renderLearnDeckRow(d, row, list) {
   const n = d.learn.sections.length, done = doneCount(d);
-  row.append(el('div', { class: 'name' }, '📖 ' + d.name));
-  row.append(el('div', { class: 'muted small' }, ['Learn', fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : ''].filter(Boolean).join(' · ')));
+  row.append(el('div', { class: 'name' }, '📖 ' + d.name, typePill(d)));
+  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : ''].filter(Boolean).join(' · ')));
   const btns = el('div', { class: 'row' });
   btns.append(el('button', { class: 'btn btn-primary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; const open = x.learn.sections.findIndex(z => z.status !== 'done'); openLearn(x, open >= 0 ? open : x.learn.current); } }, done === n ? 'Review' : 'Resume'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'cram') }, '⚡ Exam Cram'));
@@ -2950,7 +3033,7 @@ function setRange(from, to, which) {
     x.range = r;
     applyRange(x);
     if (studyCtx) { studyCtx.learn = b.learn || null; studyCtx.cram = b.cram || null; renderDeckCtx(); }
-    else { pickMode(null); $('learnPreview').classList.add('hidden'); }
+    else { pickMode(extracted.chosenType || null); $('learnPreview').classList.add('hidden'); }
   }
   renderRangeBox();
   updateGenBtn();
@@ -2965,7 +3048,7 @@ $('rangeAll').addEventListener('click', () => { if (extracted && extracted.range
 // extracted notes (src) when they're not huge. Linked decks point at each other (learnId / cramId),
 // so switching back resumes Learn where it was left and never re-reads files or photos.
 const SRC_KEEP_CHARS = 150000;
-const ORIG = { learnDesc: $('learnDesc').innerHTML, cramDesc: $('cramDesc').innerHTML, modeTitle: $('modeTitle').textContent, cramTitle: $('cramTitle').textContent, makeTitle: $('makeTitle').textContent };
+const ORIG = { learnT: $('learnT').innerHTML, cramT: $('cramT').innerHTML, learnDesc: $('learnDesc').innerHTML, cramDesc: $('cramDesc').innerHTML, modeTitle: $('modeTitle').textContent, cramTitle: $('cramTitle').textContent, makeTitle: $('makeTitle').textContent };
 function srcFromExtracted(x) {
   if (!x || !Array.isArray(x.parts)) return null;
   const all = x.allParts || x.parts;
@@ -3038,12 +3121,14 @@ function renderDeckCtx() {
   if (cr) info.push('⚡ Exam Cram: ' + cr.questions.length + ' questions');
   $('ctxInfo').textContent = info.join(' · ');
   $('modeTitle').textContent = 'How do you want to study?';
+  $('learnT').textContent = '📖 Learn (in order)'; $('cramT').textContent = '⚡ Exam Cram (everything)';
   $('cramTitle').textContent = '2. Exam Cram options';
   $('makeTitle').textContent = '3. Make my quiz';
   if (lr) {
     const n = lr.learn.sections.length, done = doneCount(lr);
     $('learnDesc').textContent = done >= n ? 'All ' + n + ' sections done — review any section or take the Final Review.' : 'Pick up where you left off: section ' + (lr.learn.current + 1) + ' of ' + n + (done ? ' (' + done + ' done)' : '') + '.';
-  } else $('learnDesc').innerHTML = extracted ? ORIG.learnDesc : 'Not available for this older quiz — its notes weren\'t saved with it. Tap “Upload different notes” and pick the file again.';
+  } else if (extracted && isCramOnly(cr)) $('learnDesc').textContent = 'This is a Cram-only deck. Tap to also make Learn summaries from the same notes (uses extra AI calls).';
+  else $('learnDesc').innerHTML = extracted ? ORIG.learnDesc : 'Not available for this older quiz — its notes weren\'t saved with it. Tap “Upload different notes” and pick the file again.';
   $('cramDesc').textContent = !extracted ? 'Not available — this deck\'s notes weren\'t saved with it.' : cr ? 'Make a NEW quiz on the whole deck (10 to 200 questions) — or retake your saved one below.' : 'One big quiz on the whole deck, 10 to 200 questions.';
   $('learnBtn').disabled = !lr && !extracted;
   $('cramBtn').disabled = !extracted;
@@ -3067,6 +3152,7 @@ function exitDeckCtx() {
   studyCtx = null;
   $('screen-upload').classList.remove('deckctx');
   $('learnDesc').innerHTML = ORIG.learnDesc; $('cramDesc').innerHTML = ORIG.cramDesc;
+  $('learnT').innerHTML = ORIG.learnT; $('cramT').innerHTML = ORIG.cramT;
   $('modeTitle').textContent = ORIG.modeTitle; $('cramTitle').textContent = ORIG.cramTitle; $('makeTitle').textContent = ORIG.makeTitle;
   $('learnBtn').disabled = false; $('cramBtn').disabled = false; $('ctxExtras').innerHTML = '';
   $('ctxShareBtn').classList.add('hidden'); $('ctxShareStatus').classList.add('hidden');
@@ -3118,12 +3204,12 @@ async function renderDecks() {
     const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
     const row = el('div', { class: 'deck' });
     if (d.mode === 'learn' && d.learn) { renderLearnDeckRow(d, row, list); continue; }
-    row.append(el('div', { class: 'name' }, '⚡ ' + d.name));
+    row.append(el('div', { class: 'name' }, '⚡ ' + d.name, typePill(d)));
     row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : ''].filter(Boolean).join(' · ')));
     const btns = el('div', { class: 'row' });
     btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
     if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
-    if (d.learnId || (d.src && d.src.parts)) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
+    if (d.learnId || (d.src && d.src.parts && !isCramOnly(d))) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
     btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
     btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => ShareUI.open(await DeckStore.get(d.id)) }, '🔗 Share'));
     btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
@@ -3332,6 +3418,7 @@ function buildShareContent(b) {
   const learnQuestions = b.learn ? b.learn.questions.filter(q => q && q.question && remap[q.section] != null).map(q => shareQ(q, remap[q.section])) : [];
   const cramQuestions = b.cram ? b.cram.questions.filter(q => q && q.question).map(q => shareQ(q)) : [];
   const body = { v: 1, title, sections, learnQuestions, cramQuestions };
+  if (!b.learn) body.type = 'cram'; // Cram-only deck: the viewer shows no Learn part
   return Object.assign(body, { sig: shareSig(body) });
 }
 
@@ -3441,37 +3528,104 @@ const ShareUI = (() => {
     const b = await shareBundle(d), key = shareKeyOf(d);
     const content = buildShareContent(b);
     const body = sheet('Share “' + content.title + '”');
-    if (!content.sections.length && !content.learnQuestions.length && !content.cramQuestions.length) {
+    if (!content.sections.length && !content.learnQuestions.length && !content.cramQuestions.length && !missingOf(b).length) {
       body.append(el('p', { class: 'muted' }, 'Nothing to share yet. Open a Learn section or make an Exam Cram quiz first, then share it.'));
       return;
     }
-    const bytes = new Blob([JSON.stringify(content)]).size;
     body.append(el('div', { class: 'muted' }, el('span', { class: 'spinner' }), 'Checking…'));
     await ShareStore.refresh(true);
-    render(body, d, key, content, bytes);
+    render(body, d, key, b);
   }
 
-  function render(body, d, key, content, bytes) {
+  // Learn sections the owner never opened (no summary yet) that have text to summarize.
+  function missingOf(b) {
+    return b.learn && b.learn.learn ? b.learn.learn.sections.map((s, i) => (!s.summary && s.text && s.text.trim() ? i : -1)).filter(i => i >= 0) : [];
+  }
+  const finPending = {}; // deck id -> { section index: Promise } for decks that aren't open in Learn
+  let finRun = 0;
+  // Before sharing a Learn deck, write the missing section summaries with the same per-section call
+  // Learn mode uses, saving each into the owner's deck. Then hand the full content to `then`.
+  async function finishSummaries(body, d, key, b, then) {
+    if (!missingOf(b).length) return then(buildShareContent(b));
+    const run = ++finRun, deck = b.learn;
+    const pending = L && L.deck === deck ? L.pending : (finPending[deck.id] = finPending[deck.id] || {});
     body.innerHTML = '';
+    const label = el('div', { id: 'shrFinMsg', style: 'font-weight:600' }, 'Finishing summaries…');
+    const fill = el('div'), sub = el('div', { class: 'muted small', id: 'shrFinSub' }, 'Checking the AI connection…');
+    const cancel = el('button', { class: 'btn btn-secondary', id: 'shrFinCancel' }, 'Cancel');
+    let stopped = false;
+    cancel.onclick = () => { stopped = true; cancel.disabled = true; cancel.textContent = 'Stopping…'; };
+    body.append(el('p', { class: 'muted', style: 'margin:0 0 0.4rem' }, 'Writing the summaries for sections you haven\'t opened yet, so the shared copy has every section. They\'re saved to your deck too.'),
+      label, el('div', { class: 'fin-bar' }, fill), sub, cancel);
+    const live = () => run === finRun && body.isConnected;
+    let fatal = '';
+    if (workerState !== 'ready') { if (!workerCheck) checkWorker(); await workerStateNow(); }
+    if (workerState !== 'ready') { const t = el('div'); t.innerHTML = (WORKER_MSGS[workerState] || WORKER_MSGS.no_code)[1]; fatal = t.textContent; }
+    const todo = missingOf(b);
+    for (let k = 0; k < todo.length && !fatal; k++) {
+      if (stopped || !live()) break;
+      const i = todo[k];
+      label.textContent = 'Finishing summaries… ' + (k + 1) + ' of ' + todo.length;
+      fill.style.width = Math.round(k / todo.length * 100) + '%';
+      sub.textContent = deck.learn.sections[i].title || '';
+      for (let tries = 0; ; tries++) {
+        try { await ensureDeckSection(deck, pending, i, false, m => { if (live()) sub.textContent = m; }); break; }
+        catch (e) {
+          const dd = e.data || {};
+          if ((e.status === 429 && dd.perDay) || dd.error === 'no_key' || e.status === 'bad_worker') { fatal = e.message || 'The AI isn\'t available right now.'; break; }
+          if (tries >= 2 || stopped || !live()) break;
+          for (let t = [3, 8][tries]; t > 0 && !stopped && live(); t--) { sub.textContent = 'Couldn\'t write this one — trying again in ' + t + 's…'; await sleep(1000); }
+          if (stopped || !live()) break;
+        }
+      }
+    }
+    if (!live()) return;
+    fill.style.width = '100%';
+    const left = missingOf(b).length;
+    if (stopped) { render(body, d, key, b); msg(body, 'Stopped — nothing was shared. Summaries written so far are saved in your deck.', false); return; }
+    if (!left) return then(buildShareContent(b));
+    body.innerHTML = '';
+    body.append(el('div', { class: 'notice warn', id: 'shrFinFail' }, (fatal ? fatal + ' ' : 'Some summaries couldn\'t be written right now. ') + left + ' section' + (left === 1 ? '' : 's') + ' still ha' + (left === 1 ? 's' : 've') + ' no summary.'));
+    const anyway = el('button', { class: 'btn btn-primary', id: 'shrAnyway' }, 'Share anyway (' + left + ' section' + (left === 1 ? '' : 's') + ' without summaries)');
+    anyway.onclick = () => then(buildShareContent(b));
+    const again = el('button', { class: 'btn btn-secondary', id: 'shrRetry' }, 'Try again');
+    again.onclick = () => finishSummaries(body, d, key, b, then);
+    body.append(anyway, again, el('button', { class: 'btn btn-secondary', id: 'shrLater', onclick: close }, 'Try later'),
+      el('div', { class: 'muted small', style: 'margin-top:0.4rem' }, 'Sections without a summary are left out of the shared copy. Summaries written so far are saved in your deck.'));
+  }
+
+  function render(body, d, key, b) {
+    body.innerHTML = '';
+    const content = buildShareContent(b), bytes = new Blob([JSON.stringify(content)]).size;
+    const miss = missingOf(b).length;
     const row = ShareStore.forKey(key);
-    const what = [content.sections.length ? content.sections.length + ' section summar' + (content.sections.length === 1 ? 'y' : 'ies') : '', (content.learnQuestions.length + content.cramQuestions.length) + ' questions'].filter(Boolean).join(' · ');
+    const what = [content.sections.length ? content.sections.length + ' section summar' + (content.sections.length === 1 ? 'y' : 'ies') : '', (content.learnQuestions.length + content.cramQuestions.length) + ' questions', content.type === 'cram' ? 'Cram only' : ''].filter(Boolean).join(' · ');
+    const missNote = miss ? el('div', { class: 'notice info', style: 'margin-top:0.5rem', id: 'shrMissNote' }, miss + ' section' + (miss === 1 ? ' hasn\'t' : 's haven\'t') + ' been opened yet. We\'ll write ' + (miss === 1 ? 'its summary' : 'their summaries') + ' first (' + miss + ' AI call' + (miss === 1 ? '' : 's') + '), so the shared copy has every section.') : null;
     const tooBig = bytes > SHARE_MAX_BYTES;
+    // Run a DB step after finishing summaries; errors land back on the normal sheet.
+    const withContent = (btn, fn) => busy(btn, 'Working…', () => finishSummaries(body, d, key, b, async c => {
+      try { await fn(c); }
+      catch (e) { render(body, d, key, b); msg(body, e && e.message === 'too big' ? 'This deck is too big to share (over 1 MB).' : shareErr(e), false); }
+    }));
     const save = async (btn, fn) => { try { await busy(btn, 'Working…', fn); } catch (e) { msg(body, shareErr(e), false); } };
-    const doCreate = async () => {
+    const doCreate = async c => {
       const sb = await XRS.client(); const id = newShareId(12);
-      const r = await sb.from('shared_decks').insert({ id, owner: XRS.user.id, deck_client_id: key, title: content.title, content }).select('id,deck_client_id,revoked,created_at,updated_at').single();
+      const r = await sb.from('shared_decks').insert({ id, owner: XRS.user.id, deck_client_id: key, title: c.title, content: c }).select('id,deck_client_id,revoked,created_at,updated_at').single();
       if (r.error) throw r.error;
-      return Object.assign(r.data, { sig: content.sig });
+      return Object.assign(r.data, { sig: c.sig });
     };
+    const big = c => new Blob([JSON.stringify(c)]).size > SHARE_MAX_BYTES;
     if (!row || row.revoked) {
       body.append(el('p', { class: 'muted' }, row ? 'This deck\'s link is turned off. Anyone who opens the old link sees “not available”.'
         : 'Anyone with the link can study a read-only copy: ' + what + '. They can\'t edit your deck, and pictures aren\'t included.'));
       if (tooBig) { msg(body, 'This deck is too big to share (over 1 MB).', false); return; }
+      if (missNote) body.append(missNote);
       const btn = el('button', { class: 'btn btn-primary' }, row ? 'Turn on with a new link' : 'Create share link');
-      btn.onclick = () => save(btn, async () => {
-        const nr = await doCreate();
+      btn.onclick = () => withContent(btn, async c => {
+        if (big(c)) throw new Error('too big');
+        const nr = await doCreate(c);
         if (row) { const sb = await XRS.client(); await sb.from('shared_decks').delete().eq('id', row.id); ShareStore.drop(row.id); }
-        ShareStore.put(nr); render(body, d, key, content, bytes); refresh(); msg(body, 'Link ready ✓ Anyone with it can view (not edit).', true);
+        ShareStore.put(nr); render(body, d, key, b); refresh(); msg(body, 'Link ready ✓ Anyone with it can view (not edit).', true);
       });
       body.append(btn);
       return;
@@ -3483,16 +3637,17 @@ const ShareUI = (() => {
       el('div', { class: 'muted small' }, 'Shared copy updated ' + fmtDate(row.updated_at) + ' · ' + what));
     const stale = row.sig && row.sig !== content.sig;
     if (stale) body.append(el('div', { class: 'notice info', style: 'margin-top:0.5rem' }, 'You\'ve changed this deck since you shared it. Tap “Update shared copy” to send the new version to the same link.'));
+    else if (missNote) { missNote.textContent = miss + ' section' + (miss === 1 ? ' has' : 's have') + ' no summary in the shared copy yet. “Update shared copy” writes ' + (miss === 1 ? 'it' : 'them') + ' first.'; body.append(missNote); }
     const copyBtn = el('button', { class: 'btn btn-primary', onclick: () => copy(url, body) }, 'Copy link');
     body.append(copyBtn);
     if (navigator.share) body.append(el('button', { class: 'btn btn-secondary', onclick: async () => { try { await navigator.share({ title: content.title, text: 'Study “' + content.title + '” on XRaySavvy', url }); } catch (e) { /* cancelled */ } } }, 'Share…'));
     const upBtn = el('button', { class: 'btn btn-secondary' }, 'Update shared copy');
-    upBtn.onclick = () => save(upBtn, async () => {
-      if (tooBig) throw new Error('too big');
+    upBtn.onclick = () => withContent(upBtn, async c => {
+      if (big(c)) throw new Error('too big');
       const sb = await XRS.client();
-      const r = await sb.from('shared_decks').update({ title: content.title, content, deck_client_id: key }).eq('id', row.id).select('id,deck_client_id,revoked,created_at,updated_at').single();
+      const r = await sb.from('shared_decks').update({ title: c.title, content: c, deck_client_id: key }).eq('id', row.id).select('id,deck_client_id,revoked,created_at,updated_at').single();
       if (r.error) throw r.error;
-      ShareStore.put(Object.assign(r.data, { sig: content.sig })); render(body, d, key, content, bytes); refresh();
+      ShareStore.put(Object.assign(r.data, { sig: c.sig })); render(body, d, key, b); refresh();
       msg(body, 'Shared copy updated ✓ Same link.', true);
     });
     const offBtn = el('button', { class: 'btn btn-danger' }, 'Turn off link');
@@ -3500,7 +3655,7 @@ const ShareUI = (() => {
       const sb = await XRS.client();
       const r = await sb.from('shared_decks').update({ revoked: true }).eq('id', row.id).select('id,deck_client_id,revoked,created_at,updated_at').single();
       if (r.error) throw r.error;
-      ShareStore.put(Object.assign(r.data, { sig: row.sig })); render(body, d, key, content, bytes); refresh();
+      ShareStore.put(Object.assign(r.data, { sig: row.sig })); render(body, d, key, b); refresh();
       msg(body, 'Link turned off.', true);
     }); };
     body.append(upBtn, offBtn);
@@ -3533,7 +3688,9 @@ const SharedView = (() => {
     const learnQuestions = (Array.isArray(c.learnQuestions) ? c.learnQuestions : []).map(q => cleanQ(q, sections.length)).filter(q => q && q.section != null);
     const cramQuestions = (Array.isArray(c.cramQuestions) ? c.cramQuestions : []).map(q => cleanQ(q)).filter(Boolean);
     const by = typeof raw.by === 'string' ? raw.by.slice(0, 30) : '';
-    return { title, sections, learnQuestions, cramQuestions, by, updated_at: raw.updated_at };
+    const type = c.type === 'cram' ? 'cram' : 'learn';
+    return type === 'cram' ? { type, title, sections: [], learnQuestions: [], cramQuestions, by, updated_at: raw.updated_at }
+      : { type, title, sections, learnQuestions, cramQuestions, by, updated_at: raw.updated_at };
   }
   const withIds = (qs, pre) => qs.map((q, i) => Object.assign({ id: pre + i, stats: { right: 0, wrong: 0 } }, q));
   function viewerDecks(id, c) {
@@ -3624,11 +3781,11 @@ const SharedView = (() => {
   function copyDecks(c) {
     const now = new Date().toISOString(), lid = c.sections.length ? DeckStore.newId() : null, cid = c.cramQuestions.length ? DeckStore.newId() : null;
     const q = qs => qs.map(x => Object.assign({}, x, { id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }));
-    const learn = lid ? { id: lid, mode: 'learn', name: c.title, createdAt: now, cramId: cid, sharedFrom: true,
+    const learn = lid ? { id: lid, mode: 'learn', deckType: 'learn', name: c.title, createdAt: now, cramId: cid, sharedFrom: true,
       source: { fileName: c.title, kind: 'txt', units: c.sections.length }, settings: { type: 'mix' }, pics: null, missed: [], attempts: [],
       questions: q(c.learnQuestions),
       learn: { current: 0, finalLast: null, sections: c.sections.map(s => ({ title: s.title, label: s.label, text: s.summary + (s.keyPoints.length ? '\n\n' + s.keyPoints.join('\n') : ''), status: 'ready', summary: s.summary, keyPoints: s.keyPoints.slice(), extras: {}, asks: [], score: null, misses: [] })) } } : null;
-    const cram = cid ? { id: cid, name: c.title, createdAt: now, learnId: lid, sharedFrom: true, source: { fileName: c.title, kind: 'txt' }, settings: {}, pics: null, missed: [], attempts: [], questions: q(c.cramQuestions) } : null;
+    const cram = cid ? { id: cid, name: c.title, createdAt: now, learnId: lid, sharedFrom: true, deckType: 'cram', source: { fileName: c.title, kind: 'txt' }, settings: {}, pics: null, missed: [], attempts: [], questions: q(c.cramQuestions) } : null;
     return { learn, cram };
   }
   async function doSave(id, c) {
