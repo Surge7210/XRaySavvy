@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
-<script src="./auth.js?v=3"></script>
+<script src="./auth.js?v=4"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -1738,7 +1738,7 @@ function nudgeOnAnswer(ok, anchor) {
 // ---- Optional account: log each graded answer (async; never blocks the quiz) ----
 function logResults(rows, p) {
   try {
-    if (!window.XRS || !XRS.user || !p) return;
+    if (!window.XRS || !p) return; // signed out: auth.js keeps these on this device until an account signs in
     setTimeout(() => {
       try { XRS.log(rows.map(r => Object.assign({ source: 'projections', projection: p.projection, group_label: p.extremity }, r))); } catch (e) {}
     }, 0);

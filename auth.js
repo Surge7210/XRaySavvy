@@ -76,6 +76,8 @@
         XRS.user = u ? { id: u.id, email: u.email, meta: u.user_metadata || {} } : null;
         if (event === 'PASSWORD_RECOVERY') setTimeout(function () { openSheet('newpass'); }, 0);
         if ((XRS.user && XRS.user.id) !== prev || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          // Answers given while signed out on this device move to whoever signs in here (sign-up, login, email link).
+          if (XRS.user && (event === 'SIGNED_IN' || !prev)) claimSignedOut(XRS.user.id);
           if (XRS.user) { loadProfile(sb); setTimeout(flush, 300); }
           setTimeout(emit, 0);
         }
@@ -148,20 +150,30 @@
   var flushTimer = null;
   function cut(v, n) { return v == null ? null : String(v).slice(0, n); }
   // rows: [{source, field, correct, result?, projection?, group_label?, deck_client_id?, deck_name?}]
-  // Returns the row ids (or [] when logged out).
+  // Returns the row ids. Logged out: home-page quiz answers ('projections') are kept here with user_id null
+  // (same row shape and timestamp) and are claimed by the account that next signs in on this device.
+  // Each row's id is a client-made uuid and the table's primary key, so a resend can never make a duplicate.
   function log(rows) {
-    if (!XRS.user) return [];
+    var list = (Array.isArray(rows) ? rows : [rows]);
+    if (!XRS.user) list = list.filter(function (r) { return r && r.source === 'projections'; });
+    if (!list.length) return [];
     var now = new Date().toISOString();
-    var q = readQ(), ids = [];
-    (Array.isArray(rows) ? rows : [rows]).forEach(function (r) {
+    var q = readQ(), ids = [], uid = XRS.user ? XRS.user.id : null;
+    list.forEach(function (r) {
       var id = uuid(); ids.push(id);
-      q.push({ id: id, user_id: XRS.user.id, source: r.source, field: r.field, correct: !!r.correct, result: r.result || null,
+      q.push({ id: id, user_id: uid, source: r.source, field: r.field, correct: !!r.correct, result: r.result || null,
         projection: cut(r.projection, 200), group_label: cut(r.group_label, 200),
         deck_client_id: cut(r.deck_client_id, 100), deck_name: cut(r.deck_name, 200), created_at: now });
     });
     writeQ(q);
-    clearTimeout(flushTimer); flushTimer = setTimeout(flush, 1200);
+    if (uid) { clearTimeout(flushTimer); flushTimer = setTimeout(flush, 1200); }
     return ids;
+  }
+  function claimSignedOut(uid) {
+    if (!uid) return;
+    var q = readQ(), n = 0;
+    q.forEach(function (r) { if (r && r.user_id == null) { r.user_id = uid; n++; } });
+    if (n) writeQ(q);
   }
   // Fix an answer after the fact (e.g. "I was right").
   function mark(id, patch) {
@@ -182,12 +194,14 @@
       if (!uid) return;
       var mine = q.filter(function (r) { return r.user_id === uid; }).slice(0, 500);
       if (mine.length) {
-        var res = await sb.from('quiz_results').insert(mine);
+        // ON CONFLICT (id) DO NOTHING: rows already sent (a retry, or another tab) are skipped, the rest go in.
+        var res = await sb.from('quiz_results').upsert(mine, { onConflict: 'id', ignoreDuplicates: true });
         if (res.error && res.error.code !== '23505') throw res.error; // 23505 = already sent
       }
       var sent = {}; mine.forEach(function (r) { sent[r.id] = 1; });
-      writeQ(readQ().filter(function (r) { return !sent[r.id] && r.user_id === uid; }));
-      if (readQ().length) setTimeout(flush, 500);
+      // keep signed-out answers (user_id null) for whoever signs in next; drop what was sent
+      writeQ(readQ().filter(function (r) { return !sent[r.id] && (r.user_id === uid || r.user_id == null); }));
+      if (readQ().some(function (r) { return r.user_id === uid; })) setTimeout(flush, 500);
     } catch (e) { console.warn('[XRS] will retry sending results later', e); }
     finally { flushing = false; }
   }
