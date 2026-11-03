@@ -190,11 +190,12 @@
   }
   el.querySelector('.sp-in').appendChild(load);
   var pct = load.querySelector('.sp-pct'), t0 = Date.now();
-  (function tick() {
+  function tick() {
     var n = Math.min(100, Math.round((Date.now() - t0) / 40));
     pct.textContent = n < 100 ? 'Loading\u2026 ' + n + '%' : 'Ready!';
-    if (n < 100 && el.parentNode) requestAnimationFrame(tick);
-  })();
+    if (n < 100 && !done) requestAnimationFrame(tick);
+  }
+  
   var done = false;
   function hide() {
     if (done) return; done = true;
@@ -203,6 +204,7 @@
   }
   el.addEventListener('click', hide);
   document.body.appendChild(el);
+  tick();
   setTimeout(hide, 4000);
 })();
 </script>
