@@ -2,24 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=1"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
   body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
-  header { padding:1rem 1rem 0.5rem; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:10; }
+  header { padding:max(0.9rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.3rem max(1rem, env(safe-area-inset-left)); background:var(--bg); }
   h1 { margin:0 0 0.6rem 0; font-size:1.35rem; }
-  .tabs { display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.6rem; }
-  .tabs a.tab-link { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.9rem; border-radius:999px; font-size:0.9rem; text-decoration:none; }
-  .tabs button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.9rem; border-radius:999px; cursor:pointer; font-size:0.9rem; }
-  .tabs button.active { background:var(--accent); border-color:var(--accent); color:white; }
+  .hdr-inner, .ref-inner { max-width:800px; margin:0 auto; }
+  #ref-controls { position:sticky; top:0; z-index:10; background:var(--bg); border-bottom:1px solid var(--border); padding:0.4rem max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left)); }
+  #ref-controls.hidden { display:none; }
+  body.no-ref header { border-bottom:1px solid var(--border); }
+
+  /* ---- Bottom tab bar (phone-app style) ---- */
+  .bottom-tabs { position:fixed; left:0; right:0; bottom:0; z-index:50; background:rgba(15,20,25,0.94); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); border-top:1px solid var(--border); padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .bottom-tabs .bt-inner { display:flex; max-width:560px; margin:0 auto; }
+  .bottom-tabs .bt { flex:1; min-height:58px; min-width:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:6px 2px 5px; background:none; border:none; color:var(--muted); font:inherit; font-size:0.7rem; font-weight:600; letter-spacing:0.01em; text-decoration:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .bottom-tabs .bt .ic { display:flex; align-items:center; justify-content:center; width:56px; height:30px; border-radius:999px; transition:background .15s, color .15s; }
+  .bottom-tabs .bt svg { width:24px; height:24px; }
+  .bottom-tabs .bt.active { color:var(--accent); }
+  .bottom-tabs .bt.active .ic { background:rgba(29,155,240,0.18); }
+  .bottom-tabs .bt:focus-visible { outline:2px solid var(--accent); outline-offset:-4px; border-radius:12px; }
+  body.kb-open .bottom-tabs { display:none; }
+
+  /* ---- Quiz chooser ---- */
+  .qc-title { font-size:1.15rem; margin:0.2rem 0 0.2rem; }
+  .qc-sub { color:var(--muted); font-size:0.9rem; margin:0 0 1rem; }
+  .quiz-option { display:flex; align-items:center; gap:0.9rem; width:100%; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.1rem 1rem; margin-bottom:0.8rem; color:var(--text); font:inherit; cursor:pointer; min-height:84px; -webkit-tap-highlight-color:transparent; transition:border-color .15s, transform .1s; }
+  .quiz-option:hover, .quiz-option:focus-visible { border-color:var(--accent); outline:none; }
+  .quiz-option:active { transform:scale(0.985); }
+  .quiz-option .qo-ic { flex:none; width:48px; height:48px; border-radius:14px; background:rgba(29,155,240,0.15); color:var(--accent); display:flex; align-items:center; justify-content:center; }
+  .quiz-option .qo-ic svg { width:26px; height:26px; }
+  .quiz-option .qo-txt { flex:1; min-width:0; }
+  .quiz-option .qo-name { display:block; font-size:1.08rem; font-weight:700; }
+  .quiz-option .qo-desc { display:block; color:var(--muted); font-size:0.88rem; margin-top:0.1rem; }
+  .quiz-option .qo-go { flex:none; color:var(--muted); font-size:1.4rem; }
+  #quiz-mode-bar { display:flex; align-items:center; justify-content:space-between; gap:0.6rem; margin:-0.2rem 0 0.8rem; }
+  #quiz-mode-bar.hidden { display:none; }
+  #quiz-back { background:none; border:none; color:var(--accent); font:inherit; font-size:0.95rem; padding:0.6rem 0.2rem; min-height:44px; cursor:pointer; }
+  #quiz-mode-name { color:var(--muted); font-size:0.9rem; font-weight:600; }
   input[type="search"], input[type="text"] { width:100%; padding:0.7rem 1rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; margin-bottom:0.5rem; }
   .filters { display:flex; gap:0.5rem; overflow-x:auto; padding:0.4rem 0 0.6rem; }
   .filters button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.3rem 0.75rem; border-radius:999px; white-space:nowrap; cursor:pointer; font-size:0.8rem; }
   .filters button.active { background:var(--accent); border-color:var(--accent); color:white; }
-  main { padding:1rem; max-width:800px; margin:0 auto; }
+  main { padding:1rem max(1rem, env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); max-width:800px; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1rem; margin-bottom:0.8rem; }
   .card h3 { margin:0 0 0.3rem 0; font-size:1.05rem; }
   .card .extremity { color:var(--accent); font-size:0.85rem; font-weight:600; }
@@ -67,21 +95,24 @@
 <canvas id="confetti-canvas"></canvas>
 
 <header>
-  <div class="hdr-top"><h1>X-Ray Projections</h1><span id="acct-slot"></span></div>
-  <div class="tabs">
-    <button id="tab-ref" class="active">Reference</button>
-    <button id="tab-random">Random Quiz</button>
-    <button id="tab-focus">Focused Quiz</button>
-    <button id="tab-mc">Multiple Choice</button>
-    <button id="tab-progress">📊 Progress</button>
-    <a class="tab-link" id="tab-upload" href="./upload.html">📄 Upload &amp; Quiz</a>
-  </div>
-  <div id="ref-controls">
-    <input type="search" id="search" placeholder="Search projections, extremities, or CR locations..." autocomplete="off">
-    <div class="filters" id="filters"></div>
-  </div>
+  <div class="hdr-inner"><div class="hdr-top"><h1>X-Ray Projections</h1><span id="acct-slot"></span></div></div>
 </header>
+<div id="ref-controls"><div class="ref-inner">
+  <input type="search" id="search" placeholder="Search projections, extremities, or CR locations..." autocomplete="off">
+  <div class="filters" id="filters"></div>
+</div></div>
 <main>
+  <div id="quiz-chooser" class="hidden">
+    <h2 class="qc-title">Choose a quiz</h2>
+    <p class="qc-sub">Pick how you want to practice.</p>
+    <button class="quiz-option" id="tab-random"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg></span><span class="qo-txt"><span class="qo-name">Random Quiz</span><span class="qo-desc">Type the CR angle and location for a random projection.</span></span><span class="qo-go">&rsaquo;</span></button>
+    <button class="quiz-option" id="tab-focus"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span><span class="qo-txt"><span class="qo-name">Focused Quiz</span><span class="qo-desc">Work through every projection for one body part.</span></span><span class="qo-go">&rsaquo;</span></button>
+    <button class="quiz-option" id="tab-mc"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></svg></span><span class="qo-txt"><span class="qo-name">Multiple Choice</span><span class="qo-desc">Pick the right answer from four options.</span></span><span class="qo-go">&rsaquo;</span></button>
+  </div>
+  <div id="quiz-mode-bar" class="hidden">
+    <button id="quiz-back" type="button">&lsaquo; Quiz types</button>
+    <span id="quiz-mode-name"></span>
+  </div>
   <div id="ref-view">
     <div class="count" id="count"></div>
     <div id="results"></div>
@@ -127,6 +158,14 @@
     <div id="progress-body"></div>
   </div>
 </main>
+<nav class="bottom-tabs" aria-label="Main">
+  <div class="bt-inner">
+    <button class="bt active" id="tab-ref" aria-current="page"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6.5A2.5 2.5 0 0 0 4 21.5v-2z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H19"/><path d="M9 7h6M9 11h4"/></svg></span>Reference</button>
+    <button class="bt" id="tab-quiz"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17.2h.01"/></svg></span>Quiz</button>
+    <button class="bt" id="tab-progress"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>Progress</button>
+    <a class="bt" id="tab-upload" href="./upload.html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6M9 14.5 12 11.5l3 3"/></svg></span>Upload</a>
+  </div>
+</nav>
 <script id="data" type="application/json">
 [
   {
@@ -1888,10 +1927,61 @@ function checkAnswer() {
   }
 }
 
+// ---- Bottom tab bar + quiz chooser (layout/navigation only) ----
+const tabQuiz = document.getElementById('tab-quiz');
+const quizChooser = document.getElementById('quiz-chooser');
+const quizModeBar = document.getElementById('quiz-mode-bar');
+const quizModeName = document.getElementById('quiz-mode-name');
+const quizBack = document.getElementById('quiz-back');
+const MODE_INFO = new Map([[tabRandom, ['Random Quiz', 'random']], [tabFocus, ['Focused Quiz', 'focus']], [tabMC, ['Multiple Choice', 'mc']]]);
+
+let refScrollY = 0;
+function setHash(h) {
+  const want = h ? '#' + h : location.pathname + location.search;
+  if ((location.hash || '') === (h ? '#' + h : '')) return;
+  try { history.replaceState(null, '', want); } catch (e) {}
+}
+
 function setActiveTab(active) {
-  [tabRef, tabRandom, tabFocus, tabMC, tabProgress].forEach(t => t.classList.remove('active'));
-  active.classList.add('active');
+  const bottom = active === tabRef ? tabRef : active === tabProgress ? tabProgress : tabQuiz;
+  [tabRef, tabQuiz, tabProgress].forEach(t => { t.classList.toggle('active', t === bottom); t.removeAttribute('aria-current'); });
+  bottom.setAttribute('aria-current', 'page');
   progressView.classList.toggle('hidden', active !== tabProgress);
+  quizChooser.classList.toggle('hidden', active !== tabQuiz);
+  const info = MODE_INFO.get(active);
+  quizModeBar.classList.toggle('hidden', !info);
+  if (info) quizModeName.textContent = info[0];
+  const wasRef = !document.body.classList.contains('no-ref');
+  if (wasRef && active !== tabRef) refScrollY = window.scrollY;
+  document.body.classList.toggle('no-ref', active !== tabRef);
+  setHash(active === tabRef ? '' : active === tabProgress ? 'progress' : active === tabQuiz ? 'quiz' : info[1]);
+  if (active === tabRef) { if (!wasRef) { const y = refScrollY; requestAnimationFrame(() => window.scrollTo(0, y)); } }
+  else window.scrollTo(0, 0);
+}
+
+function showQuizChooser() {
+  setActiveTab(tabQuiz);
+  refView.classList.add('hidden');
+  quizView.classList.add('hidden');
+  mcView.classList.add('hidden');
+  refControls.classList.add('hidden');
+  focusControls.classList.add('hidden');
+}
+tabQuiz.onclick = showQuizChooser;
+quizBack.onclick = showQuizChooser;
+
+// Hide the tab bar only while an on-screen keyboard is actually open (so it doesn't ride above it on Android).
+if (window.visualViewport) {
+  let vvW = visualViewport.width, vvMaxH = visualViewport.height;
+  const isTyping = () => { const a = document.activeElement; return !!(a && a.matches && a.matches('input, select, textarea')); };
+  const kbCheck = () => {
+    const vv = window.visualViewport;
+    if (Math.abs(vv.width - vvW) > 40) { vvW = vv.width; vvMaxH = vv.height; }
+    vvMaxH = Math.max(vvMaxH, vv.height);
+    document.body.classList.toggle('kb-open', isTyping() && vv.height < vvMaxH - 150);
+  };
+  visualViewport.addEventListener('resize', kbCheck);
+  document.addEventListener('focusout', () => setTimeout(kbCheck, 60));
 }
 
 tabRef.onclick = () => {
@@ -2078,10 +2168,20 @@ function showProgressTab() {
 window.showProgressTab = showProgressTab;
 tabProgress.onclick = showProgressTab;
 if (window.XRS) XRS.on(() => { if (tabProgress.classList.contains('active')) { lastProgress = null; renderProgress(); } });
-if (location.hash === '#progress') showProgressTab();
+function routeFromHash() {
+  const h = (location.hash || '').slice(1).toLowerCase();
+  if (h === 'progress') showProgressTab();
+  else if (h === 'quiz') showQuizChooser();
+  else if (h === 'random') tabRandom.onclick();
+  else if (h === 'focus' || h === 'focused') tabFocus.onclick();
+  else if (h === 'mc' || h === 'multiple-choice') tabMC.onclick();
+  else if (h === 'reference' || h === 'ref') tabRef.onclick();
+}
+window.addEventListener('hashchange', routeFromHash);
 
 renderFilters();
 render();
+routeFromHash();
 
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('show-answer')) {
