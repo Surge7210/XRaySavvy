@@ -175,19 +175,6 @@
     '<div class="sp-skip">Tap to skip</div>';
   var load = document.createElement('div'); load.className = 'sp-load';
   load.innerHTML = '<div class="sp-track"><div class="sp-bar"></div></div><div class="sp-pct">Loading\u2026 0%</div>';
-  // Founding 100 line: signed-out only, only while spots remain; never waits on the network.
-  var signedOut = !(window.XRS && XRS.user);
-  var cached = signedOut && window.XRS && XRS.foundingSpotsCached ? XRS.foundingSpotsCached() : null;
-  if (signedOut && !(cached && cached.n <= 0)) {
-    var line = document.createElement('p'); line.className = 'sp-f100';
-    var set = function (n) {
-      if (n === 0) { line.style.display = 'none'; return; }
-      line.textContent = '\u{1F396}\uFE0F First 100 to sign up get free lifetime Pro' + (typeof n === 'number' ? ' \u2014 ' + n + (n === 1 ? ' spot' : ' spots') + ' left' : '');
-    };
-    set(cached ? cached.n : null);
-    el.querySelector('.sp-in').appendChild(line);
-    if (window.XRS && XRS.foundingSpots) XRS.foundingSpots().then(function (n) { if (n !== null && el.parentNode) set(n); });
-  }
   el.querySelector('.sp-in').appendChild(load);
   var pct = load.querySelector('.sp-pct'), t0 = Date.now();
   function tick() {
