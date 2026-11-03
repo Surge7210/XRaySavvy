@@ -13,7 +13,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="XRaySavvy: a shared radiography study deck">
 <meta name="twitter:description" content="Study this deck free: section summaries, key points and quizzes (Learn &amp; Exam Cram). No account needed.">
-<script src="./auth.js?v=5"></script>
+<script src="./auth.js?v=6"></script>
 <style>
 :root{--bg:#0f1419;--card:#1a2332;--text:#e7e9ea;--muted:#8b98a5;--accent:#1d9bf0;--border:#38444d;--good:#00ba7c;--bad:#f4212e}
 *{box-sizing:border-box}
@@ -3832,7 +3832,10 @@ const SharedView = (() => {
 })();
 
 updateGenBtn();
+// upload.html#decks (from the account sheet) opens straight on My Decks; auth.js calls showMyDecks() when already here.
+window.showMyDecks = () => { exitDeckCtx(); renderDecks(); showScreen('decks'); };
 if (SHARE_PARAM != null) SharedView.open(SHARE_PARAM);
+else if (location.hash === '#decks') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } window.showMyDecks(); }
 else if (/[?&]demo=1/.test(location.search)) startDemo();
 else if (/[?&]demo=learn/.test(location.search)) startDemoLearn();
 SharedView.resumePendingSave();

@@ -260,6 +260,7 @@
     '.xrs-sheet input{width:100%;padding:0.7rem 0.9rem;border-radius:10px;border:1px solid var(--border,#38444d);background:var(--bg,#0f1419);color:var(--text,#e7e9ea);font-size:16px;font-family:inherit;box-sizing:border-box}' +
     '.xrs-go{width:100%;margin-top:0.9rem;padding:0.75rem;border:none;border-radius:10px;background:var(--accent,#1d9bf0);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit}' +
     '.xrs-go.sec{background:#38444d}.xrs-go:disabled{opacity:.6}' +
+    '.xrs-go.alt{background:transparent;color:var(--accent,#1d9bf0);border:1px solid var(--accent,#1d9bf0)}' +
     '.xrs-link{background:none;border:none;color:var(--accent,#1d9bf0);cursor:pointer;font-size:0.9rem;padding:0.5rem 0;font-family:inherit}' +
     '.xrs-msg{margin-top:0.7rem;padding:0.6rem 0.8rem;border-radius:8px;font-size:0.9rem}.xrs-msg.err{background:#3d1a1c;color:#ff8a92}.xrs-msg.ok{background:#0d3d2e;color:#00ba7c}' +
     '.xrs-note{color:var(--muted,#8b98a5);font-size:0.8rem;margin-top:0.8rem}' +
@@ -316,6 +317,13 @@
     return m;
   }
 
+  // My Decks: decks live in this browser's localStorage (synced in when logged in), so the count is cheap.
+  function deckCount() { try { var v = JSON.parse(localStorage.getItem('xraysavvy.decks.v1') || '[]'); return Array.isArray(v) ? v.length : 0; } catch (e) { return 0; } }
+  function openMyDecks() {
+    closeSheet();
+    if (window.showMyDecks) window.showMyDecks(); // only upload.html defines it
+    else location.href = './upload.html#decks';
+  }
   function notice(title, text, ok, offerReset) { openSheet('notice', { title: title, text: text, ok: ok, offerReset: offerReset }); }
   function openSheet(view, opts) {
     addCss(); closeSheet();
@@ -388,6 +396,8 @@
       sheet.appendChild(form);
       if (view === 'login') sheet.appendChild(h('button', { class: 'xrs-link', id: 'xrs-forgot', onclick: function () { openSheet('forgot'); }, text: 'Forgot password?' }));
       sheet.appendChild(h('div', { class: 'xrs-note', text: 'Optional: log in to sync your decks across devices and track your progress. ' + PRIVACY }));
+      var dcOut = deckCount();
+      if (dcOut) sheet.appendChild(h('div', { style: 'text-align:center' }, [h('button', { class: 'xrs-link', id: 'xrs-mydecks', onclick: openMyDecks, text: '📚 My Decks on this device (' + dcOut + ')' })]));
       setTimeout(function () { (name || email).focus(); }, 50);
     } else if (view === 'forgot') {
       var em2 = h('input', { type: 'email', id: 'xrs-email', autocomplete: 'email', inputmode: 'email', autocapitalize: 'off' });
@@ -424,6 +434,8 @@
       sheet.appendChild(h('div', { class: 'xrs-note', text: 'Your decks sync to this account and every answer counts toward your 📊 Progress.' }));
       var onIndex = /index\.html$|\/$/.test(location.pathname);
       sheet.appendChild(h('button', { class: 'xrs-go', onclick: function () { closeSheet(); if (onIndex && window.showProgressTab) window.showProgressTab(); else location.href = './index.html#progress'; }, text: '📊 See my progress' }));
+      var dc = deckCount();
+      sheet.appendChild(h('button', { class: 'xrs-go alt', id: 'xrs-mydecks', onclick: openMyDecks, text: '📚 My Decks' + (dc ? ' (' + dc + ')' : '') }));
       var out = h('button', { class: 'xrs-go sec', id: 'xrs-logout', text: 'Log out' });
       out.onclick = async function () {
         out.disabled = true;
