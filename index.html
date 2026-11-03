@@ -39,6 +39,51 @@
   .quiz-option .qo-name { display:block; font-size:1.08rem; font-weight:700; }
   .quiz-option .qo-desc { display:block; color:var(--muted); font-size:0.88rem; margin-top:0.1rem; }
   .quiz-option .qo-go { flex:none; color:var(--muted); font-size:1.4rem; }
+  /* ---- Focused Quiz: multi body-part picker, progress panel, summary ---- */
+  .fp-head { font-size:1.1rem; margin:0 0 0.15rem; }
+  .fp-hint { color:var(--muted); font-size:0.88rem; margin:0 0 0.8rem; }
+  .fp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:0.5rem; }
+  .fp-chip { position:relative; display:flex; align-items:center; gap:0.55rem; min-height:48px; padding:0.5rem 0.7rem; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); font:inherit; font-size:0.92rem; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .fp-chip .fp-num { flex:none; width:26px; height:26px; border-radius:50%; border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; color:transparent; }
+  .fp-chip .fp-name { flex:1; min-width:0; line-height:1.2; }
+  .fp-chip .fp-cnt { flex:none; color:var(--muted); font-size:0.75rem; }
+  .fp-chip.sel { border-color:var(--accent); background:rgba(29,155,240,0.12); }
+  .fp-chip.sel .fp-num { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .fp-bar { position:sticky; bottom:calc(66px + env(safe-area-inset-bottom)); margin-top:0.9rem; background:rgba(26,35,50,0.97); border:1px solid var(--border); border-radius:14px; padding:0.6rem 0.7rem; display:flex; align-items:center; gap:0.5rem; box-shadow:0 -6px 18px rgba(0,0,0,0.35); z-index:5; }
+  .fp-sum { flex:1; min-width:0; font-size:0.85rem; color:var(--muted); line-height:1.25; }
+  .fp-sum strong { color:var(--text); }
+  .fp-bar button, .fd-actions button { min-height:44px; border:none; border-radius:10px; padding:0 1rem; font:inherit; font-size:0.95rem; font-weight:600; cursor:pointer; }
+  .fp-bar button:disabled { opacity:0.4; cursor:default; }
+  .fp-order { font-size:0.82rem; color:var(--muted); margin:0.7rem 0 0; }
+  #focus-panel { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:0.65rem 0.8rem; margin-bottom:0.7rem; }
+  #focus-panel.hidden { display:none; }
+  .fpn-top { display:flex; align-items:center; gap:0.6rem; }
+  .fpn-txt { flex:1; min-width:0; font-size:0.86rem; line-height:1.3; }
+  .fpn-txt .cur { font-weight:700; color:var(--text); }
+  .fpn-txt .ov { color:var(--muted); }
+  #fpn-toggle { flex:none; min-height:44px; padding:0 0.8rem; border-radius:999px; border:1px solid var(--border); background:var(--bg); color:var(--accent); font:inherit; font-size:0.85rem; font-weight:600; cursor:pointer; }
+  .fpn-meter { height:7px; background:var(--bg); border:1px solid var(--border); border-radius:999px; overflow:hidden; margin-top:0.45rem; }
+  .fpn-meter > div { height:100%; background:var(--accent); border-radius:999px; transition:width .25s; }
+  #fpn-list { margin-top:0.6rem; border-top:1px solid var(--border); padding-top:0.4rem; }
+  #fpn-list.hidden { display:none; }
+  .fpn-row { display:flex; align-items:center; gap:0.55rem; padding:0.35rem 0; font-size:0.88rem; }
+  .fpn-row .n { flex:none; width:22px; height:22px; border-radius:50%; background:var(--bg); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:700; color:var(--muted); }
+  .fpn-row .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fpn-row .ct { flex:none; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .fpn-row .st { flex:none; min-width:74px; text-align:center; font-size:0.72rem; font-weight:700; border-radius:999px; padding:0.15rem 0.5rem; }
+  .fpn-row.done .st { background:#0d3d2e; color:var(--good); }
+  .fpn-row.done .n { background:var(--good); border-color:var(--good); color:#fff; }
+  .fpn-row.cur .st { background:rgba(29,155,240,0.18); color:var(--accent); }
+  .fpn-row.cur .n { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .fpn-row.cur .nm { font-weight:700; }
+  .fpn-row.next .st { background:var(--bg); color:var(--muted); }
+  #fpn-new { background:none; border:none; color:var(--accent); font:inherit; font-size:0.85rem; padding:0.5rem 0 0.1rem; min-height:44px; cursor:pointer; }
+  #focus-done.hidden, #focus-quiz.hidden { display:none; }
+  .fd-title { font-size:1.25rem; margin:0 0 0.2rem; }
+  .fd-score { color:var(--muted); margin:0 0 0.9rem; }
+  .fd-score strong { color:var(--text); font-size:1.1rem; }
+  .fd-actions { display:flex; gap:0.6rem; margin-top:1rem; flex-wrap:wrap; }
+  .fd-actions button { flex:1; min-width:140px; padding:0 0.6rem; }
   #quiz-mode-bar { display:flex; align-items:center; justify-content:space-between; gap:0.6rem; margin:-0.2rem 0 0.8rem; }
   #quiz-mode-bar.hidden { display:none; }
   #quiz-back { background:none; border:none; color:var(--accent); font:inherit; font-size:0.95rem; padding:0.6rem 0.2rem; min-height:44px; cursor:pointer; }
@@ -106,7 +151,7 @@
     <h2 class="qc-title">Choose a quiz</h2>
     <p class="qc-sub">Pick how you want to practice.</p>
     <button class="quiz-option" id="tab-random"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg></span><span class="qo-txt"><span class="qo-name">Random Quiz</span><span class="qo-desc">Type the CR angle and location for a random projection.</span></span><span class="qo-go">&rsaquo;</span></button>
-    <button class="quiz-option" id="tab-focus"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span><span class="qo-txt"><span class="qo-name">Focused Quiz</span><span class="qo-desc">Work through every projection for one body part.</span></span><span class="qo-go">&rsaquo;</span></button>
+    <button class="quiz-option" id="tab-focus"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span><span class="qo-txt"><span class="qo-name">Focused Quiz</span><span class="qo-desc">Pick one or more body parts and go through every projection of each, in the order you choose.</span></span><span class="qo-go">&rsaquo;</span></button>
     <button class="quiz-option" id="tab-mc"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></svg></span><span class="qo-txt"><span class="qo-name">Multiple Choice</span><span class="qo-desc">Pick the right answer from four options.</span></span><span class="qo-go">&rsaquo;</span></button>
   </div>
   <div id="quiz-mode-bar" class="hidden">
@@ -119,9 +164,34 @@
   </div>
   <div id="quiz-view" class="hidden">
     <div id="focus-controls" class="hidden" style="margin-bottom:1rem;">
-      <label class="quiz-label">Choose extremity</label>
-      <select id="focus-select" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem;">
-      </select>
+      <h2 class="fp-head">Pick body parts</h2>
+      <p class="fp-hint">Tap them in the order you want to study. Tap again to remove.</p>
+      <div class="fp-grid" id="fp-grid"></div>
+      <div class="fp-bar">
+        <div class="fp-sum" id="fp-sum">Nothing picked yet</div>
+        <button class="btn-secondary" id="fp-clear" type="button">Clear</button>
+        <button class="btn-primary" id="fp-start" type="button" disabled>Start</button>
+      </div>
+    </div>
+    <div id="focus-done" class="hidden">
+      <div class="quiz-box">
+        <h2 class="fd-title">Focused Quiz complete 🎉</h2>
+        <p class="fd-score" id="fd-score"></p>
+        <div id="fd-list"></div>
+        <div class="fd-actions">
+          <button class="btn-primary" id="fd-again" type="button">Quiz again</button>
+          <button class="btn-secondary" id="fd-new" type="button">Pick new body parts</button>
+        </div>
+      </div>
+    </div>
+    <div id="focus-quiz">
+    <div id="focus-panel" class="hidden">
+      <div class="fpn-top">
+        <div class="fpn-txt"><div class="cur" id="fpn-cur"></div><div class="ov" id="fpn-ov"></div></div>
+        <button id="fpn-toggle" type="button" aria-expanded="false" aria-controls="fpn-list">Progress ▾</button>
+      </div>
+      <div class="fpn-meter"><div id="fpn-meter" style="width:0%"></div></div>
+      <div id="fpn-list" class="hidden"><div id="fpn-rows"></div><button id="fpn-new" type="button">Change body parts</button></div>
     </div>
     <div class="quiz-box">
       <div class="quiz-question" id="quiz-question">Loading quiz...</div>
@@ -140,6 +210,7 @@
       </div>
       <div id="progress" style="margin-top:0.8rem; color:var(--muted); font-size:0.9rem;"></div>
       <div id="quiz-feedback"></div>
+    </div>
     </div>
   </div>
 
@@ -1044,7 +1115,6 @@ const tabRef = document.getElementById('tab-ref');
 const tabRandom = document.getElementById('tab-random');
 const tabFocus = document.getElementById('tab-focus');
 const focusControls = document.getElementById('focus-controls');
-const focusSelect = document.getElementById('focus-select');
 const progressEl = document.getElementById('progress');
 const restartBtn = document.getElementById('restart-btn');
 const tabMC = document.getElementById('tab-mc');
@@ -1117,13 +1187,13 @@ let quizMode = 'random';
 let focusQueue = [];
 let focusIndex = 0;
 let focusCorrect = 0;
+let focusPicked = [];   // ordered list of picked body parts (extremity names)
+let focusGroups = [];   // [{ label, items, done, correct }] in the order picked
+let focusShownIdx = 0;    // index in focusQueue of the question on screen
+let focusCountedSerial = -1; // count each focused question once, even if Check is pressed twice
 
 let weakPool = null; // "Quiz my weak spots" (from the Progress tab)
 function getQuizPool() {
-  if (quizMode === 'focus' && focusSelect.value === '__weak__' && weakPool && weakPool.length) return weakPool;
-  if (quizMode === 'focus' && focusSelect.value) {
-    return data.filter(p => p.extremity === focusSelect.value);
-  }
   return data;
 }
 
@@ -1670,11 +1740,15 @@ function shuffle(arr) {
   return a;
 }
 
+// Build the queue: every projection of body part #1 (shuffled, as before), then all of #2, and so on.
 function resetFocusProgress() {
-  const pool = getQuizPool();
-  focusQueue = shuffle(pool);
+  focusGroups.forEach(g => { g.items = shuffle(g.items); g.done = 0; g.correct = 0; });
+  focusQueue = [];
+  focusGroups.forEach((g, gi) => g.items.forEach((p, pos) => focusQueue.push({ p, gi, pos })));
+  focusShownIdx = 0;
   focusIndex = 0;
   focusCorrect = 0;
+  focusCountedSerial = -1;
   updateProgressDisplay();
 }
 
@@ -1684,14 +1758,9 @@ function updateProgressDisplay() {
     restartBtn.style.display = 'none';
     return;
   }
-  const total = focusQueue.length;
-  if (focusIndex >= total && total > 0) {
-    progressEl.innerHTML = '<strong>Final score: ' + focusCorrect + ' out of ' + total + '</strong>';
-    restartBtn.style.display = 'inline-block';
-  } else {
-    progressEl.textContent = focusCorrect + ' out of ' + total;
-    restartBtn.style.display = 'none';
-  }
+  restartBtn.style.display = 'none';
+  progressEl.textContent = focusCorrect + ' correct so far';
+  renderFocusPanel();
 }
 
 function hasRotation(p) {
@@ -1702,11 +1771,13 @@ function hasRotation(p) {
 function loadQuiz() {
   if (quizMode === 'focus') {
     if (focusIndex >= focusQueue.length) {
-      quizQuestionEl.textContent = 'You have finished all projections for this extremity.';
-      updateProgressDisplay();
+      showFocusDone();
       return;
     }
-    currentQuiz = focusQueue[focusIndex];
+    currentQuiz = focusQueue[focusIndex].p;
+    focusShownIdx = focusIndex;
+    renderFocusPanel();
+    nextBtn.textContent = 'Next Question';
   } else {
     const pool = getQuizPool();
     if (pool.length === 0) {
@@ -1909,13 +1980,16 @@ function checkAnswer() {
     const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
     const hasRot = hasRotation(currentQuiz);
     const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
-    if (degreeOk && locOk && rotOk) {
-      focusCorrect++;
-      launchConfetti();
-    } else {
-      wrongAnswerEffect();
+    const allOk = degreeOk && locOk && rotOk;
+    if (allOk) launchConfetti(); else wrongAnswerEffect();
+    if (focusCountedSerial !== quizSerial && focusIndex < focusQueue.length) {
+      focusCountedSerial = quizSerial;
+      const g = focusGroups[focusQueue[focusIndex].gi];
+      g.done++;
+      if (allOk) { g.correct++; focusCorrect++; }
+      focusIndex++;
+      if (focusIndex >= focusQueue.length) nextBtn.textContent = 'See results';
     }
-    focusIndex++;
     updateProgressDisplay();
   } else if (currentQuiz) {
     // Random Quiz confetti
@@ -1947,6 +2021,7 @@ function setActiveTab(active) {
   [tabRef, tabQuiz, tabProgress].forEach(t => { t.classList.toggle('active', t === bottom); t.removeAttribute('aria-current'); });
   bottom.setAttribute('aria-current', 'page');
   progressView.classList.toggle('hidden', active !== tabProgress);
+  setFocusStage(null);
   quizChooser.classList.toggle('hidden', active !== tabQuiz);
   const info = MODE_INFO.get(active);
   quizModeBar.classList.toggle('hidden', !info);
@@ -2011,17 +2086,110 @@ tabFocus.onclick = () => {
   refView.classList.add('hidden');
   mcView.classList.add('hidden');
   refControls.classList.add('hidden');
-  focusControls.classList.remove('hidden');
-  resetFocusProgress();
-  loadQuiz();
+  showFocusPicker();
 };
 
-focusSelect.onchange = () => {
-  if (quizMode === 'focus') {
-    resetFocusProgress();
-    loadQuiz();
-  }
+// ---------- Focused Quiz: pick several body parts in order ----------
+const focusQuizEl = document.getElementById('focus-quiz');
+const focusDoneEl = document.getElementById('focus-done');
+const focusPanel = document.getElementById('focus-panel');
+const fpGrid = document.getElementById('fp-grid');
+const fpSum = document.getElementById('fp-sum');
+const fpStart = document.getElementById('fp-start');
+const fpClear = document.getElementById('fp-clear');
+const fpnToggle = document.getElementById('fpn-toggle');
+const fpnList = document.getElementById('fpn-list');
+const fEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const extCount = ext => data.filter(p => p.extremity === ext).length;
+
+// stage: null (not focused mode) | 'pick' | 'quiz' | 'done'
+function setFocusStage(stage) {
+  focusControls.classList.toggle('hidden', stage !== 'pick');
+  focusDoneEl.classList.toggle('hidden', stage !== 'done');
+  focusQuizEl.classList.toggle('hidden', stage === 'pick' || stage === 'done');
+  focusPanel.classList.toggle('hidden', stage !== 'quiz');
+  if (stage !== 'quiz') nextBtn.textContent = 'Next Question';
+}
+
+function renderFocusPicker() {
+  fpGrid.innerHTML = '';
+  extremities.forEach(ext => {
+    const idx = focusPicked.indexOf(ext);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fp-chip' + (idx >= 0 ? ' sel' : '');
+    b.dataset.ext = ext;
+    b.setAttribute('aria-pressed', idx >= 0 ? 'true' : 'false');
+    b.innerHTML = `<span class="fp-num">${idx >= 0 ? idx + 1 : ''}</span><span class="fp-name">${fEsc(ext)}</span><span class="fp-cnt">${extCount(ext)}</span>`;
+    b.onclick = () => {
+      const i = focusPicked.indexOf(ext);
+      if (i >= 0) focusPicked.splice(i, 1); else focusPicked.push(ext);
+      renderFocusPicker();
+    };
+    fpGrid.appendChild(b);
+  });
+  const n = focusPicked.length;
+  const total = focusPicked.reduce((a, e) => a + extCount(e), 0);
+  fpSum.innerHTML = n ? `<strong>${n} body part${n > 1 ? 's' : ''}</strong> · ${total} projections<br>${focusPicked.map((e, i) => (i + 1) + '. ' + fEsc(e)).join(' → ')}` : 'Nothing picked yet';
+  fpStart.disabled = n === 0;
+  fpClear.disabled = n === 0;
+}
+
+function showFocusPicker() {
+  setFocusStage('pick');
+  renderFocusPicker();
+  window.scrollTo(0, 0);
+}
+
+function startFocus(groups) {
+  focusGroups = groups.map(g => ({ label: g.label, items: g.items.slice(), done: 0, correct: 0 }));
+  setFocusStage('quiz');
+  fpnList.classList.add('hidden'); fpnToggle.setAttribute('aria-expanded', 'false'); fpnToggle.textContent = 'Progress ▾';
+  resetFocusProgress();
+  loadQuiz();
+  window.scrollTo(0, 0);
+}
+
+function renderFocusPanel() {
+  if (!focusGroups.length) return;
+  const total = focusQueue.length, done = Math.min(focusIndex, total);
+  const shown = focusQueue[Math.min(focusShownIdx, total - 1)];
+  const curGi = shown ? shown.gi : -1;
+  const cur = curGi >= 0 ? focusGroups[curGi] : null;
+  document.getElementById('fpn-cur').textContent = cur
+    ? `${cur.label} · question ${shown.pos + 1} of ${cur.items.length}` + (focusGroups.length > 1 ? ` · part ${curGi + 1} of ${focusGroups.length}` : '')
+    : '';
+  document.getElementById('fpn-ov').textContent = `${done} of ${total} done · ${total - done} left`;
+  document.getElementById('fpn-meter').style.width = (total ? (done / total) * 100 : 0) + '%';
+  document.getElementById('fpn-rows').innerHTML = focusGroups.map((g, i) => {
+    const st = g.done >= g.items.length ? 'done' : i === curGi ? 'cur' : 'next';
+    const label = st === 'done' ? '✓ Finished' : st === 'cur' ? 'Current' : 'Up next';
+    return `<div class="fpn-row ${st}"><span class="n">${st === 'done' ? '✓' : i + 1}</span><span class="nm">${fEsc(g.label)}</span><span class="ct">${g.done}/${g.items.length}</span><span class="st">${label}</span></div>`;
+  }).join('');
+}
+
+function showFocusDone() {
+  setFocusStage('done');
+  const total = focusQueue.length;
+  document.getElementById('fd-score').innerHTML = `<strong>${focusCorrect} of ${total}</strong> fully correct across ${focusGroups.length} body part${focusGroups.length > 1 ? 's' : ''}`;
+  document.getElementById('fd-list').innerHTML = focusGroups.map(g => pgBar(g.label, g.items.length ? (g.correct / g.items.length) * 100 : 0, g.correct + ' of ' + g.items.length + ' correct')).join('');
+  window.scrollTo(0, 0);
+}
+
+fpStart.onclick = () => {
+  if (!focusPicked.length) return;
+  weakPool = null;
+  startFocus(focusPicked.map(ext => ({ label: ext, items: data.filter(p => p.extremity === ext) })));
 };
+fpClear.onclick = () => { focusPicked = []; renderFocusPicker(); };
+fpnToggle.onclick = () => {
+  const open = fpnList.classList.toggle('hidden') === false;
+  fpnToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  fpnToggle.textContent = open ? 'Progress ▴' : 'Progress ▾';
+};
+document.getElementById('fpn-new').onclick = showFocusPicker;
+document.getElementById('fd-again').onclick = () => startFocus(focusGroups);
+document.getElementById('fd-new').onclick = showFocusPicker;
 
 tabMC.onclick = () => {
   setActiveTab(tabMC);
@@ -2045,8 +2213,8 @@ checkBtn.onclick = checkAnswer;
 mcNextBtn.onclick = loadMC;
 
 nextBtn.onclick = () => {
-  if (quizMode === 'focus' && focusIndex < focusQueue.length) {
-    loadQuiz();
+  if (quizMode === 'focus') {
+    if (focusIndex >= focusQueue.length) showFocusDone(); else loadQuiz();
   } else if (quizMode !== 'focus') {
     loadQuiz();
   }
@@ -2054,13 +2222,6 @@ nextBtn.onclick = () => {
 quizDegreeEl.addEventListener('keydown', e => { if (e.key === 'Enter') quizLocationEl.focus(); });
 quizLocationEl.addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
 
-// Populate focused quiz dropdown
-extremities.forEach(ext => {
-  const opt = document.createElement('option');
-  opt.value = ext;
-  opt.textContent = ext;
-  focusSelect.appendChild(opt);
-});
 
 // ===================== PROGRESS TAB (optional account) =====================
 let lastProgress = null;
@@ -2147,12 +2308,8 @@ function startWeakSpots(list) {
   const keys = new Set((list || []).map(m => m.group_label + '|' + m.projection));
   weakPool = data.filter(p => keys.has(p.extremity + '|' + p.projection));
   if (!weakPool.length) { alert('No weak spots to quiz yet — keep practicing!'); return; }
-  let opt = focusSelect.querySelector('option[value="__weak__"]');
-  if (!opt) { opt = document.createElement('option'); opt.value = '__weak__'; focusSelect.insertBefore(opt, focusSelect.firstChild); }
-  opt.textContent = '⭐ My weak spots (' + weakPool.length + ')';
-  focusSelect.value = '__weak__';
   tabFocus.onclick();
-  window.scrollTo(0, 0);
+  startFocus([{ label: '⭐ My weak spots', items: weakPool }]);
 }
 
 function showProgressTab() {
