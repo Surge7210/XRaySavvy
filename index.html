@@ -152,7 +152,7 @@
 </head>
 <body>
 <script>
-/* Intro splash: ~2.5 s branded overlay, then fades. Once per browser session (sessionStorage), tap to skip,
+/* Intro splash: ~3 s branded overlay, then fades. Once per browser session (sessionStorage), tap to skip,
    respects prefers-reduced-motion, skipped for share links. It is only an overlay: the app below loads as normal. */
 (function () {
   try {
@@ -189,7 +189,7 @@
   }
   el.addEventListener('click', hide);
   document.body.appendChild(el);
-  setTimeout(hide, 2500);
+  setTimeout(hide, 3000);
 })();
 </script>
 <canvas id="confetti-canvas"></canvas>
