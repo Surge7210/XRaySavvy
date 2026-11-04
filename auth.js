@@ -162,7 +162,10 @@
     return spotsPromise;
   }
   // A small "First 100" line element; hidden when spots are known to be gone. Fills in the count when it arrives.
+  // Hidden for now at the owner's request (Nov 3, 2026). Set SHOW_FOUNDING_LINE = true to bring it back.
+  var SHOW_FOUNDING_LINE = false;
   function foundingLine(cls, id) {
+    if (!SHOW_FOUNDING_LINE) return null;
     var c = foundingSpotsCached();
     if (c && c.n <= 0) return null;
     var el = h('div', { class: cls, id: id });
