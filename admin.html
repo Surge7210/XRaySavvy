@@ -46,6 +46,23 @@
   .btn.sec { background:transparent; color:var(--accent); border:1px solid var(--border); }
   .err { color:#ff8a8a; font-size:0.85rem; margin-top:0.4rem; }
   .hidden { display:none !important; }
+  .su-head { display:flex; justify-content:space-between; align-items:center; gap:0.5rem; }
+  .su-head h2 { margin:0; }
+  .icon-btn { background:transparent; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:0.4rem 0.8rem; font-size:0.85rem; font-weight:600; cursor:pointer; min-height:36px; }
+  .icon-btn:disabled { opacity:0.5; }
+  .su-stats { grid-template-columns:repeat(2, 1fr); }
+  .su-list { list-style:none; margin:0.7rem 0 0; padding:0; }
+  .su-item { border-top:1px solid var(--border); padding:0.6rem 0; }
+  .su-item.new { background:linear-gradient(90deg, rgba(29,155,240,0.12), transparent 70%); margin:0 -1rem; padding:0.6rem 1rem; }
+  .su-top { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem 0.4rem; }
+  .su-handle { font-weight:700; word-break:break-all; }
+  .su-name { color:var(--muted); font-size:0.85rem; }
+  .su-line { color:var(--muted); font-size:0.8rem; margin-top:0.15rem; }
+  .chip { display:inline-block; font-size:0.7rem; font-weight:700; padding:0.1rem 0.45rem; border-radius:999px; border:1px solid var(--border); white-space:nowrap; }
+  .chip.new { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .chip.ok { color:var(--good); border-color:rgba(0,186,124,0.5); }
+  .chip.no { color:var(--warn); border-color:rgba(255,212,0,0.5); }
+  .chip.fm { color:#c9a7ff; border-color:rgba(201,167,255,0.5); }
 </style>
 </head>
 <body>
@@ -63,6 +80,7 @@
   </div>
   <div id="dash" class="hidden">
     <p class="sub" id="updated"></p>
+    <div id="signups"></div>
     <div id="cards"></div>
     <button class="btn sec" id="refresh" type="button">Refresh</button>
   </div>
@@ -189,11 +207,66 @@
     cards.appendChild(wk);
   }
 
+  // ---- Recent sign-ups (owner-only RPC admin_recent_signups; returns email handles only) ----
+  var CT = 'America/Chicago';
+  function ctTime(iso) { return new Date(iso).toLocaleString('en-US', { timeZone: CT, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' CT'; }
+  function ago(iso) {
+    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+    var d = Math.floor(s / 86400); return d + (d === 1 ? ' day ago' : ' days ago');
+  }
+  function chip(cls, text) { return el('span', 'chip ' + cls, text); }
+  function renderSignups(data, err) {
+    var box = $('signups'); box.textContent = '';
+    var c = el('section', 'card'), head = el('div', 'su-head');
+    head.appendChild(el('h2', '', '🆕 Recent sign-ups'));
+    var btn = el('button', 'icon-btn', '↻ Refresh'); btn.type = 'button'; btn.id = 'su-refresh';
+    btn.onclick = function () { btn.disabled = true; btn.textContent = 'Loading…'; loadSignups(); };
+    head.appendChild(btn); c.appendChild(head);
+    if (!data) { c.appendChild(el('div', 'err', err || 'Sign-ups unavailable.')); box.appendChild(c); return; }
+    c.appendChild(el('p', 'src', 'Newest first · times in Central (CT) · handles only, no full emails.'));
+    var s = el('div', 'stats su-stats');
+    [[data.accounts_total, 'Total accounts'], [data.accounts_new_24h, 'New (24 h)']].forEach(function (x) {
+      var st = el('div', 'stat'); st.appendChild(el('div', 'n', fmt(x[0]))); st.appendChild(el('div', 'l', x[1])); s.appendChild(st);
+    });
+    c.appendChild(s);
+    var list = el('ul', 'su-list'), rows = data.signups || [];
+    rows.forEach(function (u) {
+      var isNew = Date.now() - new Date(u.created_at).getTime() < 86400000;
+      var li = el('li', 'su-item' + (isNew ? ' new' : ''));
+      var top = el('div', 'su-top');
+      top.appendChild(el('span', 'su-handle', (u.handle || '?') + '@…'));
+      if (isNew) top.appendChild(chip('new', 'New'));
+      top.appendChild(u.confirmed ? chip('ok', '✓ Confirmed') : chip('no', 'Unconfirmed'));
+      if (u.founding_number != null) top.appendChild(chip('fm', 'Founding #' + u.founding_number));
+      li.appendChild(top);
+      if (u.display_name) li.appendChild(el('div', 'su-name', u.display_name));
+      li.appendChild(el('div', 'su-line', 'Joined ' + ctTime(u.created_at) + ' · ' + ago(u.created_at)));
+      var last = [u.last_sign_in_at, u.last_quiz_at].filter(Boolean).sort().pop();
+      li.appendChild(el('div', 'su-line', 'Last active ' + (last ? ago(last) : 'never') + ' · ' + fmt(u.quiz_answers) + ' quiz answer' + (u.quiz_answers === 1 ? '' : 's')));
+      list.appendChild(li);
+    });
+    if (!rows.length) list.appendChild(el('li', 'su-item', 'No accounts yet.'));
+    c.appendChild(list);
+    box.appendChild(c);
+  }
+  async function loadSignups() {
+    if (window.__USAGE_MOCK) { renderSignups(window.__USAGE_MOCK.signups, null); return; }
+    try {
+      var sb = await XRS.client();
+      var r = await sb.rpc('admin_recent_signups', { limit_n: 25 });
+      if (r.error) throw r.error;
+      renderSignups(r.data, null);
+    } catch (e) { renderSignups(null, 'Sign-ups unavailable: ' + (e.message || e)); }
+  }
+
   function show(which) { ['loading', 'private', 'dash'].forEach(function (id) { $(id).classList.toggle('hidden', id !== which); }); }
 
   // window.__USAGE_MOCK lets a test render the page without a live session.
   async function load() {
-    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); return; }
+    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); return; }
     var sb, session;
     try { sb = await XRS.client(); session = (await sb.auth.getSession()).data.session; } catch (e) { session = null; }
     if (!session || !session.user || session.user.id !== OWNER_ID) { show('private'); return; }
@@ -203,9 +276,11 @@
       .catch(function (e) { errs.worker = 'Worker counts unavailable: ' + e.message; return null; });
     var dP = sb.rpc('admin_usage').then(function (r) { if (r.error) throw r.error; return r.data; })
       .catch(function (e) { errs.db = 'Database stats unavailable: ' + (e.message || e); return null; });
+    var sP = loadSignups();
     var res = await Promise.all([wP, dP]);
     if (!res[0] && !res[1] && /private|not allowed/i.test((errs.worker || '') + (errs.db || ''))) { show('private'); return; }
     show('dash'); render(res[0], res[1], errs);
+    await sP;
   }
   $('refresh').onclick = load;
   var lastUid = XRS.user && XRS.user.id;
