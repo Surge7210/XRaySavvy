@@ -365,6 +365,7 @@ body.picbox-open{overflow:hidden}
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.13.0/mammoth.browser.min.js"></script>
+<script src="./pic-filter.js?v=1"></script>
 <script>
 // ===================== CONNECTION =====================
 // Paste your Cloudflare Worker URL here (see worker/SETUP.md). It is NOT a secret.
@@ -2512,7 +2513,7 @@ const SlidePics = (() => {
     const tx = d.transaction(['imgs', 'files'], 'readwrite');
     const imgs = tx.objectStore('imgs');
     imgs.delete(IDBKeyRange.bound(key + '|', key + '|~'));
-    items.forEach(it => imgs.put({ id: key + '|' + pad(it.n) + '|' + it.k, key, n: it.n, k: it.k, blob: it.blob, w: it.w, h: it.h, area: it.area }));
+    items.forEach(it => imgs.put({ id: key + '|' + pad(it.n) + '|' + it.k, key, n: it.n, k: it.k, blob: it.blob, w: it.w, h: it.h, area: it.area, hash: it.hash || null }));
     tx.objectStore('files').put(meta);
     await txDone(tx);
   }
@@ -2567,12 +2568,16 @@ const SlidePics = (() => {
     // nearly blank (one flat colour) => skip
     let mn = 255, mx = 0;
     for (let i = 0; i < px.length; i += 4) { const g = (px[i] + px[i + 1] + px[i + 2]) / 3; mn = Math.min(mn, g); mx = Math.max(mx, g); }
+    // Useful-picture check (pic-filter.js): drops title banners, text-only images, flat fills.
+    let chk = null;
+    try { chk = window.PicFilter ? PicFilter.check(out, tw, th, w, h) : null; } catch (e) { chk = null; }
+    if (chk && !chk.keep) { if (cur !== src && cur.width) { cur.width = 0; cur.height = 0; } out.width = 0; out.height = 0; return null; }
     const blob = await new Promise(res => out.toBlob(res, 'image/jpeg', QUALITY));
     if (cur !== src && cur.width) { cur.width = 0; cur.height = 0; }
     out.width = 0; out.height = 0;
-    return blob ? { blob, w: tw, h: th, area: w * h, sig, flat: mx - mn < 12 } : null;
+    return blob ? { blob, w: tw, h: th, area: w * h, sig, hash: chk && chk.hash, flat: mx - mn < 12 } : null;
   }
-  const tooSmall = (w, h) => Math.max(w, h) < 150 || Math.min(w, h) < 80;
+  const tooSmall = (w, h) => Math.max(w, h) < 220 || Math.min(w, h) < 120;
   const repeated = (count, total) => count >= 5 || (count >= 3 && count >= total * 0.25);
   const tick = () => new Promise(r => setTimeout(r, 0));
 
@@ -2634,7 +2639,10 @@ const SlidePics = (() => {
     return finish(out, total);
   }
   // Drop pictures that look identical across many slides/pages (copied logos), dedupe within a unit, cap per unit.
+  // With pic-filter.js: near-identical pictures (perceptual hash) are grouped across the whole deck,
+  // groups on many slides are dropped as template art, and only the first copy of the rest is kept.
   function finish(out, total) {
+    if (window.PicFilter && out.every(e => e.hash)) out = PicFilter.select(out, total);
     const sigUnits = {};
     out.forEach(e => { (sigUnits[e.sig] = sigUnits[e.sig] || new Set()).add(e.n); });
     const byUnit = {};
@@ -2646,7 +2654,7 @@ const SlidePics = (() => {
     });
     const items = [];
     Object.keys(byUnit).forEach(n => {
-      byUnit[n].sort((a, b) => b.area - a.area).slice(0, PER_UNIT).forEach((e, k) => items.push({ n: +n, k, blob: e.blob, w: e.w, h: e.h, area: e.area }));
+      byUnit[n].sort((a, b) => b.area - a.area).slice(0, PER_UNIT).forEach((e, k) => items.push({ n: +n, k, blob: e.blob, w: e.w, h: e.h, area: e.area, hash: e.hash }));
     });
     return items;
   }
@@ -2734,6 +2742,45 @@ const SlidePics = (() => {
     return null;
   }
 
+  // ---------- re-check pictures saved before the useful-picture filter ----------
+  // Pictures saved by an older version are run through pic-filter.js once (banners, text-only
+  // images, duplicates, template art removed) so existing decks clean up without a re-upload.
+  const refiltering = {};
+  function refilter(key) {
+    if (!window.PicFilter) return Promise.resolve(null);
+    if (refiltering[key]) return refiltering[key];
+    const p = (async () => {
+      const meta = await getFile(key);
+      if (!meta || !meta.done || (meta.fv || 0) >= PicFilter.VERSION) return null;
+      const rows = (await getRange(key, 0, 99999)).sort((a, b) => a.n - b.n || a.k - b.k);
+      const good = [];
+      for (const row of rows) {
+        let src = null;
+        try {
+          src = await decode(row.blob);
+          const { w, h } = dims(src);
+          const ow = row.area && w && h ? Math.round(Math.sqrt(row.area * w / h)) : w, oh = row.area && ow ? Math.round(row.area / ow) : h;
+          const c = PicFilter.check(src, w, h, ow, oh);
+          if (c.keep) good.push(Object.assign({}, row, { hash: c.hash }));
+        } catch (e) { /* unreadable: drop */ }
+        finally { try { src && src.close && src.close(); } catch (e) { } }
+        await tick();
+      }
+      let total = meta.units && meta.units.length ? Math.max.apply(null, meta.units) : 0;
+      rows.forEach(r => { total = Math.max(total, r.n); });
+      const kept = PicFilter.select(good, total), byUnit = {};
+      kept.forEach(r => { (byUnit[r.n] = byUnit[r.n] || []).push(r); });
+      const items = [];
+      Object.keys(byUnit).forEach(n => byUnit[n].forEach((r, k) => items.push({ n: +n, k, blob: r.blob, w: r.w, h: r.h, area: r.area, hash: r.hash })));
+      const units = Object.keys(byUnit).map(Number).sort((a, b) => a - b);
+      const next = Object.assign({}, meta, { count: items.length, units, fv: PicFilter.VERSION });
+      await saveAll(key, next, items);
+      return next;
+    })().catch(e => { console.warn('pictures: re-check skipped', e); return null; });
+    refiltering[key] = p;
+    return p;
+  }
+
   // ---------- run after a file is read ----------
   let runToken = 0;
   function start(file, kind, x) {
@@ -2744,7 +2791,8 @@ const SlidePics = (() => {
     const info = $('fileInfo');
     const show = t => { status.textContent = t; if (t && !status.isConnected && info && extracted === x) info.append(status); };
     const p = (async () => {
-      const have = await getFile(key);
+      let have = await getFile(key);
+      if (have && have.done) have = (await refilter(key)) || have;
       if (have && have.done) { await attach(key, x, have.units); if (have.count) show('🖼️ ' + have.count + ' picture' + (have.count === 1 ? '' : 's') + ' from this file will show in Learn summaries.'); return have; }
       await db();   // throws if IndexedDB is unavailable -> feature quietly off
       show('🖼️ Finding pictures…');
@@ -2754,7 +2802,7 @@ const SlidePics = (() => {
       const items = kind === 'pptx' ? await fromPptx(buf, progress, alive) : await fromPdf(buf, progress, alive);
       if (!items) return null;   // a newer file was picked
       const units = Array.from(new Set(items.map(i => i.n))).sort((a, b) => a - b);
-      const meta = { key, fileName: file.name, kind, count: items.length, units, createdAt: Date.now(), done: true };
+      const meta = { key, fileName: file.name, kind, count: items.length, units, createdAt: Date.now(), done: true, fv: window.PicFilter ? PicFilter.VERSION : 0 };
       await saveAll(key, meta, items);
       try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
       await attach(key, x, units);
@@ -2806,6 +2854,7 @@ const SlidePics = (() => {
     const pics = deck && deck.pics, r = deck && deck.learn && sectionUnits(deck, i);
     if (!pics || !pics.key || !r) return;
     await (pending[pics.key] || null);   // also lets the caller attach the slot first
+    await refilter(pics.key);
     let rows = [];
     try { rows = await getRange(pics.key, r[0], r[1]); } catch (e) { rows = []; }
     if (!slot.isConnected) return;
@@ -2846,7 +2895,7 @@ const SlidePics = (() => {
       for (const f of files) if (!used.has(f.key) && Date.now() - (f.createdAt || 0) > 864e5) await removeKey(f.key);
     } catch (e) { }
   }
-  return { start, slotFor, gc, keyFor, _pending: pending };
+  return { start, slotFor, gc, keyFor, _pending: pending, _refilter: refilter, _getRange: getRange, _getFile: getFile };
 })();
 
 // Simple full-screen picture viewer.
