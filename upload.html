@@ -44,6 +44,9 @@ main{max-width:800px;margin:0 auto;padding:1rem}
 .shr-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:flex-end;justify-content:center}
 .shr-sheet{background:var(--card);color:var(--text);width:100%;max-width:480px;border-radius:16px 16px 0 0;border:1px solid var(--border);padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
 @media(min-width:600px){.shr-ov{align-items:center}.shr-sheet{border-radius:16px}}
+.cr-sum{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:0.7rem 0.8rem;margin:0.3rem 0 0.4rem}
+.cr-sum b{color:var(--text)}
+.cr-link{background:none;border:none;color:var(--muted);font-family:inherit;font-size:0.9rem;cursor:pointer;width:100%;min-height:44px;margin-top:0.3rem;text-decoration:underline}
 .shr-top{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;margin-bottom:0.4rem}
 .shr-top h2{margin:0;font-size:1.15rem}
 .shr-x{background:none;border:none;color:var(--muted);font-size:1.6rem;cursor:pointer;line-height:1;padding:0.2rem 0.5rem;min-height:44px;min-width:44px}
@@ -895,6 +898,11 @@ const DeckStore = (() => {
       else { q.stats.wrong++; q.stats.lastMissed = new Date().toISOString(); if (!d.missed.includes(qid)) d.missed.push(qid); }
       touch(d); writeAll(all);
     },
+    // Exam Cram auto-save copy kept on the deck itself (synced with the deck; no updatedAt change, so list order stays put).
+    setCramSession(id, sess) {
+      const all = readAll(); const d = all.find(x => x.id === id); if (!d || d.demo) return;
+      d.cramSession = sess; touch(d); writeAll(all);
+    },
     async recordAttempt(id, score, total, mode) {
       const all = readAll(); const d = all.find(x => x.id === id); if (!d) return;
       d.attempts.push({ date: new Date().toISOString(), score, total, mode });
@@ -1690,16 +1698,157 @@ function gradeShort(user, answer) {
 // ===================== QUIZ =====================
 let quiz = null; // {deck, items, i, score, missed:[], answered, mode}
 
+// ---- Exam Cram auto-save / resume ----
+// After every answered question the session (question order, next question, score, answers, missed list)
+// is saved to localStorage `xraysavvy.cram.<deckId>` (shared links: `xraysavvy.cram.share_<shareId>`).
+// For the student's own decks a copy also goes on the deck (deck.cramSession), so it syncs to their account
+// with the deck (DeckSync, debounced, offline-safe) and resumes on another device. Shared decks only ever
+// save on this device. Newest copy wins; finishing or "Start over" leaves a small 'cleared' marker.
+const CramSave = (() => {
+  const PRE = 'xraysavvy.cram.', MAX_AGE = 30 * 86400000;
+  let deckTimer = null, pendingDeck = null, offered = false;
+  const ms = t => { const n = Date.parse(t || ''); return isNaN(n) ? 0 : n; };
+  const owned = deck => !deck.shared && !deck.unsaved && !deck.demo;
+  function eligible(deck, opts) {
+    if (!deck || deck.demo || (opts && opts.onComplete)) return false;
+    if (deck.shared) return !!deck.shareId && (deck.mode !== 'learn' || !!(opts && opts.cram));
+    return deck.mode !== 'learn' && !deck.unsaved;
+  }
+  const keyFor = deck => PRE + (deck.shared ? 'share_' + deck.shareId : deck.id);
+  function valid(s) {
+    return s && typeof s === 'object' && !s.cleared && Array.isArray(s.order) && s.order.length && Number.isInteger(s.i) && s.i > 0 &&
+      typeof s.score === 'number' && Array.isArray(s.missed) && Date.now() - ms(s.updatedAt) < MAX_AGE;
+  }
+  function readLocal(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; } }
+  // Saved session for this deck (or null). Picks the newer of this device's copy and the synced deck copy.
+  function load(deck) {
+    const key = keyFor(deck), loc = readLocal(key);
+    let best = loc;
+    if (owned(deck)) {
+      const acct = deck.cramSession;
+      if (acct && typeof acct === 'object' && ms(acct.updatedAt) > ms(loc && loc.updatedAt)) best = acct;
+    }
+    if (!valid(best)) { if (loc && !valid(loc)) { try { localStorage.removeItem(key); } catch (e) {} } return null; }
+    return best;
+  }
+  function snapshot() {
+    const q = quiz, next = q.i + (q.answered ? 1 : 0);
+    const vals = Object.values(q.answers || {});
+    return { v: 1, deckId: q.deck.shared ? null : q.deck.id, shareId: q.deck.shared ? q.deck.shareId : null, deckName: q.deck.name,
+      mode: q.mode, label: q.opts.label || null, cram: !!q.opts.cram, order: q.items.map(x => x.id), i: next, total: q.items.length,
+      score: q.score, correct: q.score, wrong: Math.max(0, next - q.score), close: vals.filter(v => v === 'close').length,
+      missed: q.missed.slice(), answers: q.answers || {}, startedAt: q.startedAt, updatedAt: new Date().toISOString() };
+  }
+  function writeDeck(id, sess, now) {
+    pendingDeck = { id, sess }; clearTimeout(deckTimer);
+    const go = () => { deckTimer = null; const p = pendingDeck; pendingDeck = null; if (p) try { DeckStore.setCramSession(p.id, p.sess); } catch (e) {} };
+    if (now) go(); else deckTimer = setTimeout(go, 1200);
+  }
+  // Called after every answer (and on leaving the page). Device copy right away; account copy debounced.
+  function save(now) {
+    if (!quiz || !quiz.saveKey || quiz.round > 1) return;
+    const answered = quiz.i + (quiz.answered ? 1 : 0);
+    if (!answered) return;
+    const s = snapshot();
+    try { localStorage.setItem(quiz.saveKey, JSON.stringify(s)); } catch (e) { /* storage full: keep going */ }
+    if (owned(quiz.deck)) writeDeck(quiz.deck.id, s, now);
+  }
+  function flush() { if (pendingDeck) { clearTimeout(deckTimer); const p = pendingDeck; pendingDeck = null; try { DeckStore.setCramSession(p.id, p.sess); } catch (e) {} } }
+  function clear(deck) {
+    try { localStorage.removeItem(keyFor(deck)); } catch (e) {}
+    if (owned(deck)) {
+      if (pendingDeck && pendingDeck.id === deck.id) { clearTimeout(deckTimer); pendingDeck = null; }
+      const mark = { cleared: true, updatedAt: new Date().toISOString() };
+      deck.cramSession = mark;
+      try { DeckStore.setCramSession(deck.id, mark); } catch (e) {}
+    }
+  }
+  const ago = t => { const m = Math.round((Date.now() - ms(t)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' day' + (m < 2880 ? '' : 's') + ' ago'; };
+  let ov = null;
+  function close() { if (ov) { ov.remove(); ov = null; } }
+  // The choice sheet. startOver() runs the quiz the student originally asked for, from scratch.
+  function prompt(deck, s, startOver, notNow) {
+    close();
+    const n = Math.min(s.i + 1, s.order.length), tot = s.order.length, wrong = Math.max(0, s.i - s.score);
+    ov = el('div', { class: 'shr-ov', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Resume Exam Cram', id: 'cramResume' });
+    const box = el('div', { class: 'shr-sheet' });
+    box.append(el('div', { class: 'shr-top' }, el('h2', null, '⚡ Unfinished Exam Cram'), el('button', { class: 'shr-x', 'aria-label': 'Close', onclick: () => { close(); if (notNow) notNow(); } }, '×')));
+    const done = s.i >= tot;
+    box.append(el('div', { class: 'cr-sum', id: 'cramResumeSum' },
+      el('div', { style: 'font-weight:600' }, s.label || deck.name),
+      el('div', { class: 'muted', style: 'margin-top:0.25rem' }, done ? 'All ' + tot + ' questions answered — just the summary left.' : 'You answered ' + s.i + ' of ' + tot + ' questions.'),
+      el('div', { class: 'muted' }, 'Score so far: ', el('b', null, s.score + ' correct'), ' · ' + wrong + ' missed'),
+      el('div', { class: 'muted small', style: 'margin-top:0.2rem' }, 'Auto-saved ' + ago(s.updatedAt))));
+    box.append(el('button', { class: 'btn btn-primary btn-block', id: 'cramResumeBtn', onclick: () => { close(); resumeQuiz(deck, s); } },
+      done ? '▶ See my results' : '▶ Resume where you left off (Question ' + n + ' of ' + tot + ')'));
+    box.append(el('button', { class: 'btn btn-secondary btn-block', id: 'cramStartOverBtn', onclick: () => {
+      if (s.i >= 5 && !confirm('Start over? Your saved progress (' + s.i + ' answered) will be cleared.')) return;
+      close(); clear(deck); startOver();
+    } }, '↺ Start over'));
+    if (notNow) box.append(el('button', { class: 'cr-link', id: 'cramNotNowBtn', onclick: () => { close(); notNow(); } }, 'Not now'));
+    ov.append(box);
+    ov.addEventListener('click', e => { if (e.target === ov) { close(); if (notNow) notNow(); } });
+    document.body.append(ov);
+  }
+  // Page (re)load: offer the most recent unfinished Exam Cram right away (reload / app switch mid-cram).
+  async function offerOnLoad() {
+    if (offered) return; offered = true;
+    try {
+      const decks = (await DeckStore.list()).filter(d => eligible(d, {}));
+      let best = null;
+      for (const d of decks) { const s = load(d); if (s && Date.now() - ms(s.updatedAt) < 3 * 86400000 && (!best || ms(s.updatedAt) > ms(best.s.updatedAt))) best = { d, s }; }
+      if (best && currentScreen === 'upload' && !studyCtx && !document.getElementById('cramResume'))
+        prompt(best.d, best.s, () => startQuiz(best.d, null, 'all', null, true), () => {});
+    } catch (e) { /* never block the page */ }
+  }
+  // Shared link opened: if this viewer has an unfinished cram for it, offer it.
+  function offerShared(deck, opts) {
+    if (!eligible(deck, opts)) return;
+    const s = load(deck);
+    if (s && currentScreen === 'share' && !document.getElementById('cramResume'))
+      prompt(deck, s, () => startQuiz(deck, null, 'all', opts, true), () => {});
+  }
+  const onHide = () => { save(true); flush(); };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide(); });
+  window.addEventListener('pagehide', onHide);
+  return { eligible, keyFor, load, save, clear, prompt, offerOnLoad, offerShared, flush };
+})();
+
 // opts (Learn mode): {label, onComplete(result), onQuit(), retryMissed}
-function startQuiz(deck, onlyIds, mode, opts) {
+function startQuiz(deck, onlyIds, mode, opts, fresh) {
+  opts = opts || {};
+  // Exam Cram: an unfinished saved session for this deck -> ask Resume vs Start over first.
+  if (!fresh && CramSave.eligible(deck, opts)) {
+    const saved = CramSave.load(deck);
+    if (saved) { CramSave.prompt(deck, saved, () => startQuiz(deck, onlyIds, mode, opts, true)); return; }
+  }
   let items = deck.questions;
   if (onlyIds) items = items.filter(q => onlyIds.includes(q.id));
   if (!items.length) { alert('No questions to show yet.'); return; }
-  quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode, opts: opts || {}, round: 1, total: items.length };
+  quiz = { deck, items: shuffle(items), i: 0, score: 0, missed: [], answered: false, mode, opts, round: 1, total: items.length,
+    answers: {}, startedAt: new Date().toISOString(), saveKey: CramSave.eligible(deck, opts) ? CramSave.keyFor(deck) : null };
+  openQuizScreen();
+  renderQuestion();
+}
+function openQuizScreen() {
+  const deck = quiz.deck;
   $('qDeckName').textContent = quiz.opts.label || deck.name;
   $('quizLearnBtn').classList.toggle('hidden', deck.mode === 'learn' || !!deck.demo || !!deck.shared || isCramOnly(deck));
   $('resultsModesBtn').classList.toggle('hidden', !!deck.demo);
   showScreen('quiz');
+}
+// Continue a saved Exam Cram session: same question order, score and missed list. Answers already given
+// were logged (quiz_results, per-question stats) when they happened, so nothing is re-logged here.
+function resumeQuiz(deck, s) {
+  const byId = new Map(deck.questions.map(q => [q.id, q]));
+  const items = s.order.map(id => byId.get(id)).filter(Boolean);
+  if (!items.length) { CramSave.clear(deck); startQuiz(deck, null, s.mode || 'all', null, true); return; }
+  const next = Math.min(s.i, items.length);
+  quiz = { deck, items, i: Math.min(next, items.length - 1), score: Math.min(s.score, next), missed: s.missed.filter(id => byId.has(id)), answered: false,
+    mode: s.mode || 'all', opts: { label: s.label || undefined, cram: !!s.cram }, round: 1, total: items.length,
+    answers: Object.assign({}, s.answers), startedAt: s.startedAt, saveKey: CramSave.keyFor(deck) };
+  openQuizScreen();
+  if (next >= items.length) { quiz.answered = true; showResults(false); return; } // every question was answered: show the summary
   renderQuestion();
 }
 
@@ -1757,6 +1906,8 @@ function finishAnswer(correct, kind, headline) {
   setNextLabel();
   recordAnswerFor(quiz.deck, q, correct);
   quiz.logId = logUploadResult(quiz.deck, q, correct, kind);
+  if (quiz.answers) quiz.answers[q.id] = correct ? 'right' : kind === 'close' ? 'close' : 'wrong';
+  CramSave.save();
 }
 // Optional account: one row per graded answer, tagged with deck + section. Async, never blocks the quiz.
 function logUploadResult(deck, q, correct, kind) {
@@ -1825,6 +1976,8 @@ $('overrideBtn').addEventListener('click', () => {
   if (quiz.deck.mode === 'learn') { if (q.stats && q.stats.wrong > 0) q.stats.wrong--; }
   recordAnswerFor(quiz.deck, q, true);
   if (quiz.logId && window.XRS) XRS.mark(quiz.logId, { correct: true, result: 'override' });
+  if (quiz.answers) quiz.answers[q.id] = 'override';
+  CramSave.save();
 });
 $('quitBtn').addEventListener('click', () => {
   if (quiz.opts.onQuit) { quiz.opts.onQuit(); return; }
@@ -1887,10 +2040,11 @@ function showResults(early) {
     d.append(a); list.append(d);
   }
   quiz.lastMissed = missedQs.map(q => q.id);
+  if (quiz.saveKey) { CramSave.clear(quiz.deck); quiz.saveKey = null; } // finished: the next Exam Cram starts fresh
   showScreen('results');
   uploadNudge(quiz.score, total, early ? null : $('rPct'));
 }
-$('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed', quiz.opts.label ? { label: quiz.opts.label } : null));
+$('retryMissedBtn').addEventListener('click', () => startQuiz(quiz.deck, quiz.lastMissed, 'missed', quiz.opts.label ? { label: quiz.opts.label, cram: quiz.opts.cram } : null));
 $('retakeBtn').addEventListener('click', () => quiz.mode === 'final' ? startFinalReview(quiz.deck) : startQuiz(quiz.deck, null, 'all'));
 $('doneBtn').addEventListener('click', () => {
   if (quiz.deck.mode === 'learn') { L = { deck: quiz.deck, pending: {} }; renderMap(); showScreen('map'); }
@@ -3187,6 +3341,9 @@ function renderDeckCtx() {
   $('ctxShareBtn').onclick = () => shareSrc && ShareUI.open(shareSrc);
   ShareUI.paintStatus($('ctxShareStatus'), shareSrc);
   if (cr && cr.questions.length) {
+    const crSaved = CramSave.load(cr);
+    if (crSaved) ex.append(el('button', { class: 'btn btn-primary', id: 'ctxCramResume', onclick: async () => { const x = (await DeckStore.get(cr.id)) || cr, s = CramSave.load(x); if (s) CramSave.prompt(x, s, () => startQuiz(x, null, 'all', null, true)); else startQuiz(x, null, 'all'); } },
+      '▶ Resume my Exam Cram (Question ' + Math.min(crSaved.i + 1, crSaved.order.length) + ' of ' + crSaved.order.length + ')'));
     ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz((await DeckStore.get(cr.id)) || cr, null, 'all') }, '↻ Retake my Exam Cram quiz (' + cr.questions.length + ' questions)'));
     if (cr.missed && cr.missed.length) ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = (await DeckStore.get(cr.id)) || cr; startQuiz(x, x.missed, 'missed'); } }, '✗ Just the ones I missed (' + cr.missed.length + ')'));
   }
@@ -3219,6 +3376,7 @@ $('learnModesBtn').addEventListener('click', () => L && openModes(L.deck));
 $('mapModesBtn').addEventListener('click', () => L && openModes(L.deck));
 function leaveQuizOk() {
   if (!quiz || quiz.deck.mode === 'learn' || quiz.i < 3) return true;
+  if (quiz.saveKey) return true; // Exam Cram auto-saves: they can resume it from the same deck later
   return confirm('Leave this quiz? Your answers so far are saved, but this round won\'t be scored.');
 }
 $('quizModesBtn').addEventListener('click', () => { if (quiz && leaveQuizOk()) openModes(quiz.deck); });
@@ -3773,6 +3931,10 @@ const SharedView = (() => {
     }
     if (!state.data) document.title = 'Shared deck · XRaySavvy';
     show();
+    if (state.data) {
+      const cd = state.cram || (state.learn && state.learn.questions.length ? state.learn : null);
+      if (cd) CramSave.offerShared(cd, cd === state.learn ? { label: state.data.title + ' · Exam Cram', cram: true } : {});
+    }
   }
   function savedMap() { try { const v = JSON.parse(localStorage.getItem(SAVED) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
   async function savedDeckFor(id) {
@@ -3817,7 +3979,7 @@ const SharedView = (() => {
       const counts = [10, 25, 50].filter(n => n < cramN);
       for (const n of counts.concat(['All'])) chips.append(el('button', { class: 'chip', 'data-count': String(n), onclick: () => {
         const ids = n === 'All' ? null : shuffle(cramDeck.questions).slice(0, n).map(q => q.id);
-        startQuiz(cramDeck, ids, 'all', cramDeck === state.learn ? { label: c.title + ' · Exam Cram' } : null);
+        startQuiz(cramDeck, ids, 'all', cramDeck === state.learn ? { label: c.title + ' · Exam Cram', cram: true } : null);
       } }, n === 'All' ? 'All ' + cramN : String(n)));
       cb.append(chips); card.append(cb);
     }
@@ -3887,6 +4049,7 @@ if (SHARE_PARAM != null) SharedView.open(SHARE_PARAM);
 else if (location.hash === '#decks') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } window.showMyDecks(); }
 else if (/[?&]demo=1/.test(location.search)) startDemo();
 else if (/[?&]demo=learn/.test(location.search)) startDemoLearn();
+else CramSave.offerOnLoad();
 SharedView.resumePendingSave();
 </script>
 </body>
