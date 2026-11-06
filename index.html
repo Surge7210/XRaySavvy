@@ -1247,7 +1247,7 @@ function render() {
       <h3>${p.projection}</h3>
       <div class="detail"><strong>CR Degree & Direction:</strong> ${p.crDegree}</div>
       <div class="detail"><strong>CR Location:</strong> ${p.crLocation}</div>
-      ${hasRotation(p) ? `<div class="detail"><strong>Body Part Rotation:</strong> ${p.rotation}</div>` : ''}
+      ${p.rotation ? `<div class="detail"><strong>Body Part Rotation:</strong> ${p.rotation}</div>` : ''}
       ${p.bestShows ? `<div class="best-shows"><strong>Best shows:</strong> ${p.bestShows}</div>` : ''}
     </div>
   `).join('');
@@ -1849,8 +1849,14 @@ function updateProgressDisplay() {
 }
 
 function hasRotation(p) {
-  const r = (p && p.rotation ? String(p.rotation) : '').trim().toLowerCase();
-  return !!r && !['—','-','none','n/a','na'].includes(r);
+  // Quiz only: hide the rotation field when there is no body-part rotation to recall.
+  // "None (supine without rotation)" etc. count as no rotation. Reference cards use p.rotation directly.
+  const r = (p && p.rotation ? String(p.rotation) : '').trim();
+  if (!r) return false;
+  const low = r.toLowerCase();
+  if (['—','-','–','none','n/a','na'].includes(low)) return false;
+  if (/^none\b/.test(low) || /^n\/a\b/.test(low)) return false;
+  return true;
 }
 
 function loadQuiz() {
@@ -1936,26 +1942,106 @@ function coreWords(str) {
     .filter(w => w.length > 1 && !stop.has(w));
 }
 
+function extractNumericRanges(str) {
+  // Ranges like 1–2, 40-70°, 30 to 40, T5–T6. Not fractions like 1/2.
+  const s = String(str || '').toLowerCase();
+  const ranges = [];
+  s.replace(/(\d+(?:\.\d+)?)\s*(?:["”″']|in(?:ch(?:es)?)?\.?|°|degrees?|deg)?\s*(?:-|\u2013|\u2014|to)\s*[a-z]?\s*(\d+(?:\.\d+)?)/g,
+    (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
+  return ranges;
+}
+function userHasExactRange(user, range) {
+  const [a, b] = range;
+  return extractNumericRanges(user).some(([x, y]) =>
+    (x === a && y === b) || (x === b && y === a));
+}
+function userNumbers(str) {
+  return (String(str || '').match(/\d+(?:\.\d+)?/g) || []).map(Number);
+}
+// If the key has a numeric range, Correct requires that exact range (hyphen/en-dash/to OK).
+// A single number inside the range → at best Close. Only out-of-range numbers → Wrong.
+function applyRangeConstraint(user, correct, result) {
+  const ranges = extractNumericRanges(correct);
+  if (!ranges.length) return result;
+  if (ranges.every(r => userHasExactRange(user, r))) return result;
+  const uNums = userNumbers(user);
+  const inAny = n => ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b));
+  if (uNums.length && !uNums.some(inAny)) return 'wrong';
+  if (result === 'correct') return 'close';
+  return result;
+}
+
+function extractBetweenPairs(str) {
+  const s = String(str || '');
+  const pairs = [];
+  const re = /(?:midway|halfway|mid(?:\s*|-)?point)\s+between\s+(.+?)\s+and\s+(.+?)(?=(?:,|\.|$|;|\s+midway|\s+halfway))/gi;
+  let m;
+  while ((m = re.exec(s))) pairs.push({ a: m[1].trim(), b: m[2].trim() });
+  return pairs;
+}
+function landmarkSideMatched(uNorm, sideRaw) {
+  let side = normalize(sideRaw);
+  // Common short landmarks / synonyms
+  if (/\bmcp\b/.test(side) && side.split(/\s+/).filter(w => w.length > 1).length <= 2) {
+    return /\bmcp\b/.test(uNorm) || /\bmidcoronal\b/.test(uNorm) ||
+      (/\bmid\b/.test(uNorm) && /\bcoronal\b/.test(uNorm));
+  }
+  if (/\bvertebral\b/.test(side) && /\bcolumn\b/.test(side)) {
+    if ((/\bvertebral\b/.test(uNorm) && /\bcolumn\b/.test(uNorm)) || /\bspine\b/.test(uNorm)) return true;
+  }
+  const stop = new Set(['the','of','a','an','and','or','to','on','at','in','for']);
+  const optional = new Set(['surface','process','border']); // "anterior abdomen" OK; "lateral elevated side" still needs left+lateral+elevated
+  let words = side.split(/\s+/).filter(w => w.length > 1 && !stop.has(w));
+  // If "border" is the only place-word with left/lateral/elevated, keep elevated/lateral/left as required
+  const required = words.filter(w => !optional.has(w));
+  if (!required.length) return words.some(w => uNorm.includes(w));
+  const need = Math.max(1, Math.ceil(required.length * 0.6));
+  const hits = required.filter(w => uNorm.includes(w)).length;
+  return hits >= need;
+}
+// midway/halfway between A and B → Correct needs both sides; only one → Close.
+function applyBetweenConstraint(user, correct, result) {
+  const pairs = extractBetweenPairs(correct);
+  if (!pairs.length) return result;
+  const uNorm = normalize(user);
+  let anyPartial = false;
+  let allComplete = true;
+  for (const { a, b } of pairs) {
+    const aOk = landmarkSideMatched(uNorm, a);
+    const bOk = landmarkSideMatched(uNorm, b);
+    if (aOk && bOk) continue;
+    allComplete = false;
+    if (aOk || bOk) anyPartial = true;
+  }
+  if (allComplete) return result;
+  if (anyPartial) return result === 'wrong' ? 'wrong' : 'close';
+  if (result === 'correct') return 'close';
+  return result;
+}
+
 function scoreRotation(user, correct) {
   if (!user || !String(user).trim()) return 'wrong';
   const nums = s => (String(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
-  // turn ranges like 15–20 into [15, 20]
-  const ranges = [];
-  String(correct).replace(/(\d+(?:\.\d+)?)\s*[\u2013\-–to]+\s*(\d+(?:\.\d+)?)/g, (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
+  const ranges = extractNumericRanges(correct);
   const cNums = nums(correct);
   if (cNums.length === 0) return scoreMatch(user, correct); // no number (e.g. "Right lateral"): compare words
   const uNums = nums(user);
   if (uNums.length === 0) return 'wrong';
   // only the number matters; medial/lateral/RPO/LPO wording is optional
-  const ok = uNums.every(n => cNums.includes(n) || ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b)));
+  if (ranges.length) {
+    if (ranges.every(r => userHasExactRange(user, r))) return 'correct';
+    const inAny = n => ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b));
+    if (uNums.some(inAny)) return 'close'; // e.g. "40" for "40–70°"
+    return 'wrong';
+  }
+  const ok = uNums.every(n => cNums.includes(n));
   return ok ? 'correct' : 'wrong';
 }
 
 // Pull numbers and ranges (e.g. 15–20°, 15 to 20 degrees) out of a raw string.
 function degreeNumbers(str) {
   const s = String(str || '').toLowerCase();
-  const ranges = [];
-  s.replace(/(\d+(?:\.\d+)?)\s*(?:°|degrees?|deg)?\s*(?:-|\u2013|\u2014|to)\s*(\d+(?:\.\d+)?)/g, (m, a, b) => { ranges.push([Number(a), Number(b)]); return m; });
+  const ranges = extractNumericRanges(s);
   const nums = (s.match(/\d+(?:\.\d+)?/g) || []).map(Number);
   return { nums, ranges };
 }
@@ -1969,7 +2055,14 @@ function scoreDegreeDirection(user, correct) {
   const cDirs = directionTokens(correct), uDirs = directionTokens(user);
   if (!c.nums.length || !u.nums.length || !cDirs.length) return null;
   if (uDirs.some(d => !cDirs.includes(d))) return 'wrong'; // e.g. caudal when the answer is cephalad
-  const inRange = n => c.nums.includes(n) || c.ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b));
+  if (c.ranges.length) {
+    if (!uDirs.length) return null;
+    if (c.ranges.every(r => userHasExactRange(user, r))) return 'correct';
+    const inAny = n => c.ranges.some(([a, b]) => n >= Math.min(a, b) && n <= Math.max(a, b));
+    if (u.nums.some(inAny)) return 'close';
+    return 'wrong';
+  }
+  const inRange = n => c.nums.includes(n);
   const numsOk = u.nums.every(inRange);
   if (numsOk && uDirs.length) return 'correct';
   return null; // leave other cases (e.g. number only) to the general matcher, as before
@@ -1990,10 +2083,10 @@ function scoreMatch(user, correct, field) {
 
   if (field === 'degree') {
     const d = scoreDegreeDirection(user, correct);
-    if (d) return d;
+    if (d) return applyRangeConstraint(user, correct, d);
   } else {
     const n = checkNumberedLocation(user, correct);
-    if (n) return n;
+    if (n) return applyRangeConstraint(user, correct, applyBetweenConstraint(user, correct, n));
   }
 
   const uNorm = normalize(user);
@@ -2010,18 +2103,20 @@ function scoreMatch(user, correct, field) {
   const hits = u.filter(w => c.some(cw => cw.includes(w) || w.includes(cw))).length;
   const ratio = hits / Math.max(u.length, Math.min(c.length, 4));
 
+  let result = 'wrong';
   // Exact or very clear single-word match (e.g. "perpendicular")
-  if (u.length === 1 && c.some(cw => cw.includes(u[0]) || u[0].includes(cw))) return 'correct';
-  if (uNorm === cNorm || cNorm.includes(uNorm) || uNorm.includes(cNorm)) return 'correct';
-
+  if (u.length === 1 && c.some(cw => cw.includes(u[0]) || u[0].includes(cw))) result = 'correct';
+  else if (uNorm === cNorm || cNorm.includes(uNorm) || uNorm.includes(cNorm)) result = 'correct';
   // Strong overlap
-  if (numMatch && hits >= 2 && ratio >= 0.45) return 'correct';
-  if (ratio >= 0.65 && hits >= 2) return 'correct';
-  if (hits >= Math.min(c.length, 3) && hits >= 2) return 'correct';
-
+  else if (numMatch && hits >= 2 && ratio >= 0.45) result = 'correct';
+  else if (ratio >= 0.65 && hits >= 2) result = 'correct';
+  else if (hits >= Math.min(c.length, 3) && hits >= 2) result = 'correct';
   // Partial / similar but not solid enough → Pretty close
-  if (ratio >= 0.25 || hits >= 1 || numMatch) return 'close';
-  return 'wrong';
+  else if (ratio >= 0.25 || hits >= 1 || numMatch) result = 'close';
+
+  result = applyRangeConstraint(user, correct, result);
+  if (field !== 'degree') result = applyBetweenConstraint(user, correct, result);
+  return result;
 }
 
 function checkAnswer() {
