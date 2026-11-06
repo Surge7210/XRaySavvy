@@ -155,6 +155,19 @@
   @keyframes sp-fill { from { width:0; } to { width:100%; } }
   @keyframes sp-rise { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }
   @media (prefers-reduced-motion: reduce) { #xrs-splash, #xrs-splash .sp-in { transition:none; animation:none; } }
+
+  .fp-style { margin:0.85rem 0 0.7rem; }
+  .fp-style-label { font-size:0.85rem; color:var(--muted); margin:0 0 0.4rem; font-weight:600; }
+  .fp-style-tog { display:flex; gap:0.45rem; }
+  .fp-style-btn { flex:1; min-height:48px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--text); font:inherit; font-size:0.95rem; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0.55rem 0.6rem; }
+  .fp-style-btn.active { border-color:var(--accent); background:rgba(29,155,240,0.14); color:var(--accent); }
+  .fmc-field { margin:0.85rem 0 0.2rem; }
+  .fmc-opts { display:flex; flex-direction:column; gap:0.5rem; margin:0.35rem 0 0.2rem; }
+  .fmc-opt { text-align:left; width:100%; min-height:52px; padding:0.75rem 0.95rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font:inherit; font-size:0.95rem; line-height:1.35; -webkit-tap-highlight-color:transparent; }
+  .fmc-opt.sel { border-color:var(--accent); background:rgba(29,155,240,0.12); }
+  .fmc-opt.good { border-color:#00ba7c; background:#0d3d2e; color:#00ba7c; }
+  .fmc-opt.bad { border-color:#f4212e; background:#3d1a1c; color:#f4212e; }
+  .fmc-opt:disabled { cursor:default; opacity:1; }
 </style>
 </head>
 <body>
@@ -227,6 +240,13 @@
       <h2 class="fp-head">Pick body parts</h2>
       <p class="fp-hint">Tap them in the order you want to study. Tap again to remove.</p>
       <div class="fp-grid" id="fp-grid"></div>
+      <div class="fp-style" id="fp-style" role="group" aria-label="Answer style">
+        <div class="fp-style-label">Answer style</div>
+        <div class="fp-style-tog">
+          <button type="button" class="fp-style-btn" id="fp-style-type" aria-pressed="true">Type answers</button>
+          <button type="button" class="fp-style-btn" id="fp-style-mc" aria-pressed="false">Multiple choice</button>
+        </div>
+      </div>
       <div class="fp-bar">
         <div class="fp-sum" id="fp-sum">Nothing picked yet</div>
         <button class="btn-secondary" id="fp-clear" type="button">Clear</button>
@@ -255,14 +275,17 @@
     </div>
     <div class="quiz-box">
       <div class="quiz-question" id="quiz-question">Loading quiz...</div>
-      <label class="quiz-label">CR Degree and Direction</label>
-      <input type="text" id="quiz-degree" placeholder="Type your answer..." autocomplete="off">
-      <label class="quiz-label">CR Location</label>
-      <input type="text" id="quiz-location" placeholder="Type your answer..." autocomplete="off">
-      <div id="rotation-section" class="hidden">
-        <label class="quiz-label">Body Part Rotation</label>
-        <input type="text" id="quiz-rotation" placeholder="Type your answer..." autocomplete="off">
+      <div id="quiz-typed">
+        <label class="quiz-label">CR Degree and Direction</label>
+        <input type="text" id="quiz-degree" placeholder="Type your answer..." autocomplete="off">
+        <label class="quiz-label">CR Location</label>
+        <input type="text" id="quiz-location" placeholder="Type your answer..." autocomplete="off">
+        <div id="rotation-section" class="hidden">
+          <label class="quiz-label">Body Part Rotation</label>
+          <input type="text" id="quiz-rotation" placeholder="Type your answer..." autocomplete="off">
+        </div>
       </div>
+      <div id="quiz-mc-fields" class="hidden"></div>
       <div class="quiz-actions">
         <button class="btn-primary" id="check-btn">Check Answer</button>
         <button class="btn-secondary" id="next-btn">Next Question</button>
@@ -1848,6 +1871,177 @@ function updateProgressDisplay() {
   renderFocusPanel();
 }
 
+const FOCUS_STYLE_KEY = 'xraysavvy.focusAnswerStyle';
+let focusAnswerStyle = 'type';
+try { if (localStorage.getItem(FOCUS_STYLE_KEY) === 'mc') focusAnswerStyle = 'mc'; } catch (e) {}
+let focusMcPicks = { degree: null, location: null, rotation: null };
+let focusMcCorrect = { degree: null, location: null, rotation: null };
+let focusMcLocked = false;
+
+function optionKey(v) {
+  return normalize(String(v == null ? '' : v));
+}
+function fieldValue(p, field) {
+  if (!p) return null;
+  if (field === 'degree') return p.crDegreeFull || p.crDegree || null;
+  if (field === 'location') return p.crLocation || null;
+  if (field === 'rotation') return p.rotation || null;
+  return null;
+}
+// 1 correct + up to 3 distractors from real projections (same body part first, then all).
+function pickFieldOptions(correctProj, field, want) {
+  want = want || 4;
+  const correct = fieldValue(correctProj, field);
+  if (!correct) return [];
+  const seen = new Set([optionKey(correct)]);
+  const opts = [correct];
+  const same = data.filter(p => p.extremity === correctProj.extremity && p !== correctProj);
+  const rest = data.filter(p => p !== correctProj);
+  const pools = [same, rest].map(pool => {
+    let list = pool;
+    if (field === 'rotation') list = pool.filter(hasRotation);
+    return shuffle(list);
+  });
+  for (const pool of pools) {
+    for (const p of pool) {
+      if (opts.length >= want) break;
+      const v = fieldValue(p, field);
+      if (!v) continue;
+      const k = optionKey(v);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      opts.push(v);
+    }
+  }
+  return shuffle(opts);
+}
+
+function setFocusAnswerStyle(style) {
+  focusAnswerStyle = style === 'mc' ? 'mc' : 'type';
+  try { localStorage.setItem(FOCUS_STYLE_KEY, focusAnswerStyle); } catch (e) {}
+  const typeBtn = document.getElementById('fp-style-type');
+  const mcBtn = document.getElementById('fp-style-mc');
+  if (typeBtn && mcBtn) {
+    typeBtn.classList.toggle('active', focusAnswerStyle === 'type');
+    mcBtn.classList.toggle('active', focusAnswerStyle === 'mc');
+    typeBtn.setAttribute('aria-pressed', focusAnswerStyle === 'type' ? 'true' : 'false');
+    mcBtn.setAttribute('aria-pressed', focusAnswerStyle === 'mc' ? 'true' : 'false');
+  }
+}
+
+function showQuizAnswerUI(style) {
+  const typed = document.getElementById('quiz-typed');
+  const mc = document.getElementById('quiz-mc-fields');
+  const isMc = style === 'mc';
+  if (typed) typed.classList.toggle('hidden', isMc);
+  if (mc) mc.classList.toggle('hidden', !isMc);
+}
+
+function renderFocusMcField(container, field, label, options, correctVal) {
+  const wrap = document.createElement('div');
+  wrap.className = 'fmc-field';
+  wrap.dataset.field = field;
+  const lab = document.createElement('label');
+  lab.className = 'quiz-label';
+  lab.textContent = label;
+  wrap.appendChild(lab);
+  const opts = document.createElement('div');
+  opts.className = 'fmc-opts';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fmc-opt';
+    btn.textContent = opt;
+    btn.dataset.value = opt;
+    btn.onclick = () => {
+      if (focusMcLocked) return;
+      focusMcPicks[field] = opt;
+      opts.querySelectorAll('.fmc-opt').forEach(b => b.classList.toggle('sel', b === btn));
+    };
+    opts.appendChild(btn);
+  });
+  wrap.appendChild(opts);
+  container.appendChild(wrap);
+  focusMcCorrect[field] = correctVal;
+}
+
+function buildFocusMc(p) {
+  const box = document.getElementById('quiz-mc-fields');
+  if (!box) return;
+  box.innerHTML = '';
+  focusMcPicks = { degree: null, location: null, rotation: null };
+  focusMcCorrect = { degree: null, location: null, rotation: null };
+  focusMcLocked = false;
+  const deg = fieldValue(p, 'degree');
+  const loc = fieldValue(p, 'location');
+  renderFocusMcField(box, 'degree', 'CR Degree and Direction', pickFieldOptions(p, 'degree'), deg);
+  renderFocusMcField(box, 'location', 'CR Location', pickFieldOptions(p, 'location'), loc);
+  if (hasRotation(p)) {
+    renderFocusMcField(box, 'rotation', 'Body Part Rotation', pickFieldOptions(p, 'rotation'), fieldValue(p, 'rotation'));
+  }
+}
+
+function checkFocusMc() {
+  if (!currentQuiz || focusMcLocked) return;
+  const hasRot = hasRotation(currentQuiz);
+  const fields = hasRot ? ['degree', 'location', 'rotation'] : ['degree', 'location'];
+  const missing = fields.some(f => !focusMcPicks[f]);
+  if (missing) {
+    quizFeedback.innerHTML = '<div class="feedback close">Pick an answer for each field first.</div>';
+    return;
+  }
+  focusMcLocked = true;
+  const results = {};
+  fields.forEach(f => {
+    const ok = optionKey(focusMcPicks[f]) === optionKey(focusMcCorrect[f]);
+    results[f] = ok ? 'correct' : 'wrong';
+    const wrap = document.querySelector('#quiz-mc-fields .fmc-field[data-field="' + f + '"]');
+    if (!wrap) return;
+    wrap.querySelectorAll('.fmc-opt').forEach(btn => {
+      btn.disabled = true;
+      const v = btn.dataset.value;
+      if (optionKey(v) === optionKey(focusMcCorrect[f])) btn.classList.add('good');
+      if (btn.classList.contains('sel') && !ok) btn.classList.add('bad');
+    });
+  });
+  const labels = { correct: 'Correct', wrong: 'Wrong' };
+  const classes = { correct: 'good', wrong: 'bad' };
+  let html = '';
+  html += `<div class="feedback ${classes[results.degree]}">CR Degree and Direction: ${labels[results.degree]}</div>`;
+  html += `<div class="feedback ${classes[results.location]}">CR Location: ${labels[results.location]}</div>`;
+  if (hasRot) html += `<div class="feedback ${classes[results.rotation]}">Body Part Rotation: ${labels[results.rotation]}</div>`;
+  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree & Direction: ${fEsc(focusMcCorrect.degree)}<br>CR Location: ${fEsc(focusMcCorrect.location)}`;
+  if (hasRot) html += `<br>Body Part Rotation: ${fEsc(focusMcCorrect.rotation)}`;
+  html += `</div>`;
+  quizFeedback.innerHTML = html;
+
+  if (loggedSerial !== quizSerial) {
+    loggedSerial = quizSerial;
+    const rows = [
+      { field: 'cr_angle', correct: results.degree === 'correct', result: results.degree },
+      { field: 'cr_location', correct: results.location === 'correct', result: results.location }
+    ];
+    if (hasRot) rows.push({ field: 'rotation', correct: results.rotation === 'correct', result: results.rotation });
+    logResults(rows, currentQuiz);
+  }
+
+  const allOk = fields.every(f => results[f] === 'correct');
+  if (allOk) launchConfetti(); else wrongAnswerEffect();
+  if (focusCountedSerial !== quizSerial && focusIndex < focusQueue.length) {
+    focusCountedSerial = quizSerial;
+    const g = focusGroups[focusQueue[focusIndex].gi];
+    g.done++;
+    if (allOk) { g.correct++; focusCorrect++; }
+    focusIndex++;
+    if (focusIndex >= focusQueue.length) nextBtn.textContent = 'See results';
+  }
+  updateProgressDisplay();
+  if (nudgeSerial !== quizSerial) {
+    nudgeSerial = quizSerial;
+    nudgeOnAnswer(allOk, quizFeedback);
+  }
+}
+
 function hasRotation(p) {
   // Quiz only: hide the rotation field when there is no body-part rotation to recall.
   // "None (supine without rotation)" etc. count as no rotation. Reference cards use p.rotation directly.
@@ -1882,12 +2076,18 @@ function loadQuiz() {
   quizQuestionEl.textContent = hasRot
     ? `What is the CR Degree and Direction, CR Location, and Body Part Rotation for a ${currentQuiz.projection} ${currentQuiz.extremity}?`
     : `What is the CR Degree and Direction, and CR Location for a ${currentQuiz.projection} ${currentQuiz.extremity}?`;
-  quizDegreeEl.value = '';
-  quizLocationEl.value = '';
-  quizRotationEl.value = '';
   quizFeedback.innerHTML = '';
-  rotationSection.classList.toggle('hidden', !hasRot);
-  quizDegreeEl.focus();
+  const useMc = quizMode === 'focus' && focusAnswerStyle === 'mc';
+  showQuizAnswerUI(useMc ? 'mc' : 'type');
+  if (useMc) {
+    buildFocusMc(currentQuiz);
+  } else {
+    quizDegreeEl.value = '';
+    quizLocationEl.value = '';
+    quizRotationEl.value = '';
+    rotationSection.classList.toggle('hidden', !hasRot);
+    quizDegreeEl.focus();
+  }
 }
 
 const ORDINAL_WORDS = { first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' };
@@ -2121,6 +2321,10 @@ function scoreMatch(user, correct, field) {
 
 function checkAnswer() {
   if (!currentQuiz) return;
+  if (quizMode === 'focus' && focusAnswerStyle === 'mc') {
+    checkFocusMc();
+    return;
+  }
   const degreeResult = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree');
   const locResult = scoreMatch(quizLocationEl.value, currentQuiz.crLocation);
   const hasRot = hasRotation(currentQuiz);
@@ -2371,6 +2575,10 @@ fpStart.onclick = () => {
   startFocus(focusPicked.map(ext => ({ label: ext, items: data.filter(p => p.extremity === ext) })));
 };
 fpClear.onclick = () => { focusPicked = []; renderFocusPicker(); };
+document.getElementById('fp-style-type').onclick = () => setFocusAnswerStyle('type');
+document.getElementById('fp-style-mc').onclick = () => setFocusAnswerStyle('mc');
+setFocusAnswerStyle(focusAnswerStyle);
+
 fpnToggle.onclick = () => {
   const open = fpnList.classList.toggle('hidden') === false;
   fpnToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
