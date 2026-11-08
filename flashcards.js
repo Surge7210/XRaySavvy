@@ -368,7 +368,6 @@
       '<input id="fc-subj" class="fc-in' + (opts[curK] ? ' hidden' : '') + '" maxlength="' + LIM.subject + '" placeholder="Type a category name" aria-label="Custom category" value="' + esc(opts[curK] ? opts[curK] : (c ? c.subject : '')) + '" autocomplete="off">' +
       field('fc-term', 'Term (front)', c && c.term, LIM.term) +
       field('fc-def', 'Definition (back)', c && c.definition, LIM.definition, true) +
-      field('fc-src', 'Source (optional — e.g. class handout, textbook chapter)', c && c.source, LIM.source) +
       '<p class="fc-err hidden" role="alert"></p>' +
       '<div class="fc-make-act"><button class="btn-primary fc-save" type="submit">Save card</button><button class="btn-secondary fc-cancel" type="button">Cancel</button></div></form>';
     root.querySelector('.fc-back').onclick = renderHome;
@@ -380,7 +379,7 @@
     root.querySelector('.fc-form').onsubmit = function (e) {
       e.preventDefault();
       var sj = catClean(val('fc-subj')); if (opts[catKey(sj)]) sj = opts[catKey(sj)]; // reuse existing spelling (e.g. "physics " -> "Physics")
-      var v = { subject: sj, term: val('fc-term'), definition: val('fc-def'), source: val('fc-src') || null };
+      var v = { subject: sj, term: val('fc-term'), definition: val('fc-def') }; // Source field removed from the form; existing stored sources are left untouched
       var err = root.querySelector('.fc-err'), btn = root.querySelector('.fc-save');
       if (!v.subject || !v.term || !v.definition) { err.textContent = 'Category, term and definition are required.'; err.classList.remove('hidden'); return; }
       if (curUid() !== u) return renderHome();
@@ -475,7 +474,6 @@
   function rate(r) {
     var s = load(), k = cid(cur);
     s[k] = schedule(s[k], r, Date.now()); save(s); pushOne(k, s[k]);
-    if (r === 'good' && typeof window.launchConfetti === 'function') try { window.launchConfetti(); } catch (e) {}
     if (r === 'again') queue.splice(Math.min(3, queue.length), 0, cur); else done++;
     next();
   }
@@ -483,7 +481,7 @@
     root.innerHTML = '<div class="quiz-box"><h2 class="fd-title">Deck done for now 🎉</h2><p>' + done + ' cards reviewed. Come back later for cards that are due.</p>' +
       '<div class="fd-actions"><button class="btn-primary fc-back" type="button">Back to decks</button></div></div>';
     root.querySelector('.fc-back').onclick = goBack;
-    if (done && typeof window.launchConfetti === 'function') try { window.launchConfetti(); } catch (e) {}
+    // No confetti in flashcards (fast-paced); quiz celebrations are unchanged.
   }
   window.renderFlashcards = function (el) { root = el; renderHome(); };
   // Account changed (sign in / out / switch): progress is namespaced per user id, so just re-read and re-sync.
