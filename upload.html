@@ -219,7 +219,7 @@ body.picbox-open{overflow:hidden}
     <h2>Upload anything you want to study</h2>
     <p class="hint" style="margin:-4px 0 12px;font-size:15px;opacity:.9">Drop in your slides, notes, or review questions and get an easy summary plus quizzes made just for them.</p>
     <label class="drop" id="drop">
-      <input type="file" id="fileInput" multiple accept=".pptx,.docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*,.heic,.heif">
+      <input type="file" id="fileInput" multiple accept=".pptx,.docx,.pdf,.txt,.doc,.rtf,.htm,.html,.mht,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*,.heic,.heif">
       <div class="big">Tap to choose a file</div>
       <div class="muted small">PowerPoint (.pptx), Word (.docx), PDF, .txt &mdash; or photos</div>
     </label>
@@ -1131,15 +1131,67 @@ async function extractTxt(file) {
   return { units: null, unitName: '', parts: text.split(/\n{2,}/).map(s => s.trim()).filter(Boolean) };
 }
 
+// Look at the file's actual bytes, not just its name: files are often renamed,
+// exported by other apps, or saved in an older format with a .docx/.pptx name.
+const FRIENDLY_OLD = 'This file is an older Word/PowerPoint format (or is password-protected), even though its name says otherwise. Open it in Word or PowerPoint, remove any password, then use "Save As" → Word Document (.docx), PowerPoint (.pptx) or PDF, and upload that copy.';
+function sniffKind(buf) {
+  const b = new Uint8Array(buf.slice(0, 512));
+  const head = String.fromCharCode.apply(null, b.subarray(0, 8));
+  if (b[0] === 0x50 && b[1] === 0x4B) return 'zip';
+  if (head.startsWith('%PDF') || String.fromCharCode.apply(null, b).includes('%PDF-')) return 'pdf';
+  if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) return 'ole';
+  const txt = new TextDecoder('utf-8', { fatal: false }).decode(b).replace(/^\uFEFF/, '').trimStart().toLowerCase();
+  if (txt.startsWith('{\\rtf')) return 'rtf';
+  if (txt.startsWith('mime-version') || /^(<!doctype html|<html|<head|<body)/.test(txt) || (txt.startsWith('<?xml') && /<html/.test(txt))) return 'html';
+  if (txt.startsWith('<?xml') || txt.startsWith('<w:') || txt.startsWith('<pkg:')) return 'wordxml';
+  let bad = 0; for (const c of b) if (c < 9 || (c > 13 && c < 32)) bad++;
+  return b.length && bad / b.length < 0.02 ? 'text' : 'unknown';
+}
+function rtfToText(rtf) {
+  let s = rtf.replace(/\{\\\*[^{}]*\}/g, '')
+    .replace(/\{\\(fonttbl|colortbl|stylesheet|info|pict)[\s\S]*?\}\s*(?=[\\{}]|$)/g, '')
+    .replace(/\\(par|line|row|cell|page)\b ?/g, '\n')
+    .replace(/\\'([0-9a-f]{2})/gi, (m, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\u(-?\d+)\??/g, (m, n) => String.fromCharCode((+n + 65536) % 65536))
+    .replace(/\\[a-z]+-?\d* ?/gi, '').replace(/\\([{}\\])/g, '$1').replace(/[{}]/g, '');
+  return s;
+}
+function htmlToText(html) {
+  if (/^\s*mime-version/i.test(html)) { // .mht "web archive": take the HTML part, undo quoted-printable
+    const i = html.search(/<html/i); html = (i >= 0 ? html.slice(i) : html).replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+  }
+  const d = new DOMParser().parseFromString(html, 'text/html');
+  d.querySelectorAll('script,style').forEach(n => n.remove());
+  d.querySelectorAll('p,div,br,li,tr,h1,h2,h3,h4,h5,h6').forEach(n => n.append('\n'));
+  return d.body ? d.body.textContent : '';
+}
+function textResult(text) {
+  const paras = text.split(/\n+/).map(t => t.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!paras.length) throw new Error('No readable text was found in this file. Try saving it as .docx or PDF and upload again.');
+  return { kind: 'txt', units: null, unitName: '', parts: paras, paragraphs: paras.length };
+}
 async function extractFile(file) {
   const name = file.name.toLowerCase();
   const ext = name.slice(name.lastIndexOf('.') + 1);
   if (ext === 'txt') return Object.assign({ kind: 'txt' }, await extractTxt(file));
   const buf = await readFile(file, false);
-  if (ext === 'pptx') return Object.assign({ kind: 'pptx' }, await extractPptx(buf));
-  if (ext === 'docx') return Object.assign({ kind: 'docx' }, await extractDocx(buf));
-  if (ext === 'pdf') return Object.assign({ kind: 'pdf' }, await extractPdf(buf));
-  if (ext === 'ppt' || ext === 'doc') throw new Error('Old .' + ext + ' files can\'t be read. Open it and "Save As" .' + ext + 'x first.');
+  if (!buf || !buf.byteLength) throw new Error('This file is empty (0 bytes). It may not have finished downloading — download it again and re-upload.');
+  const kind = sniffKind(buf);
+  const asText = () => new TextDecoder('utf-8').decode(buf);
+  if (kind === 'pdf') return Object.assign({ kind: 'pdf' }, await extractPdf(buf));
+  if (kind === 'ole') throw new Error(FRIENDLY_OLD);
+  if (kind === 'rtf') return textResult(rtfToText(new TextDecoder('windows-1252').decode(buf)));
+  if (kind === 'html') return textResult(htmlToText(asText()));
+  if (kind === 'wordxml') return textResult(asText().replace(/<\/w:p>/g, '\n').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&'));
+  if (kind === 'zip') {
+    let zip;
+    try { zip = await JSZip.loadAsync(buf); } catch (e) { throw new Error('This file looks damaged or only partly downloaded, so it can\'t be opened. Download it again (or open it and "Save As" a new .docx/.pptx/PDF) and re-upload.'); }
+    if (zip.file('word/document.xml')) return Object.assign({ kind: 'docx' }, await extractDocx(buf));
+    if (zip.file('ppt/presentation.xml')) return Object.assign({ kind: 'pptx' }, await extractPptx(buf));
+    throw new Error('This is a zip-type file but not a Word or PowerPoint document. Upload a .docx, .pptx, PDF or .txt.');
+  }
+  if (kind === 'text' && ext !== 'pptx') return textResult(asText());
+  if (ext === 'docx' || ext === 'pptx' || ext === 'doc' || ext === 'ppt') throw new Error('This file isn\'t a readable Word/PowerPoint document — it may be damaged, password-protected, or a different format renamed. Open it and "Save As" .docx, .pptx or PDF, then upload that copy.');
   throw new Error('Unsupported file type. Use .pptx, .docx, .pdf or .txt.');
 }
 
@@ -1315,7 +1367,8 @@ async function handleFile(file) {
     if (extracted) SlidePics.start(file, extracted.kind, extracted);
   } catch (e) {
     console.error(e);
-    info.textContent = 'Could not read that file: ' + (e.message || e);
+    const m = String((e && e.message) || e);
+    info.textContent = 'Could not read that file: ' + (/zip|central directory|jszip|stuk\.github/i.test(m) ? 'it looks damaged or isn\'t really a .docx/.pptx. Open it and "Save As" .docx, .pptx or PDF, then upload that copy.' : m);
   }
   if (extracted) $('modeCard').classList.remove('hidden');
   updateGenBtn();
