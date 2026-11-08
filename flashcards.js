@@ -149,7 +149,6 @@
           '<button class="btn-primary fc-study" data-shared="' + esc(sub) + '" type="button">Study</button></div>';
       });
     }
-    h += '<p class="fc-note">More subjects (Physics, Patient Care) coming soon.</p>';
     root.innerHTML = h;
     root.querySelectorAll('.fc-study').forEach(function (b) { b.onclick = function () {
       var cm = b.getAttribute('data-community');
