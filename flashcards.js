@@ -259,21 +259,23 @@
     if (!mine.cards.length) h += '<div class="quiz-box"><p>You don’t have any cards yet.</p><p class="fc-sub">Tap “+ New card” to add a term and definition, and choose a category like Positioning, Physics or Patient Care. Your cards are private to your account.</p></div>';
     shown.forEach(function (k) {
       var cat = cats[k];
-      h += '<h3 class="fc-subject">' + esc(cat.name) + ' <button class="fc-link fc-study-mine" data-sub="' + esc(k) + '" type="button">Study ' + cat.cards.length + '</button></h3>';
+      var ds = deckShare(cat);
+      h += '<h3 class="fc-subject">' + esc(cat.name) + ' <button class="fc-link fc-study-mine" data-sub="' + esc(k) + '" type="button">Study ' + cat.cards.length + '</button></h3>' +
+        '<div class="fc-deckshare" data-cat="' + esc(k) + '"><span class="fc-sub fc-ds-status">' + esc(ds.label) + '</span>' +
+        (ds.pub < ds.total || ds.stale ? '<button class="fc-link fc-dpub" data-cat="' + esc(k) + '" type="button">' + (ds.pub ? 'Update public deck' : 'Make deck public') + '</button>' : '') +
+        (ds.pub ? '<button class="fc-link fc-dunpub" data-cat="' + esc(k) + '" type="button">Make deck private</button>' : '') + '</div>';
       cat.cards.forEach(function (c) {
         var badge = ''; // "Submit to XRaySavvy" removed for students (owner request); old suggestion records stay in the database/admin queue.
-        var sh = mine.shared[c.id], stale = sh && (sh.term !== c.term.trim() || sh.definition !== c.definition.trim() || sh.subject !== c.subject.trim());
-        if (sh) badge += ' <span class="fc-badge fc-b-public">' + (sh.hidden ? 'Public copy hidden by XRaySavvy' : 'Public · by ' + esc(sh.author_name)) + '</span>';
+        var sh = mine.shared[c.id];
+        if (sh) badge += ' <span class="fc-badge fc-b-public">' + (sh.hidden ? 'Hidden by XRaySavvy' : 'Public') + '</span>';
         h += '<div class="quiz-box fc-item"><div class="fc-item-t">' + esc(c.term) + ' ' + badge + '</div><div class="fc-item-d">' + esc(c.definition) + '</div>' +
           (c.source ? '<div class="fc-sub">Source: ' + esc(c.source) + '</div>' : '') +
           '<div class="fc-item-act"><button class="fc-link fc-edit" data-id="' + c.id + '" type="button">Edit</button>' +
           '<button class="fc-link fc-del" data-id="' + c.id + '" type="button">Delete</button>' +
-          (sh ? (stale ? '<button class="fc-link fc-pub" data-id="' + c.id + '" type="button">Update public copy</button>' : '') + '<button class="fc-link fc-unpub" data-id="' + c.id + '" type="button">Make private</button>'
-              : '<button class="fc-link fc-pub" data-id="' + c.id + '" type="button">Make it public</button>') + '</div>' +
-          (stale ? '<div class="fc-sub">You edited this card after sharing it. The public copy still shows the old version until you tap “Update public copy”.</div>' : '') + '</div>';
+          '</div></div>';
       });
     });
-    h += '<p class="fc-note">Cards are private unless you choose “Make it public”, which shows a copy with your chosen name in Student-shared cards (not reviewed).</p>';
+    h += '<p class="fc-note">Cards are private unless you choose “Make deck public” for a category, which shows a copy of that category’s cards with your chosen name in Student-shared cards. New or edited cards stay private until you tap “Update public deck”.</p>';
     h += '</div>';
     root.innerHTML = h;
     root.querySelector('.fc-back').onclick = renderHome;
@@ -285,20 +287,29 @@
       startDeck({ id: 'my', title: k ? cats[k].name : 'My cards', cards: cards, back: renderMine }); }; });
     root.querySelectorAll('.fc-edit').forEach(function (b) { b.onclick = function () { renderEditor(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-del').forEach(function (b) { b.onclick = function () { delMine(findMine(b.getAttribute('data-id'))); }; });
-    root.querySelectorAll('.fc-pub').forEach(function (b) { b.onclick = function () { renderPublish(findMine(b.getAttribute('data-id'))); }; });
-    root.querySelectorAll('.fc-unpub').forEach(function (b) { b.onclick = function () { unpublish(findMine(b.getAttribute('data-id'))); }; });
+    root.querySelectorAll('.fc-dpub').forEach(function (b) { b.onclick = function () { renderPublishDeck(b.getAttribute('data-cat')); }; });
+    root.querySelectorAll('.fc-dunpub').forEach(function (b) { b.onclick = function () { unpublishDeck(b.getAttribute('data-cat')); }; });
   }
   // ---- Make it public (opt-in, per card; a snapshot with a name the student chooses; not reviewed) ----
-  function renderPublish(c) {
-    var u = curUid(); if (!c || !u) return renderHome();
-    var sh = mine.shared[c.id], name = (sh && sh.author_name) || catClean(window.XRS && XRS.profileName || '').slice(0, 40);
-    root.innerHTML = bar(sh ? 'Update public copy' : 'Make it public') + '<form class="quiz-box fc-form fc-pub-box" novalidate>' +
-      '<div class="fc-item-t">' + esc(c.term) + '</div><div class="fc-item-d">' + esc(c.definition) + '</div><div class="fc-sub">Category: ' + esc(c.subject) + '</div>' +
-      '<p class="fc-sub">Anyone can see public cards in <b>Student-shared cards</b> on the Flashcards tab, marked “Not reviewed”. Only the term, definition, category and the name below are shown — never your email or the card’s source. Later edits to your card don’t change the public copy unless you update it. You can make it private again any time.</p>' +
+  // ---- Deck (category) sharing: one action shares/refreshes or unshares ALL of your cards currently in that category ----
+  function isStale(c, sh) { return sh.term !== c.term.trim() || sh.definition !== c.definition.trim() || sh.subject !== c.subject.trim(); }
+  function deckShare(cat) {
+    var total = cat.cards.length, pub = 0, stale = 0, hidden = 0, names = [];
+    cat.cards.forEach(function (c) { var sh = mine.shared[c.id]; if (!sh) return; pub++; if (sh.hidden) hidden++; if (isStale(c, sh)) stale++; if (names.indexOf(sh.author_name) < 0) names.push(sh.author_name); });
+    var label = !pub ? 'Private deck' : pub === total && !stale ? 'Public deck · by ' + names.join(', ') : pub + ' of ' + total + ' public' + (stale ? ' · ' + stale + ' changed since shared' : '') + ' — tap Update public deck to share the current version';
+    if (hidden) label += ' · ' + hidden + ' hidden by XRaySavvy';
+    return { total: total, pub: pub, stale: stale, names: names, label: label };
+  }
+  function renderPublishDeck(k) {
+    var u = curUid(), cat = myCats()[k]; if (!u || !cat) return renderMine();
+    var ds = deckShare(cat), name = ds.names[0] || catClean(window.XRS && XRS.profileName || '').slice(0, 40), upd = ds.pub > 0;
+    root.innerHTML = bar(upd ? 'Update public deck' : 'Make deck public') + '<form class="quiz-box fc-form fc-pub-box" novalidate>' +
+      '<div class="fc-item-t">' + esc(cat.name) + '</div><div class="fc-sub">' + cat.cards.length + (cat.cards.length === 1 ? ' card' : ' cards') + ' in this category will be public' + (upd ? ' (current versions)' : '') + '.</div>' +
+      '<p class="fc-sub">Anyone can see public cards in <b>Student-shared cards</b> on the Flashcards tab, marked “Not reviewed”. Only the term, definition, category and the name below are shown — never your email or the card’s source. Cards you add or edit later stay private until you tap “Update public deck”. You can make the deck private again any time.</p>' +
       field('fc-author', 'Name to show (your choice, e.g. first name or nickname)', name, 40) +
       '<label class="fc-check"><input type="checkbox" id="fc-ok"> This is my own wording (or I have permission to share it), and it contains no patient information.</label>' +
       '<p class="fc-err hidden" role="alert"></p>' +
-      '<div class="fc-make-act"><button class="btn-primary fc-go" type="submit">' + (sh ? 'Update public copy' : 'Make it public') + '</button><button class="btn-secondary fc-cancel" type="button">Cancel</button></div></form>';
+      '<div class="fc-make-act"><button class="btn-primary fc-go" type="submit">' + (upd ? 'Update public deck' : 'Make deck public') + '</button><button class="btn-secondary fc-cancel" type="button">Cancel</button></div></form>';
     root.querySelector('.fc-back').onclick = renderHome;
     root.querySelector('.fc-cancel').onclick = renderMine;
     root.querySelector('#fc-ok').onchange = function () { if (this.checked) root.querySelector('.fc-err').classList.add('hidden'); };
@@ -311,23 +322,22 @@
       if (!root.querySelector('#fc-ok').checked) return fail('Please confirm the card is yours to share and has no patient information.');
       if (curUid() !== u) return renderHome();
       btn.disabled = true; btn.textContent = 'Saving…';
-      XRS.client().then(function (sb) { return sb.rpc('flashcard_share', { p_card_id: c.id, p_author: a }); }).then(function (r) {
+      XRS.client().then(function (sb) { return sb.rpc('flashcard_share_category', { p_subject: cat.name, p_author: a }); }).then(function (r) {
         if (r.error) throw r.error; if (curUid() !== u) return renderHome();
-        mine.shared[c.id] = { personal_card_id: c.id, author_name: r.data.author_name, hidden: r.data.hidden, subject: c.subject.trim(), term: c.term.trim(), definition: c.definition.trim() };
-        shared.loaded = false; renderMine();
+        shared.loaded = false; return loadMine(true).then(function () { if (curUid() === u) renderMine(); });
       }).catch(function (e2) {
         if (curUid() !== u) return renderHome();
         btn.disabled = false; btn.textContent = 'Try again'; var m = (e2 && e2.message) || '';
-        fail(/bad_name/.test(m) ? 'Please use a name (1–40 characters), not an email address.' : /share_limit/.test(m) ? 'You’ve reached the limit of 500 public cards.' : 'Couldn’t make it public. Please try again.');
+        fail(/bad_name/.test(m) ? 'Please use a name (1–40 characters), not an email address.' : /share_limit/.test(m) ? 'You’ve reached the limit of 500 public cards.' : /empty_category/.test(m) ? 'This category has no cards.' : 'Couldn’t update the public deck. Nothing was changed — please try again.');
       });
     };
   }
-  function unpublish(c) {
-    var u = curUid(); if (!c || !u) return;
-    if (!window.confirm('Make “' + c.term + '” private? The public copy will be removed. Your card stays in My Flashcards.')) return;
-    XRS.client().then(function (sb) { return sb.rpc('flashcard_unshare', { p_card_id: c.id }); })
-      .then(function (r) { if (r.error) throw r.error; if (curUid() !== u) return; delete mine.shared[c.id]; shared.loaded = false; renderMine(); })
-      .catch(function () { window.alert('Couldn’t make it private. Please try again.'); });
+  function unpublishDeck(k) {
+    var u = curUid(), cat = myCats()[k]; if (!u || !cat) return;
+    if (!window.confirm('Make the “' + cat.name + '” deck private? Its public copies will be removed. Your cards and progress stay in My Flashcards.')) return;
+    XRS.client().then(function (sb) { return sb.rpc('flashcard_unshare_category', { p_subject: cat.name }); })
+      .then(function (r) { if (r.error) throw r.error; if (curUid() !== u) return; shared.loaded = false; return loadMine(true).then(function () { if (curUid() === u) renderMine(); }); })
+      .catch(function () { window.alert('Couldn’t make the deck private. Nothing was changed — please try again.'); });
   }
   function loadShared() {
     if (!(window.XRS && XRS.client)) return;
