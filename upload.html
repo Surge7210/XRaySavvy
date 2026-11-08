@@ -79,6 +79,9 @@ label.lbl{display:block;color:var(--muted);font-size:0.9rem;margin:0.8rem 0 0.35
 .notice.warn{background:#3d331a;color:#ffd700}
 .notice.info{background:#1e2a3a;color:var(--text)}
 .notice.err{background:#3d1a1c;color:#ff8a92}
+.uf-card{border-top:1px solid var(--border);padding:0.8rem 0;margin-top:0.4rem}.uf-card input,.uf-card textarea{width:100%;font-size:16px}
+.uf-card .chips{flex-wrap:wrap}.uf-card .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uf-t{font-weight:700;overflow-wrap:anywhere}.uf-ok{color:#4fe0a8;font-weight:600}.uf-warn{color:#ffd700;font-size:0.85rem;margin-top:0.4rem}.uf-err{color:#ff8a92;font-size:0.85rem;margin-top:0.4rem}.uf-saved{opacity:0.8}
 .progress{height:10px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--border);margin:0.6rem 0}
 .progress>div{height:100%;width:0;background:var(--accent);transition:width .3s}
 .quiz-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.2rem}
@@ -243,6 +246,7 @@ body.picbox-open{overflow:hidden}
     </div>
     <button class="mode-btn" id="learnBtn"><div class="t" id="learnT">📖 Learn + Quiz <span class="t2">– summaries plus quizzes</span></div><div class="d" id="learnDesc">Best for slides &amp; notes. Goes through your file a few slides at a time: a short smart summary, then 2–4 questions on just that part. Saves your progress.</div></button>
     <button class="mode-btn" id="cramBtn"><div class="t" id="cramT">⚡ Cram only <span class="t2">– straight to quiz questions</span></div><div class="d" id="cramDesc">Best for vocab lists &amp; review questions. No summaries — one quiz on the whole file, 10 to 200 questions.</div></button>
+    <button class="mode-btn" id="flashBtn" type="button"><div class="t">🃏 Make flashcards <span class="t2">– review, then add to My Flashcards</span></div><div class="d">AI drafts flashcards from this file only. You edit, pick a category, and Add or Discard each one. Free account required.</div></button>
     <button class="btn btn-primary btn-block hidden upload-only" id="learnGoBtn" style="margin-top:0.7rem">Start Learn + Quiz →</button>
     <div id="ctxExtras" class="ctx-extras ctx-only"></div>
     <div id="learnPreview" class="hidden" style="margin-top:0.8rem"></div>
@@ -275,6 +279,8 @@ body.picbox-open{overflow:hidden}
     <div id="genError" class="notice err hidden" style="margin-top:0.8rem;margin-bottom:0"></div>
   </div>
   </div>
+
+  <div class="card hidden" id="flashCard"></div>
 
   <div class="card upload-only" id="justLookCard">
     <h2>Just looking?</h2>
@@ -1444,8 +1450,9 @@ function pickMode(m) {
   $('learnBtn').classList.toggle('active', m === 'learn');
   $('cramBtn').classList.toggle('active', m === 'cram');
   $('cramOptions').classList.toggle('hidden', m !== 'cram');
+  if (m !== 'flash' && window.XRS_UPLOAD_FLASH) XRS_UPLOAD_FLASH.show(false);
   if (m !== 'learn') $('learnPreview').classList.add('hidden');
-  if (m && extracted && !studyCtx) extracted.chosenType = m; // the deck type picked for this upload
+  if ((m === 'learn' || m === 'cram') && extracted && !studyCtx) extracted.chosenType = m; // the deck type picked for this upload
   $('learnGoBtn').classList.toggle('hidden', !(m === 'learn' && extracted && !studyCtx));
   paintTypeNote();
 }
@@ -1466,6 +1473,8 @@ function presetType() {
   if (!extracted.detected) extracted.detected = detectDeckType(extracted);
   pickMode(extracted.chosenType || extracted.detected.type);
 }
+$('flashBtn').addEventListener('click', () => { pickMode('flash'); if (window.XRS_UPLOAD_FLASH) XRS_UPLOAD_FLASH.show(true); });
+window.__flashExtracted = () => extracted;
 $('cramBtn').addEventListener('click', () => { pickMode('cram'); $('cramOptions').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 $('learnGoBtn').addEventListener('click', () => $('learnBtn').click());
 $('learnBtn').addEventListener('click', async () => {
@@ -4052,5 +4061,6 @@ else if (/[?&]demo=learn/.test(location.search)) startDemoLearn();
 else CramSave.offerOnLoad();
 SharedView.resumePendingSave();
 </script>
+<script src="./upload-flashcards.js?v=1"></script>
 </body>
 </html>
