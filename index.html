@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
-<script src="./flashcards.js?v=3"></script>
+<script src="./flashcards.js?v=4"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -46,6 +46,11 @@
   .fc-item { margin-bottom:.6rem; } .fc-item-t { font-weight:700; } .fc-item-d { margin:.2rem 0; } .fc-item-act { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.3rem; }
   .fc-badge { display:inline-block; font-size:.72rem; font-weight:600; padding:.1rem .5rem; border-radius:999px; background:#38444d; color:var(--text); vertical-align:middle; }
   .fc-b-approved { background:rgba(0,186,124,.2); color:#4fe0a8; } .fc-b-rejected { background:rgba(244,33,46,.18); color:#ff8a92; }
+  .fc-chips { display:flex; flex-wrap:wrap; gap:.4rem; margin:.3rem 0 .6rem; }
+  .fc-chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-height:36px; padding:.35rem .8rem; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--text); font:inherit; font-size:.85rem; cursor:pointer; }
+  .fc-form .fc-chip { border:1px solid var(--border); border-radius:999px; padding:.35rem .8rem; min-height:36px; font-weight:400; background:var(--card); }
+  .fc-chip.on, .fc-form .fc-chip.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+  .fc-in.hidden { display:none; } .fc-subject, .fc-item-t, .fc-item-d { overflow-wrap:anywhere; }
   .fc-lab { display:block; font-size:.85rem; color:var(--muted); margin:.7rem 0 .25rem; }
   .fc-in { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:.6rem; font:inherit; font-size:16px; }
   .fc-in:focus { outline:2px solid var(--accent); outline-offset:0; }

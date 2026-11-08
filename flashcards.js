@@ -223,15 +223,23 @@
       else loadMine().then(function () { if (curUid() === u && root.querySelector('.fc-mine')) renderMine(); });
       return;
     }
-    var bySub = {};
-    mine.cards.forEach(function (c) { (bySub[c.subject] = bySub[c.subject] || []).push(c); });
+    var cats = myCats(), keys = Object.keys(cats).sort(function (a, b) { return cats[a].name.localeCompare(cats[b].name); });
+    if (mineFilter && !cats[mineFilter]) mineFilter = '';
+    var shown = keys.filter(function (k) { return !mineFilter || k === mineFilter; });
+    var selN = mineFilter ? cats[mineFilter].cards.length : mine.cards.length;
     var h = bar('My Flashcards') + '<div class="fc-mine">' +
       '<div class="fc-make-act"><button class="btn-primary fc-new" type="button">+ New card</button>' +
-      (mine.cards.length ? '<button class="btn-secondary fc-study-mine" data-sub="" type="button">Study all (' + mine.cards.length + ')</button>' : '') + '</div>';
-    if (!mine.cards.length) h += '<div class="quiz-box"><p>You don’t have any cards yet.</p><p class="fc-sub">Tap “+ New card” to add a term and definition. Your cards are private to your account.</p></div>';
-    Object.keys(bySub).sort().forEach(function (sub) {
-      h += '<h3 class="fc-subject">' + esc(sub) + ' <button class="fc-link fc-study-mine" data-sub="' + esc(sub) + '" type="button">Study ' + bySub[sub].length + '</button></h3>';
-      bySub[sub].forEach(function (c) {
+      (mine.cards.length ? '<button class="btn-secondary fc-study-mine" data-sub="' + esc(mineFilter) + '" type="button">Study ' + (mineFilter ? esc(cats[mineFilter].name) : 'all') + ' (' + selN + ')</button>' : '') + '</div>';
+    if (keys.length) {
+      h += '<div class="fc-lab">Categories</div><div class="fc-chips" role="group" aria-label="Filter by category">' +
+        '<button type="button" class="fc-chip' + (mineFilter ? '' : ' on') + '" data-cat="" aria-pressed="' + !mineFilter + '">All (' + mine.cards.length + ')</button>' +
+        keys.map(function (k) { return '<button type="button" class="fc-chip' + (k === mineFilter ? ' on' : '') + '" data-cat="' + esc(k) + '" aria-pressed="' + (k === mineFilter) + '">' + esc(cats[k].name) + ' (' + cats[k].cards.length + ')</button>'; }).join('') + '</div>';
+    }
+    if (!mine.cards.length) h += '<div class="quiz-box"><p>You don’t have any cards yet.</p><p class="fc-sub">Tap “+ New card” to add a term and definition, and choose a category like Positioning, Physics or Patient Care. Your cards are private to your account.</p></div>';
+    shown.forEach(function (k) {
+      var cat = cats[k];
+      h += '<h3 class="fc-subject">' + esc(cat.name) + ' <button class="fc-link fc-study-mine" data-sub="' + esc(k) + '" type="button">Study ' + cat.cards.length + '</button></h3>';
+      cat.cards.forEach(function (c) {
         var st = mine.subs[c.id], badge = st ? '<span class="fc-badge fc-b-' + esc(st.status) + '">' + esc({ pending: 'Submitted · in review', approved: 'Approved ✓', rejected: 'Not added', merged: 'Already covered' }[st.status] || st.status) + '</span>' : '';
         h += '<div class="quiz-box fc-item"><div class="fc-item-t">' + esc(c.term) + ' ' + badge + '</div><div class="fc-item-d">' + esc(c.definition) + '</div>' +
           (c.source ? '<div class="fc-sub">Source: ' + esc(c.source) + '</div>' : '') +
@@ -245,13 +253,24 @@
     root.innerHTML = h;
     root.querySelector('.fc-back').onclick = renderHome;
     root.querySelector('.fc-new').onclick = function () { renderEditor(null); };
+    root.querySelectorAll('.fc-chip').forEach(function (b) { b.onclick = function () { mineFilter = b.getAttribute('data-cat'); renderMine(); }; });
     root.querySelectorAll('.fc-study-mine').forEach(function (b) { b.onclick = function () {
-      var sub = b.getAttribute('data-sub');
-      var cards = mine.cards.filter(function (c) { return !sub || c.subject === sub; }).map(function (c) { return [c.term, c.definition, '', c.id]; });
-      startDeck({ id: 'my', title: sub || 'My cards', cards: cards, back: renderMine }); }; });
+      var k = b.getAttribute('data-sub');
+      var cards = mine.cards.filter(function (c) { return !k || catKey(c.subject) === k; }).map(function (c) { return [c.term, c.definition, '', c.id]; });
+      startDeck({ id: 'my', title: k ? cats[k].name : 'My cards', cards: cards, back: renderMine }); }; });
     root.querySelectorAll('.fc-edit').forEach(function (b) { b.onclick = function () { renderEditor(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-del').forEach(function (b) { b.onclick = function () { delMine(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-submit').forEach(function (b) { b.onclick = function () { renderSubmit(findMine(b.getAttribute('data-id'))); }; });
+  }
+  var PRESETS = ['Positioning', 'Physics', 'Patient Care', 'Vocabulary', 'Anatomy', 'Radiation Protection'];
+  var mineFilter = '';
+  function catClean(t) { return String(t || '').replace(/\s+/g, ' ').trim(); }
+  function catKey(t) { return catClean(t).toLowerCase(); }
+  // Group by category ignoring case/extra spaces; show the first saved spelling. Stored values are never rewritten.
+  function myCats() {
+    var cats = {};
+    mine.cards.forEach(function (c) { var k = catKey(c.subject); (cats[k] = cats[k] || { name: catClean(c.subject), cards: [] }).cards.push(c); });
+    return cats;
   }
   function findMine(id) { return mine.cards.filter(function (c) { return c.id === id; })[0]; }
   function field(id, label, val, max, area, list) {
@@ -261,10 +280,17 @@
   }
   function renderEditor(c) {
     var u = curUid(); if (!u) return renderHome();
-    var subjects = {}; mine.cards.forEach(function (x) { subjects[x.subject] = 1; }); ['Vocabulary', 'Physics', 'Patient Care', 'Anatomy & Positioning', 'Radiation Protection'].forEach(function (x) { subjects[x] = 1; });
+    var opts = {}, order = [];
+    function addOpt(n) { var k = catKey(n); if (k && !opts[k]) { opts[k] = catClean(n); order.push(k); } }
+    var cats = myCats(); Object.keys(cats).forEach(function (k) { addOpt(cats[k].name); }); PRESETS.forEach(addOpt);
+    order.sort(function (a, b) { return opts[a].localeCompare(opts[b]); });
+    var curK = c ? catKey(c.subject) : (mineFilter || 'vocabulary');
     root.innerHTML = bar(c ? 'Edit card' : 'New card') + '<form class="quiz-box fc-form" novalidate>' +
-      field('fc-subj', 'Subject', c ? c.subject : 'Vocabulary', LIM.subject, false, 'fc-subj-list') +
-      '<datalist id="fc-subj-list">' + Object.keys(subjects).sort().map(function (x) { return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>' +
+      '<div class="fc-lab" id="fc-cat-l">Category — choose one or make your own</div>' +
+      '<div class="fc-chips" role="radiogroup" aria-labelledby="fc-cat-l">' + order.map(function (k) {
+        return '<button type="button" role="radio" class="fc-chip fc-cat' + (k === curK ? ' on' : '') + '" data-cat="' + esc(opts[k]) + '" aria-checked="' + (k === curK) + '">' + esc(opts[k]) + '</button>'; }).join('') +
+      '<button type="button" role="radio" class="fc-chip fc-cat-custom' + (opts[curK] ? '' : ' on') + '" aria-checked="' + !opts[curK] + '">+ Custom</button></div>' +
+      '<input id="fc-subj" class="fc-in' + (opts[curK] ? ' hidden' : '') + '" maxlength="' + LIM.subject + '" placeholder="Type a category name" aria-label="Custom category" value="' + esc(opts[curK] ? opts[curK] : (c ? c.subject : '')) + '" autocomplete="off">' +
       field('fc-term', 'Term (front)', c && c.term, LIM.term) +
       field('fc-def', 'Definition (back)', c && c.definition, LIM.definition, true) +
       field('fc-src', 'Source (optional — e.g. class handout, textbook chapter)', c && c.source, LIM.source) +
@@ -272,11 +298,16 @@
       '<div class="fc-make-act"><button class="btn-primary fc-save" type="submit">Save card</button><button class="btn-secondary fc-cancel" type="button">Cancel</button></div></form>';
     root.querySelector('.fc-back').onclick = renderHome;
     root.querySelector('.fc-cancel').onclick = renderMine;
+    var subjIn = root.querySelector('#fc-subj');
+    function pick(btn) { root.querySelectorAll('.fc-cat, .fc-cat-custom').forEach(function (b) { var on = b === btn; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); }
+    root.querySelectorAll('.fc-cat').forEach(function (b) { b.onclick = function () { pick(b); subjIn.value = b.getAttribute('data-cat'); subjIn.classList.add('hidden'); }; });
+    root.querySelector('.fc-cat-custom').onclick = function () { pick(this); subjIn.value = ''; subjIn.classList.remove('hidden'); subjIn.focus(); };
     root.querySelector('.fc-form').onsubmit = function (e) {
       e.preventDefault();
-      var v = { subject: val('fc-subj'), term: val('fc-term'), definition: val('fc-def'), source: val('fc-src') || null };
+      var sj = catClean(val('fc-subj')); if (opts[catKey(sj)]) sj = opts[catKey(sj)]; // reuse existing spelling (e.g. "physics " -> "Physics")
+      var v = { subject: sj, term: val('fc-term'), definition: val('fc-def'), source: val('fc-src') || null };
       var err = root.querySelector('.fc-err'), btn = root.querySelector('.fc-save');
-      if (!v.subject || !v.term || !v.definition) { err.textContent = 'Subject, term and definition are required.'; err.classList.remove('hidden'); return; }
+      if (!v.subject || !v.term || !v.definition) { err.textContent = 'Category, term and definition are required.'; err.classList.remove('hidden'); return; }
       if (curUid() !== u) return renderHome();
       btn.disabled = true; btn.textContent = 'Saving…';
       XRS.client().then(function (sb) {
@@ -286,6 +317,7 @@
         if (r.error) throw r.error;
         if (curUid() !== u) return renderHome();
         if (c) Object.assign(c, r.data); else mine.cards.push(r.data);
+        if (mineFilter && catKey(r.data.subject) !== mineFilter) mineFilter = catKey(r.data.subject);
         renderMine();
       }).catch(function (e2) {
         if (curUid() !== u) return renderHome();
@@ -384,7 +416,7 @@
   if (window.XRS && XRS.on) XRS.on(function () {
     var u = curUid(); syncState = 'local'; syncing = null;
     if (u === lastAuthUid) { if (root && !deck && root.querySelector('.fc-make-box')) renderHome(); return; }
-    lastAuthUid = u; mine = { uid: null, cards: [], subs: {}, loaded: false, loading: false, error: '' };
+    lastAuthUid = u; mineFilter = ''; mine = { uid: null, cards: [], subs: {}, loaded: false, loading: false, error: '' };
     if (root && !root.closest('.hidden')) { deck = null; renderHome(); }
   });
 })();
