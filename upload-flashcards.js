@@ -7,6 +7,33 @@
   var PRESETS = ['Positioning', 'Physics', 'Patient Care', 'Vocabulary', 'Anatomy', 'Radiation Protection'];
   var LIM = { subject: 60, term: 120, definition: 1000 };
   var FOCUS = 'FLASHCARDS: each item tests ONE key term or concept. Question: ask what a term means or names one concept (e.g. "What is ...?"). Answer: the key fact. Explanation: one-sentence definition from the text.';
+  var VOCAB = "VOCABULARY CARDS: one item per vocabulary term defined in the text. answer: ONLY the term exactly as written in the text. explanation: its definition as one short sentence from the text, NOT starting with the term or 'is defined as'. question: 'Define: <term>'.";
+  // Vocabulary card = term on front, plain definition on back. Only accepted when the term really
+  // appears in the source; otherwise the card stays in question/answer form (never invent terms).
+  function cleanDef(def, term) {
+    var d = String(def || '').replace(/\s+/g, ' ').trim();
+    var t = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    d = d.replace(new RegExp('^(the term\\s+)?(an?\\s+)?' + t + '\\s*(\\([^)]*\\)\\s*)?(:|-|–|—|is defined as|is|are|means|refers to|describes)\\s+', 'i'), '');
+    d = d.replace(/^(is defined as|defined as|refers to|means)\s+/i, '');
+    if (!d) return '';
+    d = d.charAt(0).toUpperCase() + d.slice(1);
+    return /[.!?]$/.test(d) ? d : d + '.';
+  }
+  function vocabCard(q, srcLow) {
+    // Only 'Define: X' items, or questions that explicitly ask for a term/word, become term cards.
+    var qs = String(q.question || ''), m = qs.match(/^\s*(?:define|term)\s*:\s*(.+)$/i), cand;
+    if (m) { if (q.answer && norm(q.answer) !== norm(m[1])) return null; cand = [m[1]]; }
+    else if (/\b(term|word)\b/i.test(qs)) cand = [String(q.answer || '')];
+    else return null;
+    for (var i = 0; i < cand.length; i++) {
+      var term = cand[i].replace(/\s+/g, ' ').trim().replace(/[.?!:]+$/, '');
+      if (!term || term.length > 60 || term.split(' ').length > 6 || srcLow.indexOf(term.toLowerCase()) < 0) continue;
+      var def = cleanDef(q.explanation, term);
+      if (!def || norm(def) === norm(term) || def.length < 8) continue;
+      return { term: term, definition: def };
+    }
+    return null;
+  }
   var st = { uid: null, drafts: [], running: false, cancel: false, mineNorms: null, saved: 0, discarded: 0, cat: 'Vocabulary', src: '' };
   function $(id) { return document.getElementById(id); }
   function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
@@ -40,10 +67,12 @@
         (x ? '<p class="muted small">From: <b>' + esc(clip(x.fileName || 'your notes', 80)) + '</b>. Cards are made ONLY from this file. They’re drafts — you check each one, then Add or Discard. Nothing is saved until you tap Add.</p>' :
              '<div class="notice warn">Choose a file first (or open a saved deck whose notes were saved).</div>') +
         '<label class="lbl">How many cards?</label><div class="chips" id="ufCount"><button class="chip" data-v="10">10</button><button class="chip active" data-v="20">20</button><button class="chip" data-v="30">30</button></div>' +
+        '<label class="lbl">Card style</label><div class="chips" id="ufStyle"><button class="chip active" data-v="vocab" type="button">Vocabulary (term → definition)</button><button class="chip" data-v="qa" type="button">Concept Q&amp;A</button></div>' +
         '<label class="lbl" for="ufFocus">Focus on (optional)</label><input type="text" id="ufFocus" maxlength="120" placeholder="e.g. contrast media terms">' +
         '<button class="btn btn-primary btn-block" id="ufGo" type="button" style="margin-top:0.8rem"' + (x ? '' : ' disabled') + '>Generate flashcards</button>' +
         '<div id="ufErr" class="notice err hidden" style="margin-top:0.8rem;margin-bottom:0"></div>';
       b.querySelectorAll('#ufCount .chip').forEach(function (c) { c.onclick = function () { b.querySelectorAll('#ufCount .chip').forEach(function (y) { y.classList.toggle('active', y === c); }); }; });
+      b.querySelectorAll('#ufStyle .chip').forEach(function (c) { c.onclick = function () { b.querySelectorAll('#ufStyle .chip').forEach(function (y) { y.classList.toggle('active', y === c); }); }; });
       $('ufGo').onclick = generate;
       return;
     }
@@ -60,7 +89,9 @@
     if (String(x.text).replace(/\s+/g, ' ').trim().length < 40) return err('This file has too little readable text to make flashcards.');
     var n = Number((box().querySelector('#ufCount .chip.active') || {}).getAttribute ? box().querySelector('#ufCount .chip.active').getAttribute('data-v') : 20) || 20;
     var userFocus = ($('ufFocus').value || '').trim().slice(0, 120);
-    var focus = (FOCUS + (userFocus ? ' Prefer: ' + userFocus : '')).slice(0, 300);
+    var style = ((box().querySelector('#ufStyle .chip.active') || { getAttribute: function () { return 'vocab'; } }).getAttribute('data-v')) || 'vocab';
+    var srcLow = String(x.text).replace(/\s+/g, ' ').toLowerCase();
+    var focus = ((style === 'vocab' ? VOCAB : FOCUS) + (userFocus ? ' Prefer: ' + userFocus : '')).slice(0, 300);
     st.running = true; st.cancel = false; st.src = x.fileName || 'your notes';
     var b = box();
     b.innerHTML = '<h2>🃏 Making flashcards…</h2><div class="muted" id="ufMsg">Starting…</div><div class="progress"><div id="ufBar"></div></div><div class="row"><button class="btn btn-secondary" id="ufStop" type="button">Stop</button></div><div id="ufErr" class="notice err hidden"></div>';
@@ -74,11 +105,16 @@
         try {
           var data = await callWorker({ action: 'questions', text: reqs[i].text, count: reqs[i].count, type: 'short', focus: focus });
           (data.questions || []).forEach(function (q) {
-            var front = clip(q.question, LIM.term), ans = clip(q.answer, 300), ex = clip(q.explanation, 600);
-            if (!front || !ans) return;
-            var back = clip(ex && norm(ex).indexOf(norm(ans)) < 0 ? ans + ' — ' + ex : (ex || ans), LIM.definition);
+            var v = style === 'vocab' ? vocabCard(q, srcLow) : null, front, back;
+            if (!v && style === 'vocab' && /^\s*(define|term)\s*:/i.test(String(q.question || ''))) return; // unverifiable term: drop, never invent
+            if (v) { front = clip(v.term, LIM.term); back = clip(v.definition, LIM.definition); }
+            else {
+              front = clip(q.question, LIM.term); var ans = clip(q.answer, 300), ex = clip(q.explanation, 600);
+              if (!front || !ans) return;
+              back = clip(ex && norm(ex).indexOf(norm(ans)) < 0 ? ans + ' — ' + ex : (ex || ans), LIM.definition);
+            }
             var k = norm(front); if (!k || seen[k]) return; seen[k] = 1;
-            out.push({ id: 'd' + out.length + '-' + Date.now().toString(36), term: front, definition: back, hint: clip(q.sourceHint, 60), cat: st.cat, status: 'draft' });
+            out.push({ id: 'd' + out.length + '-' + Date.now().toString(36), term: front, definition: back, kind: v ? 'vocab' : 'qa', hint: clip(q.sourceHint, 60), cat: st.cat, status: 'draft' });
           });
           break;
         } catch (e) {
@@ -140,8 +176,8 @@
       var saved = d.status === 'saved', dn = saved ? [] : dupNote(d);
       h += '<div class="uf-card' + (saved ? ' uf-saved' : '') + '" data-i="' + i + '">' +
         (saved ? '<div class="uf-ok">✓ Added to My Flashcards (' + esc(d.cat) + ')</div><div class="uf-t">' + esc(d.term) + '</div><div class="muted small">' + esc(d.definition) + '</div>' :
-        '<label class="lbl">Front (term / question)</label><input type="text" class="uf-term" maxlength="' + LIM.term + '" value="' + esc(d.term) + '">' +
-        '<label class="lbl">Back (answer)</label><textarea class="uf-def" rows="3" maxlength="' + LIM.definition + '">' + esc(d.definition) + '</textarea>' +
+        '<label class="lbl">Front (' + (d.kind === 'vocab' ? 'term' : 'question') + ')</label><input type="text" class="uf-term" maxlength="' + LIM.term + '" value="' + esc(d.term) + '">' +
+        '<label class="lbl">Back (' + (d.kind === 'vocab' ? 'definition' : 'answer') + ')</label><textarea class="uf-def" rows="3" maxlength="' + LIM.definition + '">' + esc(d.definition) + '</textarea>' +
         '<label class="lbl">Category</label><div class="chips uf-cats" role="radiogroup" aria-label="Category">' +
           cats.map(function (c) { var on = c.toLowerCase() === catClean(d.cat).toLowerCase(); return '<button type="button" role="radio" aria-checked="' + on + '" class="chip' + (on ? ' active' : '') + '" data-c="' + esc(c) + '">' + esc(c) + '</button>'; }).join('') +
         '</div><input type="text" class="uf-cat" maxlength="' + LIM.subject + '" list="ufCats" value="' + esc(d.cat) + '" aria-label="Category (choose above or type your own)" placeholder="Or type your own category">' +
