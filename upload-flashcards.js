@@ -7,7 +7,7 @@
   var PRESETS = ['Positioning', 'Physics', 'Patient Care', 'Vocabulary', 'Anatomy', 'Radiation Protection'];
   var LIM = { subject: 60, term: 120, definition: 1000 };
   var FOCUS = 'FLASHCARDS: each item tests ONE key term or concept. Question: ask what a term means or names one concept (e.g. "What is ...?"). Answer: the key fact. Explanation: one-sentence definition from the text.';
-  var VOCAB = "VOCABULARY CARDS: one item per vocabulary term defined in the text. answer: ONLY the term exactly as written in the text. explanation: its definition as one short sentence from the text, NOT starting with the term or 'is defined as'. question: 'Define: <term>'.";
+  var VOCAB = "VOCABULARY CARDS: one item per vocabulary term defined in the text. answer: ONLY the term exactly as written in the text. explanation: its definition as one short sentence from the text, NOT starting with the term or 'is defined as'. question: 'Define: <term>'. Fewer items is fine; never pad.";
   // Vocabulary card = term on front, plain definition on back. Only accepted when the term really
   // appears in the source; otherwise the card stays in question/answer form (never invent terms).
   function cleanDef(def, term) {
@@ -96,7 +96,7 @@
     var b = box();
     b.innerHTML = '<h2>🃏 Making flashcards…</h2><div class="muted" id="ufMsg">Starting…</div><div class="progress"><div id="ufBar"></div></div><div class="row"><button class="btn btn-secondary" id="ufStop" type="button">Stop</button></div><div id="ufErr" class="notice err hidden"></div>';
     $('ufStop').onclick = function () { st.cancel = true; };
-    var reqs = planRequests(x.chunks, Math.min(30, n)), out = [], seen = {}, stop = '';
+    var reqs = planRequests(x.chunks, Math.min(30, n)), out = [], qaSpare = [], seen = {}, stop = '';
     for (var i = 0; i < reqs.length && !st.cancel; i++) {
       if ($('ufMsg')) $('ufMsg').textContent = 'Reading part ' + (i + 1) + ' of ' + reqs.length + ' (' + out.length + ' cards so far)';
       if ($('ufBar')) $('ufBar').style.width = Math.round(i / reqs.length * 100) + '%';
@@ -114,6 +114,7 @@
               back = clip(ex && norm(ex).indexOf(norm(ans)) < 0 ? ans + ' — ' + ex : (ex || ans), LIM.definition);
             }
             var k = norm(front); if (!k || seen[k]) return; seen[k] = 1;
+            if (style === 'vocab' && !v) { qaSpare.push({ id: 'q' + qaSpare.length + '-' + Date.now().toString(36), term: front, definition: back, kind: 'qa', hint: clip(q.sourceHint, 60), cat: st.cat, status: 'draft' }); return; }
             out.push({ id: 'd' + out.length + '-' + Date.now().toString(36), term: front, definition: back, kind: v ? 'vocab' : 'qa', hint: clip(q.sourceHint, 60), cat: st.cat, status: 'draft' });
           });
           break;
@@ -129,9 +130,10 @@
     }
     if (uid() !== u) return; // account changed while generating: drop everything
     st.running = false;
-    st.drafts = out.slice(0, n);
+    var noTerms = !out.length && qaSpare.length;
+    st.drafts = (noTerms ? qaSpare : out).slice(0, n);
     if (!st.drafts.length) { paint(); err(stop || 'No flashcards could be made from this text. Try a file with more readable text.'); return; }
-    st.notice = stop ? stop + ' Kept the ' + st.drafts.length + ' cards made so far.' : '';
+    st.notice = (stop ? stop + ' Kept the ' + st.drafts.length + ' cards made so far.' : '') + (noTerms ? ' No vocabulary terms with definitions were found, so these are question/answer cards.' : '');
     await loadMineNorms(u);
     renderReview();
   }
