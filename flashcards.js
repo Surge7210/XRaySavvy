@@ -296,6 +296,7 @@
       '<div class="fc-make-act"><button class="btn-primary fc-go" type="submit">' + (sh ? 'Update public copy' : 'Make it public') + '</button><button class="btn-secondary fc-cancel" type="button">Cancel</button></div></form>';
     root.querySelector('.fc-back').onclick = renderHome;
     root.querySelector('.fc-cancel').onclick = renderMine;
+    root.querySelector('#fc-ok').onchange = function () { if (this.checked) root.querySelector('.fc-err').classList.add('hidden'); };
     root.querySelector('.fc-form').onsubmit = function (e) {
       e.preventDefault();
       var a = catClean(val('fc-author')), err = root.querySelector('.fc-err'), btn = root.querySelector('.fc-go');
