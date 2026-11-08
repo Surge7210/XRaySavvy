@@ -84,6 +84,7 @@
     <p class="sub" id="updated"></p>
     <div id="signups"></div>
     <div id="fcmod"></div>
+    <div id="fcshared"></div>
     <div id="cards"></div>
     <button class="btn sec" id="refresh" type="button">Refresh</button>
   </div>
@@ -308,11 +309,46 @@
     catch (e) { renderMod(null, 'Suggestions unavailable: ' + (e.message || e)); }
   }
 
+  // ---- Student-shared cards (published directly by students, not reviewed). Owner can hide/unhide/remove for safety. ----
+  function renderShared(rows, err) {
+    var box = $('fcshared'); box.textContent = '';
+    var c = el('section', 'card'), head = el('div', 'su-head');
+    head.appendChild(el('h2', '', '👥 Student-shared cards'));
+    var rb = el('button', 'icon-btn', '↻ Refresh'); rb.type = 'button'; rb.onclick = function () { rb.disabled = true; loadShared(); };
+    head.appendChild(rb); c.appendChild(head);
+    c.appendChild(el('p', 'src', 'Cards students chose to make public under a name they picked. Shown on the Flashcards tab as “Not reviewed”. Hide or remove anything unsafe or wrong; this never changes the student’s private card.'));
+    if (!rows) { c.appendChild(el('div', 'err', err || 'Unavailable.')); box.appendChild(c); return; }
+    if (!rows.length) c.appendChild(el('div', 'raw', 'No student-shared cards yet.'));
+    rows.forEach(function (r) {
+      var it = el('div', 'su-item fc-mod' + (r.hidden ? ' done' : ''));
+      var top = el('div', 'su-top'); top.appendChild(el('span', 'su-handle', r.author_name + ' · ' + r.subject)); if (r.hidden) top.appendChild(chip('no', 'Hidden'));
+      it.appendChild(top); it.appendChild(el('div', 'su-line', r.term + ' — ' + r.definition));
+      var act = el('div', 'mod-act'), msg = el('div', 'raw');
+      [[r.hidden ? 'unhide' : 'hide', r.hidden ? 'Unhide' : 'Hide'], ['remove', '✕ Remove']].forEach(function (a) {
+        var b = el('button', 'icon-btn', a[1]); b.type = 'button';
+        b.onclick = async function () {
+          if (a[0] === 'remove' && !confirm('Remove this public copy? The student keeps their private card.')) return;
+          act.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+          try { var sb = await XRS.client(); var res = await sb.rpc('admin_shared_flashcard_set', { p_id: r.id, p_action: a[0] }); if (res.error) throw res.error; msg.textContent = 'Done: ' + a[1]; loadShared(); }
+          catch (e) { msg.textContent = 'Failed: ' + (e.message || e); act.querySelectorAll('button').forEach(function (x) { x.disabled = false; }); }
+        };
+        act.appendChild(b);
+      });
+      it.appendChild(act); it.appendChild(msg); c.appendChild(it);
+    });
+    box.appendChild(c);
+  }
+  async function loadShared() {
+    if (window.__USAGE_MOCK) { renderShared(window.__USAGE_MOCK.shared || [], null); return; }
+    try { var sb = await XRS.client(); var r = await sb.rpc('admin_shared_flashcards'); if (r.error) throw r.error; renderShared(r.data || [], null); }
+    catch (e) { renderShared(null, 'Student-shared cards unavailable: ' + (e.message || e)); }
+  }
+
   function show(which) { ['loading', 'private', 'dash'].forEach(function (id) { $(id).classList.toggle('hidden', id !== which); }); }
 
   // window.__USAGE_MOCK lets a test render the page without a live session.
   async function load() {
-    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); loadMod(); return; }
+    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); loadMod(); loadShared(); return; }
     var sb, session;
     try { sb = await XRS.client(); session = (await sb.auth.getSession()).data.session; } catch (e) { session = null; }
     if (!session || !session.user || session.user.id !== OWNER_ID) { show('private'); return; }
@@ -322,7 +358,7 @@
       .catch(function (e) { errs.worker = 'Worker counts unavailable: ' + e.message; return null; });
     var dP = sb.rpc('admin_usage').then(function (r) { if (r.error) throw r.error; return r.data; })
       .catch(function (e) { errs.db = 'Database stats unavailable: ' + (e.message || e); return null; });
-    var sP = loadSignups(); loadMod();
+    var sP = loadSignups(); loadMod(); loadShared();
     var res = await Promise.all([wP, dP]);
     if (!res[0] && !res[1] && /private|not allowed/i.test((errs.worker || '') + (errs.db || ''))) { show('private'); return; }
     show('dash'); render(res[0], res[1], errs);

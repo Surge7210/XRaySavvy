@@ -133,16 +133,29 @@
           '<button class="btn-primary fc-study" data-community="' + esc(sub) + '" type="button">Study</button></div>';
       });
     }
+    if (shared.cards.length) {
+      var ss = {};
+      shared.cards.forEach(function (c) { (ss[c.subject] = ss[c.subject] || []).push(c); });
+      h += '<h3 class="fc-subject">Student-shared cards</h3><p class="fc-sub">Made public by students. <b>Not reviewed by XRaySavvy</b> — check against your handouts.</p>';
+      Object.keys(ss).sort().forEach(function (sub) {
+        var names = []; ss[sub].forEach(function (c) { if (names.indexOf(c.author_name) < 0) names.push(c.author_name); });
+        h += '<div class="quiz-box fc-deck fc-shared"><div class="fc-deck-t">' + esc(sub) + ' <span class="fc-badge">Not reviewed</span></div><div class="fc-deck-b">Shared by ' + esc(names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '')) + '</div><div class="fc-deck-n">' + ss[sub].length + ' cards</div>' +
+          '<button class="btn-primary fc-study" data-shared="' + esc(sub) + '" type="button">Study</button></div>';
+      });
+    }
     h += '<p class="fc-note">More subjects (Physics, Patient Care) coming soon.</p>';
     root.innerHTML = h;
     root.querySelectorAll('.fc-study').forEach(function (b) { b.onclick = function () {
       var cm = b.getAttribute('data-community');
       if (cm != null) return startDeck(communityDeck(cm));
+      var sd = b.getAttribute('data-shared');
+      if (sd != null) return startDeck(sharedDeck(sd));
       start(b.getAttribute('data-deck')); }; });
     var mk = root.querySelector('.fc-make');
     if (mk) mk.onclick = function () { renderMine(); };
     root.querySelectorAll('.fc-auth').forEach(function (b) { b.onclick = function () { if (window.XRS && XRS.openAuth) XRS.openAuth(b.getAttribute('data-mode')); }; });
     if (!community.loaded) loadCommunity();
+    if (!shared.loaded) loadShared();
     sync();
   }
   function buildQueue() {
@@ -161,18 +174,19 @@
 
   // ---- Make your own cards (signed-in only; private; saved to the account) ----
   var LIM = { subject: 60, term: 120, definition: 1000, source: 300 };
-  var mine = { uid: null, cards: [], subs: {}, loaded: false, loading: false, error: '' };
+  var mine = { uid: null, cards: [], subs: {}, shared: {}, loaded: false, loading: false, error: '' };
+  var shared = { cards: [], loaded: false };
   var community = { cards: [], loaded: false };
   function curUid() { return (window.XRS && XRS.user && XRS.user.id) || null; }
   function norm(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/(\w{3,})(es|s)$/, '$1'); }
   function makeCta() {
     if (!curUid()) return '<div class="quiz-box fc-make-box"><div class="fc-deck-t">✍️ Make your own cards</div>' +
-      '<div class="fc-deck-b">Create private flashcards that save to your profile and sync across your devices. Free account required.</div>' +
+      '<div class="fc-deck-b">Create flashcards that save to your profile and sync across your devices — keep them private or share them here with your name. Free account required.</div>' +
       '<div class="fc-make-act"><button class="btn-primary fc-auth" data-mode="signup" type="button">Sign up free</button>' +
       '<button class="btn-secondary fc-auth" data-mode="login" type="button">Log in</button></div></div>';
     var n = mine.uid === curUid() && mine.loaded ? ' (' + mine.cards.length + ')' : '';
     return '<div class="quiz-box fc-make-box"><div class="fc-deck-t">✍️ Make your own cards</div>' +
-      '<div class="fc-deck-b">Your personal cards are private to your account.</div>' +
+      '<div class="fc-deck-b">Your personal cards are private to your account unless you choose “Make it public”.</div>' +
       '<div class="fc-make-act"><button class="btn-primary fc-make" type="button">My Flashcards' + n + '</button></div></div>';
   }
   function loadCommunity() {
@@ -189,19 +203,21 @@
   function loadMine(force) {
     var u = curUid();
     if (!u) return Promise.resolve();
-    if (mine.uid !== u) mine = { uid: u, cards: [], subs: {}, loaded: false, loading: false, error: '' };
+    if (mine.uid !== u) mine = { uid: u, cards: [], subs: {}, shared: {}, loaded: false, loading: false, error: '' };
     if (mine.loaded && !force) return Promise.resolve();
     mine.loading = true; mine.error = '';
     return XRS.client().then(function (sb) {
       return Promise.all([
         sb.from('personal_flashcards').select('id,subject,term,definition,source,updated_at').order('created_at').limit(2000),
-        sb.from('flashcard_suggestions').select('personal_card_id,status,created_at,owner_note').order('created_at', { ascending: false }).limit(1000)
+        sb.from('flashcard_suggestions').select('personal_card_id,status,created_at,owner_note').order('created_at', { ascending: false }).limit(1000),
+        sb.rpc('my_shared_flashcards').then(function (r) { return r; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
       if (curUid() !== u) return; // account changed mid-load: drop
       if (rs[0].error) throw rs[0].error;
       mine.cards = rs[0].data || []; mine.subs = {};
       (rs[1].data || []).forEach(function (x) { if (x.personal_card_id && !mine.subs[x.personal_card_id]) mine.subs[x.personal_card_id] = x; });
+      mine.shared = {}; var shl = rs[2] && rs[2].data; (Array.isArray(shl) ? shl : []).forEach(function (x) { mine.shared[x.personal_card_id] = x; });
       mine.loaded = true;
     }).catch(function (e) { if (curUid() === u) mine.error = (e && e.message) || 'Could not load your cards.'; })
       .then(function () { if (curUid() === u) mine.loading = false; });
@@ -241,14 +257,20 @@
       h += '<h3 class="fc-subject">' + esc(cat.name) + ' <button class="fc-link fc-study-mine" data-sub="' + esc(k) + '" type="button">Study ' + cat.cards.length + '</button></h3>';
       cat.cards.forEach(function (c) {
         var st = mine.subs[c.id], badge = st ? '<span class="fc-badge fc-b-' + esc(st.status) + '">' + esc({ pending: 'Submitted · in review', approved: 'Approved ✓', rejected: 'Not added', merged: 'Already covered' }[st.status] || st.status) + '</span>' : '';
+        var sh = mine.shared[c.id], stale = sh && (sh.term !== c.term.trim() || sh.definition !== c.definition.trim() || sh.subject !== c.subject.trim());
+        if (sh) badge += ' <span class="fc-badge fc-b-public">' + (sh.hidden ? 'Public copy hidden by XRaySavvy' : 'Public · by ' + esc(sh.author_name)) + '</span>';
         h += '<div class="quiz-box fc-item"><div class="fc-item-t">' + esc(c.term) + ' ' + badge + '</div><div class="fc-item-d">' + esc(c.definition) + '</div>' +
           (c.source ? '<div class="fc-sub">Source: ' + esc(c.source) + '</div>' : '') +
           (st && st.owner_note ? '<div class="fc-sub">Reviewer note: ' + esc(st.owner_note) + '</div>' : '') +
           '<div class="fc-item-act"><button class="fc-link fc-edit" data-id="' + c.id + '" type="button">Edit</button>' +
           '<button class="fc-link fc-del" data-id="' + c.id + '" type="button">Delete</button>' +
-          (st && st.status === 'pending' ? '' : '<button class="fc-link fc-submit" data-id="' + c.id + '" type="button">Submit to XRaySavvy</button>') + '</div></div>';
+          (st && st.status === 'pending' ? '' : '<button class="fc-link fc-submit" data-id="' + c.id + '" type="button">Submit to XRaySavvy</button>') +
+          (sh ? (stale ? '<button class="fc-link fc-pub" data-id="' + c.id + '" type="button">Update public copy</button>' : '') + '<button class="fc-link fc-unpub" data-id="' + c.id + '" type="button">Make private</button>'
+              : '<button class="fc-link fc-pub" data-id="' + c.id + '" type="button">Make it public</button>') + '</div>' +
+          (stale ? '<div class="fc-sub">You edited this card after sharing it. The public copy still shows the old version until you tap “Update public copy”.</div>' : '') + '</div>';
       });
     });
+    h += '<p class="fc-note">Cards are private unless you choose “Make it public”, which shows a copy with your chosen name in Student-shared cards (not reviewed). “Submit to XRaySavvy” is separate: it sends a copy for review to the reviewed Community deck.</p>';
     h += '<p class="fc-note">Submitting sends a copy of the card for review. It only becomes public if XRaySavvy approves it; later edits to your card don’t change the submitted copy.</p></div>';
     root.innerHTML = h;
     root.querySelector('.fc-back').onclick = renderHome;
@@ -261,6 +283,59 @@
     root.querySelectorAll('.fc-edit').forEach(function (b) { b.onclick = function () { renderEditor(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-del').forEach(function (b) { b.onclick = function () { delMine(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-submit').forEach(function (b) { b.onclick = function () { renderSubmit(findMine(b.getAttribute('data-id'))); }; });
+    root.querySelectorAll('.fc-pub').forEach(function (b) { b.onclick = function () { renderPublish(findMine(b.getAttribute('data-id'))); }; });
+    root.querySelectorAll('.fc-unpub').forEach(function (b) { b.onclick = function () { unpublish(findMine(b.getAttribute('data-id'))); }; });
+  }
+  // ---- Make it public (opt-in, per card; a snapshot with a name the student chooses; not reviewed) ----
+  function renderPublish(c) {
+    var u = curUid(); if (!c || !u) return renderHome();
+    var sh = mine.shared[c.id], name = (sh && sh.author_name) || catClean(window.XRS && XRS.profileName || '').slice(0, 40);
+    root.innerHTML = bar(sh ? 'Update public copy' : 'Make it public') + '<form class="quiz-box fc-form fc-pub-box" novalidate>' +
+      '<div class="fc-item-t">' + esc(c.term) + '</div><div class="fc-item-d">' + esc(c.definition) + '</div><div class="fc-sub">Category: ' + esc(c.subject) + '</div>' +
+      '<p class="fc-sub">Anyone can see public cards in <b>Student-shared cards</b> on the Flashcards tab, marked “Not reviewed”. Only the term, definition, category and the name below are shown — never your email or the card’s source. Later edits to your card don’t change the public copy unless you update it. You can make it private again any time.</p>' +
+      field('fc-author', 'Name to show (your choice, e.g. first name or nickname)', name, 40) +
+      '<label class="fc-check"><input type="checkbox" id="fc-ok"> This is my own wording (or I have permission to share it), and it contains no patient information.</label>' +
+      '<p class="fc-err hidden" role="alert"></p>' +
+      '<div class="fc-make-act"><button class="btn-primary fc-go" type="submit">' + (sh ? 'Update public copy' : 'Make it public') + '</button><button class="btn-secondary fc-cancel" type="button">Cancel</button></div></form>';
+    root.querySelector('.fc-back').onclick = renderHome;
+    root.querySelector('.fc-cancel').onclick = renderMine;
+    root.querySelector('.fc-form').onsubmit = function (e) {
+      e.preventDefault();
+      var a = catClean(val('fc-author')), err = root.querySelector('.fc-err'), btn = root.querySelector('.fc-go');
+      function fail(m) { err.textContent = m; err.classList.remove('hidden'); }
+      if (!a) return fail('Please enter the name to show.');
+      if (/@/.test(a)) return fail('Please use a name, not an email address.');
+      if (!root.querySelector('#fc-ok').checked) return fail('Please confirm the card is yours to share and has no patient information.');
+      if (curUid() !== u) return renderHome();
+      btn.disabled = true; btn.textContent = 'Saving…';
+      XRS.client().then(function (sb) { return sb.rpc('flashcard_share', { p_card_id: c.id, p_author: a }); }).then(function (r) {
+        if (r.error) throw r.error; if (curUid() !== u) return renderHome();
+        mine.shared[c.id] = { personal_card_id: c.id, author_name: r.data.author_name, hidden: r.data.hidden, subject: c.subject.trim(), term: c.term.trim(), definition: c.definition.trim() };
+        shared.loaded = false; renderMine();
+      }).catch(function (e2) {
+        if (curUid() !== u) return renderHome();
+        btn.disabled = false; btn.textContent = 'Try again'; var m = (e2 && e2.message) || '';
+        fail(/bad_name/.test(m) ? 'Please use a name (1–40 characters), not an email address.' : /share_limit/.test(m) ? 'You’ve reached the limit of 500 public cards.' : 'Couldn’t make it public. Please try again.');
+      });
+    };
+  }
+  function unpublish(c) {
+    var u = curUid(); if (!c || !u) return;
+    if (!window.confirm('Make “' + c.term + '” private? The public copy will be removed. Your card stays in My Flashcards.')) return;
+    XRS.client().then(function (sb) { return sb.rpc('flashcard_unshare', { p_card_id: c.id }); })
+      .then(function (r) { if (r.error) throw r.error; if (curUid() !== u) return; delete mine.shared[c.id]; shared.loaded = false; renderMine(); })
+      .catch(function () { window.alert('Couldn’t make it private. Please try again.'); });
+  }
+  function loadShared() {
+    if (!(window.XRS && XRS.client)) return;
+    shared.loaded = true;
+    XRS.client().then(function (sb) { return sb.from('shared_flashcards').select('id,subject,term,definition,author_name').order('subject').limit(2000); })
+      .then(function (r) { if (r.error) throw r.error; shared.cards = r.data || []; if (root && !deck && shared.cards.length && root.querySelector('.fc-make-box') && !root.querySelector('.fc-mine')) renderHome(); })
+      .catch(function () { shared.loaded = false; });
+  }
+  function sharedDeck(sub) {
+    return { id: 'shared', title: sub + ' (student-shared)', cards: shared.cards.filter(function (c) { return c.subject === sub; })
+      .map(function (c) { return [c.term, c.definition, 'Shared by ' + c.author_name + ' · not reviewed', c.id]; }) };
   }
   var PRESETS = ['Positioning', 'Physics', 'Patient Care', 'Vocabulary', 'Anatomy', 'Radiation Protection'];
   var mineFilter = '';
@@ -329,7 +404,7 @@
   function val(id) { var el = root.querySelector('#' + id); return el ? el.value.trim() : ''; }
   function delMine(c) {
     var u = curUid(); if (!c || !u) return;
-    if (!window.confirm('Delete “' + c.term + '”? This can’t be undone.')) return;
+    if (!window.confirm('Delete “' + c.term + '”? This can’t be undone.' + (mine.shared[c.id] ? ' Its public copy will be removed too.' : ''))) return;
     XRS.client().then(function (sb) { return sb.from('personal_flashcards').delete().eq('id', c.id); })
       .then(function (r) { if (r.error) throw r.error; if (curUid() !== u) return; mine.cards = mine.cards.filter(function (x) { return x.id !== c.id; }); renderMine(); })
       .catch(function () { window.alert('Couldn’t delete. Please try again.'); });
