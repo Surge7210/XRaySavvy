@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
-<script src="./flashcards.js?v=1"></script>
+<script src="./flashcards.js?v=2"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -37,7 +37,7 @@
   .fc-card { display:block; width:100%; min-height:220px; text-align:center; color:var(--text); font:inherit; cursor:pointer; }
   .fc-card:focus-visible { outline:2px solid var(--accent); }
   .fc-front { font-size:1.6rem; font-weight:700; margin:1.5rem 0 1rem; } .fc-front.fc-small { font-size:1.15rem; font-weight:600; }
-  .fc-small { font-size:1.05rem; } .fc-ans hr { border:none; border-top:1px solid var(--border); margin:1rem 0; }
+  .fc-small { font-size:1.05rem; } .fc-note-cls { margin:.8rem 0 0; padding:.5rem .7rem; border-left:3px solid #b07d0a; background:rgba(176,125,10,.12); border-radius:6px; color:var(--text); font-size:.85rem; text-align:left; } .fc-ans hr { border:none; border-top:1px solid var(--border); margin:1rem 0; }
   .fc-rate { display:flex; gap:.5rem; margin-top:.8rem; } .fc-rate.hidden, .fc-ans.hidden { display:none; }
   .fc-r { flex:1; min-height:48px; border:none; border-radius:10px; font:inherit; font-weight:700; color:#fff; cursor:pointer; }
   .fc-again { background:var(--bad); } .fc-hard { background:#b07d0a; } .fc-good { background:var(--good); }

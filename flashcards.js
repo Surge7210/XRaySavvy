@@ -5,35 +5,35 @@
     id: 'gi-terms', subject: 'Vocabulary', title: 'GI Terminology',
     blurb: 'Pathophysiology of the GI tract — key terms',
     cards: [
-      ["Adenocarcinoma", "Cancer that begins in glandular (secretory) cells, such as those lining the colon or stomach."],
-      ["Bacteriolytic", "Able to break apart (lyse) and destroy bacteria."],
-      ["Carcinoma", "Cancer that begins in epithelial cells — the cells that cover body surfaces and line organs."],
-      ["Chyme", "The semi-liquid mix of partly digested food and stomach juices that passes from the stomach into the small intestine."],
-      ["Constipation", "Having fewer than 3 bowel movements a week, or stools that are hard, dry, and difficult to pass."],
-      ["Crohn's Disease", "A chronic inflammatory bowel disease that can affect any part of the GI tract; it most often involves the end of the small intestine (terminal ileum)."],
-      ["Deglutition", "Swallowing — moving food and liquid from the mouth through the pharynx and esophagus to the stomach."],
-      ["Diarrhea", "Loose, watery stools, often more frequent than usual; it can lead to dehydration."],
-      ["Diverticulosis", "Small pouches (diverticula) that bulge outward through weak spots in the colon wall."],
-      ["Endoscopy", "Looking inside the body with an endoscope — a thin, lighted tube with a camera, which may be flexible or rigid."],
-      ["Epithelial Tissue", "Tissue made of cells that cover body surfaces and line hollow organs, cavities, and glands."],
-      ["Esophageal Varices", "Enlarged, swollen veins in the lower esophagus, most often caused by high pressure in the portal vein (portal hypertension), commonly from cirrhosis."],
-      ["Fistula", "An abnormal connection or passageway between two organs or vessels, or between an organ and the skin, that are not normally connected."],
-      ["Heartburn", "A burning feeling behind the breastbone, usually caused by stomach acid backing up into the esophagus (acid reflux)."],
-      ["Hiatal Hernia", "Part of the stomach pushes up through the diaphragm's esophageal hiatus into the chest."],
-      ["Hirschsprung's Disease", "A condition present at birth in which nerve cells are missing from part of the bowel (usually ending at the rectum), so stool can't move through normally; the bowel above can become greatly enlarged (megacolon)."],
-      ["Ileus", "Slowed or stopped movement (peristalsis) of the intestines without a physical blockage; often called paralytic ileus."],
-      ["Inguinal Hernia", "Tissue such as fat or part of the intestine bulges through a weak spot in the abdominal wall at the groin (inguinal canal)."],
-      ["Intussusception", "One part of the intestine telescopes (slides) into an adjacent segment, which can block the bowel and cut off its blood supply."],
-      ["Laxative", "A medicine or food that helps produce a bowel movement — e.g., by adding bulk, drawing water into the stool, softening stool, or stimulating the bowel."],
-      ["Lysozyme", "An enzyme found in tears, saliva, mucus, and other body fluids that breaks down bacterial cell walls — an early defense against infection."],
-      ["Peptic Ulcer", "An open sore in the lining of the stomach or the first part of the small intestine (duodenum); it can also occur in the lower esophagus."],
-      ["Peristalsis", "A series of wave-like muscle contractions that move food and other contents along the digestive tract."],
-      ["Polyp", "An abnormal growth on a mucous membrane lining, such as the colon; it may stick out into the lumen (sometimes on a stalk) or be flat."],
-      ["Pyloric Stenosis", "Narrowing of the pylorus (the stomach outlet into the duodenum), usually from thickened muscle, which keeps food from emptying; most common in infants."],
-      ["Pylorospasm", "Closure of the stomach outlet (pylorus) from muscle spasm, delaying passage of stomach contents into the duodenum."],
-      ["Sigmoidoscopy", "An exam of the rectum and sigmoid colon (lower part of the large intestine) using a lighted scope, usually flexible."],
-      ["Ulcerative Colitis", "A chronic inflammatory bowel disease that causes inflammation and sores (ulcers) in the lining of the colon and rectum."],
-      ["Volvulus", "A loop of bowel twists around itself (and its mesentery), causing a blockage and possibly cutting off blood supply."]
+      ["Adenocarcinoma", "A malignant tumor that develops from the glandular tissue of an organ."],
+      ["Bacteriolytic", "Relating to the destruction of bacteria."],
+      ["Carcinoma", "A malignant tumor that develops from epithelial tissue."],
+      ["Chyme", "A mix of partly digested food and gastric juices."],
+      ["Constipation", "Difficulty or inability moving the bowels, due to hard or dry stool."],
+      ["Crohn's Disease", "A chronic inflammatory condition, typically of the terminal ileum."],
+      ["Deglutition", "Swallowing — the act of passing food from the mouth into the upper esophagus."],
+      ["Diarrhea", "A GI disturbance with loose, watery stools, which can cause dehydration."],
+      ["Diverticulosis", "A colon condition with small sacs (pouches) bulging out from its walls."],
+      ["Endoscopy", "A procedure to look inside a body cavity using a fiber-optic scope (usually flexible)."],
+      ["Epithelial Tissue", "Tissue that forms the outer cell layer on an organ's surface and lines hollow structures."],
+      ["Esophageal Varices", "Twisted, dilated veins around the esophagus, most often from increased portal venous pressure due to cirrhosis of the liver."],
+      ["Fistula", "An abnormal connection or passageway between two cavities or organs that are normally separate."],
+      ["Heartburn", "An uncomfortable burning feeling in the substernal region, most often from reflux of gastric juices into the esophagus."],
+      ["Hiatal Hernia", "The upper portion of the stomach protrudes through the hiatus of the diaphragm."],
+      ["Hirschsprung's Disease", "A congenital condition where nerve cells (the nerve plexus) fail to develop in part of the bowel, usually the rectosigmoid region, resulting in a megacolon.", "Class handout note: the handout says “abdominal development”; it means abnormal (missing) nerve development."],
+      ["Ileus", "Slowed or stopped intestinal movement (peristalsis) without a physical blockage — often called paralytic ileus.", "Class handout note: the handout defines ileus as the intestine twisting on itself. That twisting is volvulus, not ileus."],
+      ["Inguinal Hernia", "A protrusion of an abdominal sac (which may contain intestine) through the inguinal ring."],
+      ["Intussusception", "An intestinal obstruction where one part of the intestine slides (telescopes) into an adjacent segment.", "Class handout note: the handout says it slides into a proximal segment. Usually the proximal part slides into the distal part, so remember “adjacent”."],
+      ["Laxative", "A medication or food that encourages a bowel movement, for example by softening the stool."],
+      ["Lysozyme", "A bacteriolytic enzyme in many body fluids (like tears and saliva) that is a first line of defense against invading bacteria."],
+      ["Peptic Ulcer", "Mucosal erosion in the distal esophagus, stomach, or proximal small intestine (duodenum)."],
+      ["Peristalsis", "A rhythmic, wave-like contraction that moves contents through hollow tubes like the alimentary (digestive) and urinary tracts."],
+      ["Polyp", "A growth from a mucous membrane, often on a stalk, commonly found in the nasal cavity, uterus, or large intestine."],
+      ["Pyloric Stenosis", "A thickening around the pyloric sphincter that keeps food from passing into the duodenum."],
+      ["Pylorospasm", "A spasm of the pyloric (terminal) portion of the stomach."],
+      ["Sigmoidoscopy", "A procedure where a fiber-optic scope (usually flexible) is inserted into the large intestine to examine it."],
+      ["Ulcerative Colitis", "An inflammatory condition of the colon with ulcers of the mucosa."],
+      ["Volvulus", "A bowel obstruction caused by the intestine twisting on itself."]
     ]
   }];
   window.XRS_FLASH_DECKS = DECKS;
@@ -152,7 +152,8 @@
       '<button class="btn-secondary fc-rev" type="button" aria-pressed="' + reverse + '">' + (reverse ? 'Definition → Term' : 'Term → Definition') + '</button></div>' +
       '<button class="quiz-box fc-card" type="button" aria-label="Flashcard. Tap to reveal answer">' +
       '<div class="fc-front' + (reverse ? ' fc-small' : '') + '">' + esc(front) + '</div>' +
-      '<div class="fc-ans' + (shown ? '' : ' hidden') + '"><hr><div class="' + (reverse ? '' : 'fc-small') + '">' + esc(back) + '</div></div>' +
+      '<div class="fc-ans' + (shown ? '' : ' hidden') + '"><hr><div class="' + (reverse ? '' : 'fc-small') + '">' + esc(back) + '</div>' +
+      (c[2] ? '<p class="fc-note-cls" role="note">' + esc(c[2]) + '</p>' : '') + '</div>' +
       (shown ? '' : '<div class="fc-tap">Tap to reveal</div>') + '</button>' +
       '<div class="fc-rate' + (shown ? '' : ' hidden') + '">' +
       '<button class="fc-r fc-again" data-r="again" type="button">Again</button>' +
