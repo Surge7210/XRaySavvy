@@ -45,6 +45,10 @@
   function load() { try { return JSON.parse(localStorage.getItem(key())) || {}; } catch (e) { return {}; } }
   function save(s) { try { localStorage.setItem(key(), JSON.stringify(s)); } catch (e) {} }
   // Basic spaced repetition. rating: again | hard | good
+  // Spaced-repetition scheduling is turned OFF for now (owner request): every deck is always fully studyable,
+  // ratings only drive the end-of-session summary, and saved progress is neither read for gating nor written.
+  // The scheduler, local progress and server sync code/data are kept untouched for a later re-enable (set true).
+  var SCHEDULING = false;
   function schedule(st, rating, now) {
     st = Object.assign({ ivl: 0, reps: 0, lapses: 0 }, st || {});
     if (rating === 'again') { st.ivl = 0; st.reps = 0; st.lapses++; st.due = now + MIN; }
@@ -98,7 +102,7 @@
   }
   function paintSync() { var el = root && root.querySelector('.fc-sync'); if (el) el.textContent = syncText(); if (root && !deck && syncState === 'synced') refreshCounts(); }
   function refreshCounts() { if (!root) return; root.querySelectorAll('[data-count]').forEach(function (el) { var d = DECKS.filter(function (x) { return x.id === el.getAttribute('data-count'); })[0]; if (d) { var s = stats(d, false); el.textContent = d.cards.length + ' cards · ' + s.nw + ' new · ' + s.due + ' due'; } }); }
-  window.addEventListener('online', function () { if (window.XRS && XRS.user) sync(); });
+  window.addEventListener('online', function () { if (SCHEDULING && window.XRS && XRS.user) sync(); });
   window.XRS_FLASH = { schedule: schedule, key: key, merge: merge, sync: sync, state: function () { return syncState; } };
 
   var root, deck, reverse = false, queue = [], cur = null, shown = false, done = 0, practice = false, rated = {}, subset = null; // rated: latest rating per card index this session; subset: card indexes for targeted practice
@@ -113,7 +117,7 @@
 
   function renderHome() {
     deck = null;
-    var h = '<h2 class="fc-h">Flashcards</h2><p class="fc-sub">Pick a deck. Your progress is private to you.</p><p class="fc-sync fc-sub" aria-live="polite">' + esc(syncText()) + '</p>' + makeCta();
+    var h = '<h2 class="fc-h">Flashcards</h2>' + (SCHEDULING ? '<p class="fc-sub">Pick a deck. Your progress is private to you.</p><p class="fc-sync fc-sub" aria-live="polite">' + esc(syncText()) + '</p>' : '<p class="fc-sub">Pick a deck.</p>') + makeCta();
     var subs = {};
     DECKS.filter(function (d) { return d.enabled !== false; }).forEach(function (d) { (subs[d.subject] = subs[d.subject] || []).push(d); });
     Object.keys(subs).forEach(function (sub) {
@@ -121,7 +125,7 @@
       subs[sub].forEach(function (d) {
         var s = stats(d, false);
         h += '<div class="quiz-box fc-deck"><div class="fc-deck-t">' + esc(d.title) + '</div><div class="fc-deck-b">' + esc(d.blurb) + '</div>' +
-          '<div class="fc-deck-n" data-count="' + d.id + '">' + d.cards.length + ' cards · ' + s.nw + ' new · ' + s.due + ' due</div>' +
+          '<div class="fc-deck-n"' + (SCHEDULING ? ' data-count="' + d.id + '">' + d.cards.length + ' cards · ' + s.nw + ' new · ' + s.due + ' due' : '>' + d.cards.length + ' cards') + '</div>' +
           '<button class="btn-primary fc-study" data-deck="' + d.id + '" type="button">Study</button></div>';
       });
     });
@@ -134,10 +138,11 @@
           '<button class="btn-primary fc-study" data-community="' + esc(sub) + '" type="button">Study</button></div>';
       });
     }
+    h += '<h3 class="fc-subject fc-shared-h">Decks Made by Students</h3>';
     if (shared.cards.length) {
       var ss = {};
       shared.cards.forEach(function (c) { (ss[c.subject] = ss[c.subject] || []).push(c); });
-      h += '<h3 class="fc-subject">Student-shared cards</h3><p class="fc-sub">Made public by students. <b>Not reviewed by XRaySavvy</b> — check against your handouts.</p>';
+      h += '<p class="fc-sub">Made public by students. <b>Not reviewed by XRaySavvy</b> — check against your handouts.</p>';
       Object.keys(ss).sort().forEach(function (sub) {
         var names = []; ss[sub].forEach(function (c) { if (names.indexOf(c.author_name) < 0) names.push(c.author_name); });
         h += '<div class="quiz-box fc-deck fc-shared"><div class="fc-deck-t">' + esc(sub) + ' <span class="fc-badge">Not reviewed</span></div><div class="fc-deck-b">Shared by ' + esc(names.slice(0, 3).join(', ') + (names.length > 3 ? ' +' + (names.length - 3) : '')) + '</div><div class="fc-deck-n">' + ss[sub].length + ' cards</div>' +
@@ -157,7 +162,7 @@
     root.querySelectorAll('.fc-auth').forEach(function (b) { b.onclick = function () { if (window.XRS && XRS.openAuth) XRS.openAuth(b.getAttribute('data-mode')); }; });
     if (!community.loaded) loadCommunity();
     if (!shared.loaded) loadShared();
-    sync();
+    if (SCHEDULING) sync();
   }
   function buildQueue() {
     var s = load(), now = Date.now(), due = [], nw = [];
@@ -173,7 +178,7 @@
   function start(id) { startDeck(DECKS.filter(function (d) { return d.id === id && d.enabled !== false; })[0]); }
   function startDeck(d) {
     if (!d || !d.cards.length) return renderHome();
-    deck = d; done = 0; practice = false; subset = null; rated = {}; buildQueue(); next();
+    deck = d; done = 0; practice = !SCHEDULING; subset = null; rated = {}; buildQueue(); next();
   }
   function goBack() { if (deck && deck.back) { var b = deck.back; deck = null; b(); } else renderHome(); }
 
@@ -275,7 +280,7 @@
           '</div></div>';
       });
     });
-    h += '<p class="fc-note">Cards are private unless you choose “Make deck public” for a category, which shows a copy of that category’s cards with your chosen name in Student-shared cards. New or edited cards stay private until you tap “Update public deck”.</p>';
+    h += '<p class="fc-note">Cards are private unless you choose “Make deck public” for a category, which shows a copy of that category’s cards with your chosen name in Decks Made by Students. New or edited cards stay private until you tap “Update public deck”.</p>';
     h += '</div>';
     root.innerHTML = h;
     root.querySelector('.fc-back').onclick = renderHome;
@@ -305,7 +310,7 @@
     var ds = deckShare(cat), name = ds.names[0] || catClean(window.XRS && XRS.profileName || '').slice(0, 40), upd = ds.pub > 0;
     root.innerHTML = bar(upd ? 'Update public deck' : 'Make deck public') + '<form class="quiz-box fc-form fc-pub-box" novalidate>' +
       '<div class="fc-item-t">' + esc(cat.name) + '</div><div class="fc-sub">' + cat.cards.length + (cat.cards.length === 1 ? ' card' : ' cards') + ' in this category will be public' + (upd ? ' (current versions)' : '') + '.</div>' +
-      '<p class="fc-sub">Anyone can see public cards in <b>Student-shared cards</b> on the Flashcards tab, marked “Not reviewed”. Only the term, definition, category and the name below are shown — never your email or the card’s source. Cards you add or edit later stay private until you tap “Update public deck”. You can make the deck private again any time.</p>' +
+      '<p class="fc-sub">Anyone can see public cards in <b>Decks Made by Students</b> on the Flashcards tab, marked “Not reviewed”. Only the term, definition, category and the name below are shown — never your email or the card’s source. Cards you add or edit later stay private until you tap “Update public deck”. You can make the deck private again any time.</p>' +
       field('fc-author', 'Name to show (your choice, e.g. first name or nickname)', name, 40) +
       '<label class="fc-check"><input type="checkbox" id="fc-ok"> This is my own wording (or I have permission to share it), and it contains no patient information.</label>' +
       '<p class="fc-err hidden" role="alert"></p>' +
@@ -469,7 +474,7 @@
     var c = deck.cards[cur], front = reverse ? c[1] : c[0], back = reverse ? c[0] : c[1];
     root.innerHTML =
       '<div class="fc-bar"><button class="btn-secondary fc-back" type="button">‹ Decks</button>' +
-      '<span class="fc-left" aria-live="polite">' + (practice ? 'Practice · ' : '') + (queue.length + 1) + ' left</span>' +
+      '<span class="fc-left" aria-live="polite">' + (practice && SCHEDULING ? 'Practice · ' : '') + (queue.length + 1) + ' left</span>' +
       '<button class="btn-secondary fc-rev" type="button" aria-pressed="' + reverse + '">' + (reverse ? 'Definition → Term' : 'Term → Definition') + '</button></div>' +
       '<button class="quiz-box fc-card" type="button" aria-label="Flashcard. Tap to reveal answer">' +
       '<div class="fc-front' + (reverse ? ' fc-small' : '') + '">' + esc(front) + '</div>' +
@@ -480,7 +485,7 @@
       '<button class="fc-r fc-again" data-r="again" type="button">Again</button>' +
       '<button class="fc-r fc-hard" data-r="hard" type="button">Hard</button>' +
       '<button class="fc-r fc-good" data-r="good" type="button">Got it</button></div>' +
-      (practice ? '<p class="fc-sub fc-prac-note">Extra practice won’t change your review schedule.</p>' : '') +
+      (practice && SCHEDULING ? '<p class="fc-sub fc-prac-note">Extra practice won’t change your review schedule.</p>' : '') +
       (c[4] ? '<p class="fc-attr">' + esc(c[4]) + '</p>' : '');
     root.querySelector('.fc-back').onclick = goBack;
     root.querySelector('.fc-rev').onclick = function () { reverse = !reverse; done = 0; rated = {}; buildQueue(); next(); };
@@ -488,7 +493,7 @@
     root.querySelectorAll('.fc-r').forEach(function (b) { b.onclick = function () { rate(b.getAttribute('data-r')); }; });
   }
   function rate(r) {
-    if (!practice) { var s = load(), k = cid(cur); s[k] = schedule(s[k], r, Date.now()); save(s); pushOne(k, s[k]); }
+    if (SCHEDULING && !practice) { var s = load(), k = cid(cur); s[k] = schedule(s[k], r, Date.now()); save(s); pushOne(k, s[k]); }
     var wasDone = rated[cur] && rated[cur] !== 'again';
     rated[cur] = r;
     if (r === 'again') queue.splice(Math.min(3, queue.length), 0, cur); else if (!wasDone) done++;
@@ -501,11 +506,12 @@
     var summary = '<ul class="fc-sum"><li><b>' + good + '</b> Got it</li><li><b>' + hard.length + '</b> Hard</li></ul>';
     if (!n) msg = '<h2 class="fd-title">No cards in this deck</h2><p>There’s nothing to study here right now.</p>';
     else if (!done && !practice) msg = '<h2 class="fd-title">All caught up</h2><p>Nothing in this deck is due for review yet. You can still practice all ' + n + pl(n) + ' now — it won’t change your review schedule.</p>';
+    else if (!SCHEDULING) msg = '<h2 class="fd-title">Deck done 🎉</h2><p>' + done + pl(done) + ' studied.</p>' + summary;
     else msg = '<h2 class="fd-title">' + (practice ? 'Practice done' : 'Deck done') + ' 🎉</h2><p>' + done + pl(done) + (practice ? ' practiced.' : ' reviewed.') + '</p>' + summary +
       (practice ? '<p class="fc-sub">Extra practice didn’t change your review schedule.</p>' : '');
     root.innerHTML = '<div class="quiz-box">' + msg + '<div class="fd-actions">' +
       (n && hard.length ? '<button class="btn-primary fc-hardrev" type="button">Review hard cards (' + hard.length + ')</button>' : '') +
-      (n ? '<button class="' + (hard.length ? 'btn-secondary' : 'btn-primary') + ' fc-practice" type="button">Study again (practice all ' + n + ')</button>' : '') +
+      (n ? '<button class="' + (hard.length ? 'btn-secondary' : 'btn-primary') + ' fc-practice" type="button">' + (SCHEDULING ? 'Study again (practice all ' + n + ')' : 'Study again (all ' + n + ')') + '</button>' : '') +
       '<button class="' + (n ? 'btn-secondary' : 'btn-primary') + ' fc-back" type="button">Back to decks</button></div></div>';
     root.querySelector('.fc-back').onclick = goBack;
     function go(sub) { practice = true; subset = sub; done = 0; rated = {}; buildQueue(); next(); }
