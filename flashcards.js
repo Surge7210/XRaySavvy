@@ -337,7 +337,7 @@
   }
   function sharedDeck(sub) {
     return { id: 'shared', title: sub + ' (student-shared)', cards: shared.cards.filter(function (c) { return c.subject === sub; })
-      .map(function (c) { return [c.term, c.definition, 'Shared by ' + c.author_name + ' · not reviewed', c.id]; }) };
+      .map(function (c) { return [c.term, c.definition, '', c.id, 'Shared by ' + c.author_name]; }) };
   }
   var PRESETS = ['Positioning', 'Physics', 'Patient Care', 'Vocabulary', 'Anatomy', 'Radiation Protection'];
   var mineFilter = '';
@@ -469,7 +469,8 @@
       '<button class="fc-r fc-again" data-r="again" type="button">Again</button>' +
       (practice ? '' : '<button class="fc-r fc-hard" data-r="hard" type="button">Hard</button>') +
       '<button class="fc-r fc-good" data-r="good" type="button">Got it</button></div>' +
-      (practice ? '<p class="fc-sub fc-prac-note">Extra practice won’t change your review schedule.</p>' : '');
+      (practice ? '<p class="fc-sub fc-prac-note">Extra practice won’t change your review schedule.</p>' : '') +
+      (c[4] ? '<p class="fc-attr">' + esc(c[4]) + '</p>' : '');
     root.querySelector('.fc-back').onclick = goBack;
     root.querySelector('.fc-rev').onclick = function () { reverse = !reverse; buildQueue(); next(); };
     root.querySelector('.fc-card').onclick = function () { if (!shown) { shown = true; renderCard(); var r = root.querySelector('.fc-good'); if (r) r.focus(); } };

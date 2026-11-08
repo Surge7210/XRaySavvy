@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
-<script src="./flashcards.js?v=9"></script>
+<script src="./flashcards.js?v=10"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -46,6 +46,7 @@
   .fc-item { margin-bottom:.6rem; } .fc-item-t { font-weight:700; } .fc-item-d { margin:.2rem 0; } .fc-item-act { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.3rem; }
   .fc-badge { display:inline-block; font-size:.72rem; font-weight:600; padding:.1rem .5rem; border-radius:999px; background:#38444d; color:var(--text); vertical-align:middle; }
   .fc-b-approved { background:rgba(0,186,124,.2); color:#4fe0a8; } .fc-b-rejected { background:rgba(244,33,46,.18); color:#ff8a92; }
+  .fc-attr { margin:.9rem 0 0; font-size:.8rem; line-height:1.35; color:var(--muted); text-align:center; overflow-wrap:anywhere; }
   .fc-b-public { background:rgba(29,155,240,.2); color:#8ecdf8; } .fc-check { display:flex; gap:.75rem; align-items:center; min-height:48px; margin:.8rem 0; padding:.6rem .7rem; border:1px solid var(--border); border-radius:12px; font-size:.95rem; line-height:1.35; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .fc-check:has(input:checked) { border-color:var(--accent); background:rgba(29,155,240,.08); }
   .fc-check input[type=checkbox] { -webkit-appearance:none; appearance:none; flex:0 0 28px; width:28px; height:28px; min-width:28px; margin:0; padding:0; border:2.5px solid #e7e9ea; border-radius:7px; background:var(--bg); cursor:pointer; display:grid; place-content:center; }
