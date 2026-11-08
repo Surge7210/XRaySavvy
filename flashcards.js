@@ -100,7 +100,7 @@
   window.addEventListener('online', function () { if (window.XRS && XRS.user) sync(); });
   window.XRS_FLASH = { schedule: schedule, key: key, merge: merge, sync: sync, state: function () { return syncState; } };
 
-  var root, deck, reverse = false, queue = [], cur = null, shown = false, done = 0, practice = false;
+  var root, deck, reverse = false, queue = [], cur = null, shown = false, done = 0, practice = false, rated = {}, subset = null; // rated: latest rating per card index this session; subset: card indexes for targeted practice
   function ckey(d, i, rev) { var c = d.cards[i]; return d.id + ':' + (c[3] || i) + (rev ? ':r' : ''); }
   function cid(i) { return ckey(deck, i, reverse); }
   function stats(d, rev) {
@@ -164,15 +164,15 @@
     due.sort(function (a, b) { return s[cid(a)].due - s[cid(b)].due; });
     for (var i = nw.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = nw[i]; nw[i] = nw[j]; nw[j] = t; }
     queue = due.concat(nw);
-    if (practice) { // extra practice: every card in THIS deck, shuffled; schedule untouched
-      queue = deck.cards.map(function (c, i) { return i; });
+    if (practice) { // extra practice: every card in THIS deck (or just the chosen subset), shuffled; schedule untouched
+      queue = subset ? subset.filter(function (i) { return i < deck.cards.length; }) : deck.cards.map(function (c, i) { return i; });
       for (var a = queue.length - 1; a > 0; a--) { var z = Math.floor(Math.random() * (a + 1)); var y = queue[a]; queue[a] = queue[z]; queue[z] = y; }
     }
   }
   function start(id) { startDeck(DECKS.filter(function (d) { return d.id === id; })[0]); }
   function startDeck(d) {
     if (!d || !d.cards.length) return renderHome();
-    deck = d; done = 0; practice = false; buildQueue(); next();
+    deck = d; done = 0; practice = false; subset = null; rated = {}; buildQueue(); next();
   }
   function goBack() { if (deck && deck.back) { var b = deck.back; deck = null; b(); } else renderHome(); }
 
@@ -467,32 +467,41 @@
       (shown ? '' : '<div class="fc-tap">Tap to reveal</div>') + '</button>' +
       '<div class="fc-rate' + (shown ? '' : ' hidden') + '">' +
       '<button class="fc-r fc-again" data-r="again" type="button">Again</button>' +
-      (practice ? '' : '<button class="fc-r fc-hard" data-r="hard" type="button">Hard</button>') +
+      '<button class="fc-r fc-hard" data-r="hard" type="button">Hard</button>' +
       '<button class="fc-r fc-good" data-r="good" type="button">Got it</button></div>' +
       (practice ? '<p class="fc-sub fc-prac-note">Extra practice won’t change your review schedule.</p>' : '') +
       (c[4] ? '<p class="fc-attr">' + esc(c[4]) + '</p>' : '');
     root.querySelector('.fc-back').onclick = goBack;
-    root.querySelector('.fc-rev').onclick = function () { reverse = !reverse; buildQueue(); next(); };
+    root.querySelector('.fc-rev').onclick = function () { reverse = !reverse; done = 0; rated = {}; buildQueue(); next(); };
     root.querySelector('.fc-card').onclick = function () { if (!shown) { shown = true; renderCard(); var r = root.querySelector('.fc-good'); if (r) r.focus(); } };
     root.querySelectorAll('.fc-r').forEach(function (b) { b.onclick = function () { rate(b.getAttribute('data-r')); }; });
   }
   function rate(r) {
     if (!practice) { var s = load(), k = cid(cur); s[k] = schedule(s[k], r, Date.now()); save(s); pushOne(k, s[k]); }
-    if (r === 'again') queue.splice(Math.min(3, queue.length), 0, cur); else done++;
+    var wasDone = rated[cur] && rated[cur] !== 'again';
+    rated[cur] = r;
+    if (r === 'again') queue.splice(Math.min(3, queue.length), 0, cur); else if (!wasDone) done++;
     next();
   }
   function renderDone() {
-    var n = deck && deck.cards ? deck.cards.length : 0, msg;
+    var n = deck && deck.cards ? deck.cards.length : 0, msg, good = 0, hard = [], pl = function (k) { return k === 1 ? ' card' : ' cards'; };
+    Object.keys(rated).forEach(function (i) { if (rated[i] === 'good') good++; else if (rated[i] === 'hard') hard.push(+i); });
+    hard.sort(function (a, b) { return a - b; });
+    var summary = '<ul class="fc-sum"><li><b>' + good + '</b> Got it</li><li><b>' + hard.length + '</b> Hard</li></ul>';
     if (!n) msg = '<h2 class="fd-title">No cards in this deck</h2><p>There’s nothing to study here right now.</p>';
-    else if (practice) msg = '<h2 class="fd-title">Practice done 🎉</h2><p>' + done + (done === 1 ? ' card' : ' cards') + ' practiced. Your review schedule wasn’t changed.</p>';
-    else if (!done) msg = '<h2 class="fd-title">All caught up</h2><p>Nothing in this deck is due for review yet. You can still practice all ' + n + (n === 1 ? ' card' : ' cards') + ' now — it won’t change your review schedule.</p>';
-    else msg = '<h2 class="fd-title">Deck done for now 🎉</h2><p>' + done + (done === 1 ? ' card' : ' cards') + ' reviewed. Cards come back when they’re due — or practice them again now.</p>';
+    else if (!done && !practice) msg = '<h2 class="fd-title">All caught up</h2><p>Nothing in this deck is due for review yet. You can still practice all ' + n + pl(n) + ' now — it won’t change your review schedule.</p>';
+    else msg = '<h2 class="fd-title">' + (practice ? 'Practice done' : 'Deck done') + ' 🎉</h2><p>' + done + pl(done) + (practice ? ' practiced.' : ' reviewed.') + '</p>' + summary +
+      (practice ? '<p class="fc-sub">Extra practice didn’t change your review schedule.</p>' : '');
     root.innerHTML = '<div class="quiz-box">' + msg + '<div class="fd-actions">' +
-      (n ? '<button class="btn-primary fc-practice" type="button">' + (practice ? 'Practice again' : 'Study again (practice all ' + n + ')') + '</button>' : '') +
+      (n && hard.length ? '<button class="btn-primary fc-hardrev" type="button">Review hard cards (' + hard.length + ')</button>' : '') +
+      (n ? '<button class="' + (hard.length ? 'btn-secondary' : 'btn-primary') + ' fc-practice" type="button">Study again (practice all ' + n + ')</button>' : '') +
       '<button class="' + (n ? 'btn-secondary' : 'btn-primary') + ' fc-back" type="button">Back to decks</button></div></div>';
     root.querySelector('.fc-back').onclick = goBack;
-    var pr = root.querySelector('.fc-practice');
-    if (pr) { pr.onclick = function () { practice = true; done = 0; buildQueue(); next(); }; pr.focus(); }
+    function go(sub) { practice = true; subset = sub; done = 0; rated = {}; buildQueue(); next(); }
+    var hr = root.querySelector('.fc-hardrev'), pr = root.querySelector('.fc-practice');
+    if (hr) hr.onclick = function () { go(hard.slice()); };
+    if (pr) pr.onclick = function () { go(null); };
+    (hr || pr || root.querySelector('.fc-back')).focus();
     // No confetti in flashcards (fast-paced); quiz celebrations are unchanged.
   }
   window.renderFlashcards = function (el) { root = el; renderHome(); };
