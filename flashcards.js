@@ -256,22 +256,20 @@
       var cat = cats[k];
       h += '<h3 class="fc-subject">' + esc(cat.name) + ' <button class="fc-link fc-study-mine" data-sub="' + esc(k) + '" type="button">Study ' + cat.cards.length + '</button></h3>';
       cat.cards.forEach(function (c) {
-        var st = mine.subs[c.id], badge = st ? '<span class="fc-badge fc-b-' + esc(st.status) + '">' + esc({ pending: 'Submitted · in review', approved: 'Approved ✓', rejected: 'Not added', merged: 'Already covered' }[st.status] || st.status) + '</span>' : '';
+        var badge = ''; // "Submit to XRaySavvy" removed for students (owner request); old suggestion records stay in the database/admin queue.
         var sh = mine.shared[c.id], stale = sh && (sh.term !== c.term.trim() || sh.definition !== c.definition.trim() || sh.subject !== c.subject.trim());
         if (sh) badge += ' <span class="fc-badge fc-b-public">' + (sh.hidden ? 'Public copy hidden by XRaySavvy' : 'Public · by ' + esc(sh.author_name)) + '</span>';
         h += '<div class="quiz-box fc-item"><div class="fc-item-t">' + esc(c.term) + ' ' + badge + '</div><div class="fc-item-d">' + esc(c.definition) + '</div>' +
           (c.source ? '<div class="fc-sub">Source: ' + esc(c.source) + '</div>' : '') +
-          (st && st.owner_note ? '<div class="fc-sub">Reviewer note: ' + esc(st.owner_note) + '</div>' : '') +
           '<div class="fc-item-act"><button class="fc-link fc-edit" data-id="' + c.id + '" type="button">Edit</button>' +
           '<button class="fc-link fc-del" data-id="' + c.id + '" type="button">Delete</button>' +
-          (st && st.status === 'pending' ? '' : '<button class="fc-link fc-submit" data-id="' + c.id + '" type="button">Submit to XRaySavvy</button>') +
           (sh ? (stale ? '<button class="fc-link fc-pub" data-id="' + c.id + '" type="button">Update public copy</button>' : '') + '<button class="fc-link fc-unpub" data-id="' + c.id + '" type="button">Make private</button>'
               : '<button class="fc-link fc-pub" data-id="' + c.id + '" type="button">Make it public</button>') + '</div>' +
           (stale ? '<div class="fc-sub">You edited this card after sharing it. The public copy still shows the old version until you tap “Update public copy”.</div>' : '') + '</div>';
       });
     });
-    h += '<p class="fc-note">Cards are private unless you choose “Make it public”, which shows a copy with your chosen name in Student-shared cards (not reviewed). “Submit to XRaySavvy” is separate: it sends a copy for review to the reviewed Community deck.</p>';
-    h += '<p class="fc-note">Submitting sends a copy of the card for review. It only becomes public if XRaySavvy approves it; later edits to your card don’t change the submitted copy.</p></div>';
+    h += '<p class="fc-note">Cards are private unless you choose “Make it public”, which shows a copy with your chosen name in Student-shared cards (not reviewed).</p>';
+    h += '</div>';
     root.innerHTML = h;
     root.querySelector('.fc-back').onclick = renderHome;
     root.querySelector('.fc-new').onclick = function () { renderEditor(null); };
@@ -282,7 +280,6 @@
       startDeck({ id: 'my', title: k ? cats[k].name : 'My cards', cards: cards, back: renderMine }); }; });
     root.querySelectorAll('.fc-edit').forEach(function (b) { b.onclick = function () { renderEditor(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-del').forEach(function (b) { b.onclick = function () { delMine(findMine(b.getAttribute('data-id'))); }; });
-    root.querySelectorAll('.fc-submit').forEach(function (b) { b.onclick = function () { renderSubmit(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-pub').forEach(function (b) { b.onclick = function () { renderPublish(findMine(b.getAttribute('data-id'))); }; });
     root.querySelectorAll('.fc-unpub').forEach(function (b) { b.onclick = function () { unpublish(findMine(b.getAttribute('data-id'))); }; });
   }
@@ -408,6 +405,7 @@
       .then(function (r) { if (r.error) throw r.error; if (curUid() !== u) return; mine.cards = mine.cards.filter(function (x) { return x.id !== c.id; }); renderMine(); })
       .catch(function () { window.alert('Couldn’t delete. Please try again.'); });
   }
+  // Dormant (not reachable from the UI): kept for possible future re-enable.
   function renderSubmit(c) {
     var u = curUid(); if (!c || !u) return;
     var n = norm(c.term), warn = [], exact = false;
