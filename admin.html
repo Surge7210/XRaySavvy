@@ -54,6 +54,8 @@
   .su-list { list-style:none; margin:0.7rem 0 0; padding:0; }
   .su-item { border-top:1px solid var(--border); padding:0.6rem 0; }
   .su-item.new { background:linear-gradient(90deg, rgba(29,155,240,0.12), transparent 70%); margin:0 -1rem; padding:0.6rem 1rem; }
+  .mod-lab { display:block; font-size:0.8rem; color:var(--muted); margin-top:0.4rem; } .mod-in { display:block; width:100%; margin-top:0.2rem; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:0.5rem; font:inherit; font-size:16px; }
+  .mod-act { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.6rem; } .fc-mod.done { opacity:0.55; }
   .su-top { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem 0.4rem; }
   .su-handle { font-weight:700; word-break:break-all; }
   .su-name { color:var(--muted); font-size:0.85rem; }
@@ -81,6 +83,7 @@
   <div id="dash" class="hidden">
     <p class="sub" id="updated"></p>
     <div id="signups"></div>
+    <div id="fcmod"></div>
     <div id="cards"></div>
     <button class="btn sec" id="refresh" type="button">Refresh</button>
   </div>
@@ -262,11 +265,54 @@
     } catch (e) { renderSignups(null, 'Sign-ups unavailable: ' + (e.message || e)); }
   }
 
+  // ---- Flashcard suggestions (owner-only RPCs; server checks private.app_admins) ----
+  function renderMod(rows, err) {
+    var box = $('fcmod'); box.textContent = '';
+    var c = el('section', 'card'), head = el('div', 'su-head');
+    head.appendChild(el('h2', '', '🃏 Flashcard suggestions'));
+    var rb = el('button', 'icon-btn', '↻ Refresh'); rb.type = 'button'; rb.onclick = function () { rb.disabled = true; loadMod(); };
+    head.appendChild(rb); c.appendChild(head);
+    c.appendChild(el('p', 'src', 'Pending student suggestions. Approve publishes an edited copy as a Community card; nothing is public until you approve. Duplicate flags are automatic hints, not accuracy checks.'));
+    if (!rows) { c.appendChild(el('div', 'err', err || 'Suggestions unavailable.')); box.appendChild(c); return; }
+    if (!rows.length) c.appendChild(el('div', 'raw', 'No pending suggestions.'));
+    rows.forEach(function (r) {
+      var it = el('div', 'su-item fc-mod');
+      var top = el('div', 'su-top'); top.appendChild(el('span', 'su-handle', (r.handle || '?') + '@…'));
+      if (r.published_dups && r.published_dups.length) top.appendChild(chip('no', 'Already published: ' + r.published_dups.join(', ')));
+      if (r.other_pending) top.appendChild(chip('new', r.other_pending + ' similar pending'));
+      it.appendChild(top);
+      it.appendChild(el('div', 'su-line', 'Submitted ' + ctTime(r.created_at)));
+      function inp(label, v, area, max) { var l = el('label', 'mod-lab', label); var i = document.createElement(area ? 'textarea' : 'input'); i.className = 'mod-in'; i.value = v || ''; i.maxLength = max; if (area) i.rows = 3; l.appendChild(i); it.appendChild(l); return i; }
+      var fs = inp('Subject', r.subject, false, 60), ft = inp('Term', r.term, false, 120), fd = inp('Definition', r.definition, true, 1000), fsrc = inp('Source', r.source, false, 300), fn = inp('Note to student (optional)', '', false, 500);
+      var act = el('div', 'mod-act'), msg = el('div', 'raw');
+      [['approve', '✓ Approve & publish'], ['merge', 'Already covered'], ['reject', '✕ Reject']].forEach(function (a) {
+        var b = el('button', 'icon-btn', a[1]); b.type = 'button';
+        b.onclick = async function () {
+          act.querySelectorAll('button').forEach(function (x) { x.disabled = true; }); msg.textContent = 'Saving…';
+          try {
+            var sb = await XRS.client();
+            var res = await sb.rpc('admin_review_flashcard_suggestion', { p_id: r.id, p_action: a[0], p_subject: fs.value.trim(), p_term: ft.value.trim(), p_definition: fd.value.trim(), p_source: fsrc.value.trim() || null, p_note: fn.value.trim() || null });
+            if (res.error) throw res.error;
+            msg.textContent = 'Done: ' + a[1]; it.classList.add('done');
+          } catch (e) { msg.textContent = 'Failed: ' + (e.message || e); act.querySelectorAll('button').forEach(function (x) { x.disabled = false; }); }
+        };
+        act.appendChild(b);
+      });
+      it.appendChild(act); it.appendChild(msg); c.appendChild(it);
+    });
+    box.appendChild(c);
+  }
+  async function loadMod() {
+    if (window.__USAGE_MOCK) { renderMod(window.__USAGE_MOCK.suggestions || [], null); return; }
+    try { var sb = await XRS.client(); var r = await sb.rpc('admin_flashcard_suggestions', { p_status: 'pending' }); if (r.error) throw r.error; renderMod(r.data || [], null); }
+    catch (e) { renderMod(null, 'Suggestions unavailable: ' + (e.message || e)); }
+  }
+
   function show(which) { ['loading', 'private', 'dash'].forEach(function (id) { $(id).classList.toggle('hidden', id !== which); }); }
 
   // window.__USAGE_MOCK lets a test render the page without a live session.
   async function load() {
-    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); return; }
+    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); loadMod(); return; }
     var sb, session;
     try { sb = await XRS.client(); session = (await sb.auth.getSession()).data.session; } catch (e) { session = null; }
     if (!session || !session.user || session.user.id !== OWNER_ID) { show('private'); return; }
@@ -276,7 +322,7 @@
       .catch(function (e) { errs.worker = 'Worker counts unavailable: ' + e.message; return null; });
     var dP = sb.rpc('admin_usage').then(function (r) { if (r.error) throw r.error; return r.data; })
       .catch(function (e) { errs.db = 'Database stats unavailable: ' + (e.message || e); return null; });
-    var sP = loadSignups();
+    var sP = loadSignups(); loadMod();
     var res = await Promise.all([wP, dP]);
     if (!res[0] && !res[1] && /private|not allowed/i.test((errs.worker || '') + (errs.db || ''))) { show('private'); return; }
     show('dash'); render(res[0], res[1], errs);

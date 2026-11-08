@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
-<script src="./flashcards.js?v=2"></script>
+<script src="./flashcards.js?v=3"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -39,6 +39,17 @@
   .fc-front { font-size:1.6rem; font-weight:700; margin:1.5rem 0 1rem; } .fc-front.fc-small { font-size:1.15rem; font-weight:600; }
   .fc-small { font-size:1.05rem; } .fc-note-cls { margin:.8rem 0 0; padding:.5rem .7rem; border-left:3px solid #b07d0a; background:rgba(176,125,10,.12); border-radius:6px; color:var(--text); font-size:.85rem; text-align:left; } .fc-ans hr { border:none; border-top:1px solid var(--border); margin:1rem 0; }
   .fc-rate { display:flex; gap:.5rem; margin-top:.8rem; } .fc-rate.hidden, .fc-ans.hidden { display:none; }
+  .fc-make-box { margin:1rem 0 .4rem; border-color:var(--accent); } .fc-make-act { display:flex; flex-wrap:wrap; gap:.5rem; margin:.7rem 0; }
+  .fc-make-act button, .fc-form button { min-height:44px; padding:.55rem 1.1rem; border:none; border-radius:8px; font:inherit; font-weight:700; cursor:pointer; }
+  .fc-make-act button:disabled { opacity:.55; cursor:default; }
+  .fc-link { background:none; border:none; color:var(--accent); font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; padding:.4rem .3rem; min-height:36px; }
+  .fc-item { margin-bottom:.6rem; } .fc-item-t { font-weight:700; } .fc-item-d { margin:.2rem 0; } .fc-item-act { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.3rem; }
+  .fc-badge { display:inline-block; font-size:.72rem; font-weight:600; padding:.1rem .5rem; border-radius:999px; background:#38444d; color:var(--text); vertical-align:middle; }
+  .fc-b-approved { background:rgba(0,186,124,.2); color:#4fe0a8; } .fc-b-rejected { background:rgba(244,33,46,.18); color:#ff8a92; }
+  .fc-lab { display:block; font-size:.85rem; color:var(--muted); margin:.7rem 0 .25rem; }
+  .fc-in { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:.6rem; font:inherit; font-size:16px; }
+  .fc-in:focus { outline:2px solid var(--accent); outline-offset:0; }
+  .fc-err { color:#ff8a92; } .fc-err.hidden { display:none; } .fc-ok { color:#4fe0a8; } .fc-warn { color:#f5c451; padding-left:1.1rem; margin:.6rem 0; }
   .fc-r { flex:1; min-height:48px; border:none; border-radius:10px; font:inherit; font-weight:700; color:#fff; cursor:pointer; }
   .fc-again { background:var(--bad); } .fc-hard { background:#b07d0a; } .fc-good { background:var(--good); }
 
