@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
+<script src="./flashcards.js?v=1"></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --bad:#f4212e; }
   * { box-sizing: border-box; }
@@ -26,6 +27,20 @@
   .bottom-tabs .bt.active .ic { background:rgba(29,155,240,0.18); }
   .bottom-tabs .bt:focus-visible { outline:2px solid var(--accent); outline-offset:-4px; border-radius:12px; }
   body.kb-open .bottom-tabs { display:none; }
+  /* ---- Flashcards ---- */
+  #flash-view { max-width:800px; margin:0 auto; padding:1rem 1rem 6rem; }
+  .fc-h { margin:0 0 .2rem; } .fc-sub,.fc-note,.fc-deck-b,.fc-deck-n,.fc-tap,.fc-left { color:var(--muted); font-size:.9rem; }
+  .fc-subject { margin:1.2rem 0 .5rem; font-size:1rem; color:var(--accent); }
+  .fc-deck { margin-bottom:.8rem; } .fc-study { min-height:44px; padding:.6rem 1.4rem; border:none; border-radius:8px; font:inherit; font-weight:700; cursor:pointer; } .fc-deck-t { font-weight:700; font-size:1.1rem; } .fc-deck-n { margin:.3rem 0 .7rem; }
+  .fc-bar { display:flex; align-items:center; gap:.5rem; margin-bottom:.8rem; } .fc-left { flex:1; text-align:center; }
+  .fc-bar button { padding:.5rem .8rem; font:inherit; font-size:.85rem; font-weight:600; min-height:44px; border:none; border-radius:8px; cursor:pointer; }
+  .fc-card { display:block; width:100%; min-height:220px; text-align:center; color:var(--text); font:inherit; cursor:pointer; }
+  .fc-card:focus-visible { outline:2px solid var(--accent); }
+  .fc-front { font-size:1.6rem; font-weight:700; margin:1.5rem 0 1rem; } .fc-front.fc-small { font-size:1.15rem; font-weight:600; }
+  .fc-small { font-size:1.05rem; } .fc-ans hr { border:none; border-top:1px solid var(--border); margin:1rem 0; }
+  .fc-rate { display:flex; gap:.5rem; margin-top:.8rem; } .fc-rate.hidden, .fc-ans.hidden { display:none; }
+  .fc-r { flex:1; min-height:48px; border:none; border-radius:10px; font:inherit; font-weight:700; color:#fff; cursor:pointer; }
+  .fc-again { background:var(--bad); } .fc-hard { background:#b07d0a; } .fc-good { background:var(--good); }
 
   /* ---- Quiz chooser ---- */
   .qc-title { font-size:1.15rem; margin:0.2rem 0 0.2rem; }
@@ -308,6 +323,8 @@
     </div>
   </div>
 
+  <div id="flash-view" class="hidden"></div>
+
   <div id="progress-view" class="hidden">
     <div id="progress-body"></div>
   </div>
@@ -316,6 +333,7 @@
   <div class="bt-inner">
     <button class="bt active" id="tab-ref" aria-current="page"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6.5A2.5 2.5 0 0 0 4 21.5v-2z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H19"/><path d="M9 7h6M9 11h4"/></svg></span>Reference</button>
     <button class="bt" id="tab-quiz"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17.2h.01"/></svg></span>Quiz</button>
+    <button class="bt" id="tab-flash"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/></svg></span>Flashcards</button>
     <button class="bt" id="tab-progress"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>Progress</button>
     <a class="bt" id="tab-upload" href="./upload.html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6M9 14.5 12 11.5l3 3"/></svg></span>Upload</a>
   </div>
@@ -2396,6 +2414,15 @@ const quizChooser = document.getElementById('quiz-chooser');
 const quizModeBar = document.getElementById('quiz-mode-bar');
 const quizModeName = document.getElementById('quiz-mode-name');
 const quizBack = document.getElementById('quiz-back');
+const tabFlash = document.getElementById('tab-flash');
+const flashView = document.getElementById('flash-view');
+function showFlashTab() {
+  setActiveTab(tabFlash);
+  refView.classList.add('hidden'); quizView.classList.add('hidden'); mcView.classList.add('hidden');
+  refControls.classList.add('hidden'); focusControls.classList.add('hidden');
+  if (window.renderFlashcards) window.renderFlashcards(flashView);
+}
+tabFlash.onclick = showFlashTab;
 const MODE_INFO = new Map([[tabRandom, ['Random Quiz', 'random']], [tabFocus, ['Focused Quiz', 'focus']], [tabMC, ['Multiple Choice', 'mc']]]);
 
 let refScrollY = 0;
@@ -2406,10 +2433,11 @@ function setHash(h) {
 }
 
 function setActiveTab(active) {
-  const bottom = active === tabRef ? tabRef : active === tabProgress ? tabProgress : tabQuiz;
-  [tabRef, tabQuiz, tabProgress].forEach(t => { t.classList.toggle('active', t === bottom); t.removeAttribute('aria-current'); });
+  const bottom = active === tabRef ? tabRef : active === tabProgress ? tabProgress : active === tabFlash ? tabFlash : tabQuiz;
+  [tabRef, tabQuiz, tabFlash, tabProgress].forEach(t => { t.classList.toggle('active', t === bottom); t.removeAttribute('aria-current'); });
   bottom.setAttribute('aria-current', 'page');
   progressView.classList.toggle('hidden', active !== tabProgress);
+  flashView.classList.toggle('hidden', active !== tabFlash);
   setFocusStage(null);
   quizChooser.classList.toggle('hidden', active !== tabQuiz);
   const info = MODE_INFO.get(active);
@@ -2418,7 +2446,7 @@ function setActiveTab(active) {
   const wasRef = !document.body.classList.contains('no-ref');
   if (wasRef && active !== tabRef) refScrollY = window.scrollY;
   document.body.classList.toggle('no-ref', active !== tabRef);
-  setHash(active === tabRef ? '' : active === tabProgress ? 'progress' : active === tabQuiz ? 'quiz' : info[1]);
+  setHash(active === tabRef ? '' : active === tabProgress ? 'progress' : active === tabFlash ? 'flashcards' : active === tabQuiz ? 'quiz' : info[1]);
   if (active === tabRef) { if (!wasRef) { const y = refScrollY; requestAnimationFrame(() => window.scrollTo(0, y)); } }
   else window.scrollTo(0, 0);
 }
@@ -2728,6 +2756,7 @@ if (window.XRS) XRS.on(() => { if (tabProgress.classList.contains('active')) { l
 function routeFromHash() {
   const h = (location.hash || '').slice(1).toLowerCase();
   if (h === 'progress') showProgressTab();
+  else if (h === 'flashcards' || h === 'flash') showFlashTab();
   else if (h === 'quiz') showQuizChooser();
   else if (h === 'random') tabRandom.onclick();
   else if (h === 'focus' || h === 'focused') tabFocus.onclick();
