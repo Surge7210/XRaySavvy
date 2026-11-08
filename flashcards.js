@@ -3,6 +3,7 @@
 (function () {
   var DECKS = [{
     id: 'gi-terms', subject: 'Vocabulary', title: 'GI Terminology',
+    enabled: false, // hidden from the Flashcards tab while the owner updates it; set true to re-enable (cards + saved progress kept)
     blurb: 'Pathophysiology of the GI tract — key terms',
     cards: [
       ["Adenocarcinoma", "A malignant tumor that develops from the glandular tissue of an organ."],
@@ -114,7 +115,7 @@
     deck = null;
     var h = '<h2 class="fc-h">Flashcards</h2><p class="fc-sub">Pick a deck. Your progress is private to you.</p><p class="fc-sync fc-sub" aria-live="polite">' + esc(syncText()) + '</p>' + makeCta();
     var subs = {};
-    DECKS.forEach(function (d) { (subs[d.subject] = subs[d.subject] || []).push(d); });
+    DECKS.filter(function (d) { return d.enabled !== false; }).forEach(function (d) { (subs[d.subject] = subs[d.subject] || []).push(d); });
     Object.keys(subs).forEach(function (sub) {
       h += '<h3 class="fc-subject">' + esc(sub) + '</h3>';
       subs[sub].forEach(function (d) {
@@ -169,7 +170,7 @@
       for (var a = queue.length - 1; a > 0; a--) { var z = Math.floor(Math.random() * (a + 1)); var y = queue[a]; queue[a] = queue[z]; queue[z] = y; }
     }
   }
-  function start(id) { startDeck(DECKS.filter(function (d) { return d.id === id; })[0]); }
+  function start(id) { startDeck(DECKS.filter(function (d) { return d.id === id && d.enabled !== false; })[0]); }
   function startDeck(d) {
     if (!d || !d.cards.length) return renderHome();
     deck = d; done = 0; practice = false; subset = null; rated = {}; buildQueue(); next();
