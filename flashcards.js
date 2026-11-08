@@ -100,7 +100,7 @@
   window.addEventListener('online', function () { if (window.XRS && XRS.user) sync(); });
   window.XRS_FLASH = { schedule: schedule, key: key, merge: merge, sync: sync, state: function () { return syncState; } };
 
-  var root, deck, reverse = false, queue = [], cur = null, shown = false, done = 0;
+  var root, deck, reverse = false, queue = [], cur = null, shown = false, done = 0, practice = false;
   function ckey(d, i, rev) { var c = d.cards[i]; return d.id + ':' + (c[3] || i) + (rev ? ':r' : ''); }
   function cid(i) { return ckey(deck, i, reverse); }
   function stats(d, rev) {
@@ -164,11 +164,15 @@
     due.sort(function (a, b) { return s[cid(a)].due - s[cid(b)].due; });
     for (var i = nw.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = nw[i]; nw[i] = nw[j]; nw[j] = t; }
     queue = due.concat(nw);
+    if (practice) { // extra practice: every card in THIS deck, shuffled; schedule untouched
+      queue = deck.cards.map(function (c, i) { return i; });
+      for (var a = queue.length - 1; a > 0; a--) { var z = Math.floor(Math.random() * (a + 1)); var y = queue[a]; queue[a] = queue[z]; queue[z] = y; }
+    }
   }
   function start(id) { startDeck(DECKS.filter(function (d) { return d.id === id; })[0]); }
   function startDeck(d) {
     if (!d || !d.cards.length) return renderHome();
-    deck = d; done = 0; buildQueue(); next();
+    deck = d; done = 0; practice = false; buildQueue(); next();
   }
   function goBack() { if (deck && deck.back) { var b = deck.back; deck = null; b(); } else renderHome(); }
 
@@ -454,7 +458,7 @@
     var c = deck.cards[cur], front = reverse ? c[1] : c[0], back = reverse ? c[0] : c[1];
     root.innerHTML =
       '<div class="fc-bar"><button class="btn-secondary fc-back" type="button">‹ Decks</button>' +
-      '<span class="fc-left" aria-live="polite">' + (queue.length + 1) + ' left</span>' +
+      '<span class="fc-left" aria-live="polite">' + (practice ? 'Practice · ' : '') + (queue.length + 1) + ' left</span>' +
       '<button class="btn-secondary fc-rev" type="button" aria-pressed="' + reverse + '">' + (reverse ? 'Definition → Term' : 'Term → Definition') + '</button></div>' +
       '<button class="quiz-box fc-card" type="button" aria-label="Flashcard. Tap to reveal answer">' +
       '<div class="fc-front' + (reverse ? ' fc-small' : '') + '">' + esc(front) + '</div>' +
@@ -463,23 +467,31 @@
       (shown ? '' : '<div class="fc-tap">Tap to reveal</div>') + '</button>' +
       '<div class="fc-rate' + (shown ? '' : ' hidden') + '">' +
       '<button class="fc-r fc-again" data-r="again" type="button">Again</button>' +
-      '<button class="fc-r fc-hard" data-r="hard" type="button">Hard</button>' +
-      '<button class="fc-r fc-good" data-r="good" type="button">Got it</button></div>';
+      (practice ? '' : '<button class="fc-r fc-hard" data-r="hard" type="button">Hard</button>') +
+      '<button class="fc-r fc-good" data-r="good" type="button">Got it</button></div>' +
+      (practice ? '<p class="fc-sub fc-prac-note">Extra practice won’t change your review schedule.</p>' : '');
     root.querySelector('.fc-back').onclick = goBack;
     root.querySelector('.fc-rev').onclick = function () { reverse = !reverse; buildQueue(); next(); };
     root.querySelector('.fc-card').onclick = function () { if (!shown) { shown = true; renderCard(); var r = root.querySelector('.fc-good'); if (r) r.focus(); } };
     root.querySelectorAll('.fc-r').forEach(function (b) { b.onclick = function () { rate(b.getAttribute('data-r')); }; });
   }
   function rate(r) {
-    var s = load(), k = cid(cur);
-    s[k] = schedule(s[k], r, Date.now()); save(s); pushOne(k, s[k]);
+    if (!practice) { var s = load(), k = cid(cur); s[k] = schedule(s[k], r, Date.now()); save(s); pushOne(k, s[k]); }
     if (r === 'again') queue.splice(Math.min(3, queue.length), 0, cur); else done++;
     next();
   }
   function renderDone() {
-    root.innerHTML = '<div class="quiz-box"><h2 class="fd-title">Deck done for now 🎉</h2><p>' + done + ' cards reviewed. Come back later for cards that are due.</p>' +
-      '<div class="fd-actions"><button class="btn-primary fc-back" type="button">Back to decks</button></div></div>';
+    var n = deck && deck.cards ? deck.cards.length : 0, msg;
+    if (!n) msg = '<h2 class="fd-title">No cards in this deck</h2><p>There’s nothing to study here right now.</p>';
+    else if (practice) msg = '<h2 class="fd-title">Practice done 🎉</h2><p>' + done + (done === 1 ? ' card' : ' cards') + ' practiced. Your review schedule wasn’t changed.</p>';
+    else if (!done) msg = '<h2 class="fd-title">All caught up</h2><p>Nothing in this deck is due for review yet. You can still practice all ' + n + (n === 1 ? ' card' : ' cards') + ' now — it won’t change your review schedule.</p>';
+    else msg = '<h2 class="fd-title">Deck done for now 🎉</h2><p>' + done + (done === 1 ? ' card' : ' cards') + ' reviewed. Cards come back when they’re due — or practice them again now.</p>';
+    root.innerHTML = '<div class="quiz-box">' + msg + '<div class="fd-actions">' +
+      (n ? '<button class="btn-primary fc-practice" type="button">' + (practice ? 'Practice again' : 'Study again (practice all ' + n + ')') + '</button>' : '') +
+      '<button class="' + (n ? 'btn-secondary' : 'btn-primary') + ' fc-back" type="button">Back to decks</button></div></div>';
     root.querySelector('.fc-back').onclick = goBack;
+    var pr = root.querySelector('.fc-practice');
+    if (pr) { pr.onclick = function () { practice = true; done = 0; buildQueue(); next(); }; pr.focus(); }
     // No confetti in flashcards (fast-paced); quiz celebrations are unchanged.
   }
   window.renderFlashcards = function (el) { root = el; renderHome(); };
