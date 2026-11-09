@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109f -->
+<!-- build:20261109g -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -146,6 +146,8 @@
   .card.non-routine { border-color:#a67c00; background:linear-gradient(180deg, rgba(255,214,10,0.12), var(--card) 42%); box-shadow: inset 4px 0 0 #ffd60a; }
   .card.non-routine h3 { color:#ffe566; }
   .nr-badge { display:inline-block; margin-left:0.4rem; padding:0.12rem 0.5rem; border-radius:999px; font-size:0.72rem; font-weight:700; letter-spacing:0.02em; vertical-align:middle; background:rgba(255,214,10,0.22); color:#ffe566; border:1px solid rgba(255,214,10,0.55); }
+  .sid-mark { display:inline; margin-left:0.45rem; color:#ff5a5a; font-size:0.88rem; font-weight:600; white-space:nowrap; vertical-align:baseline; }
+  .sid-mark .sid-lbl { font-size:0.72rem; font-weight:700; letter-spacing:0.03em; opacity:0.95; }
   #nr-prompt { margin-bottom:1rem; }
   #nr-prompt .quiz-box { border-color:#a67c00; box-shadow: inset 4px 0 0 #ffd60a; }
   #nr-prompt .nr-actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:0.9rem; }
@@ -401,7 +403,7 @@
     "projection": "PA Oblique",
     "crDegree": "Perpendicular",
     "crLocation": "3rd MCP joint",
-    "rotation": "45\u00b0"
+    "rotation": "45°"
   },
   {
     "extremity": "Hand",
@@ -422,7 +424,7 @@
     "projection": "PA Oblique",
     "crDegree": "Perpendicular",
     "crLocation": "Midcarpal area",
-    "rotation": "45\u00b0"
+    "rotation": "45°"
   },
   {
     "extremity": "Wrist",
@@ -450,7 +452,7 @@
     "projection": "PA Oblique",
     "crDegree": "Perpendicular",
     "crLocation": "PIP joint",
-    "rotation": "45\u00b0"
+    "rotation": "45°"
   },
   {
     "extremity": "Fingers",
@@ -471,7 +473,7 @@
     "projection": "PA Oblique",
     "crDegree": "Perpendicular",
     "crLocation": "1st MCP joint",
-    "rotation": "45\u00b0"
+    "rotation": "45°"
   },
   {
     "extremity": "Thumb",
@@ -506,14 +508,14 @@
     "projection": "AP Oblique (Medial Rotation)",
     "crDegree": "Perpendicular",
     "crLocation": "Elbow joint",
-    "rotation": "45\u00b0 medial"
+    "rotation": "45° medial"
   },
   {
     "extremity": "Elbow",
     "projection": "AP Oblique (Lateral Rotation)",
     "crDegree": "Perpendicular",
     "crLocation": "Elbow joint",
-    "rotation": "45\u00b0 lateral"
+    "rotation": "45° lateral"
   },
   {
     "extremity": "Elbow",
@@ -548,12 +550,12 @@
     "projection": "AP Oblique (Grashey Method)",
     "crDegree": "Perpendicular",
     "crLocation": "2 inches medial and 2 inches inferior to the superolateral border",
-    "rotation": "35\u201345\u00b0"
+    "rotation": "35–45°"
   },
   {
     "extremity": "Shoulder",
     "projection": "Inferosuperior Axial",
-    "crDegree": "15\u201330\u00b0 cephalic",
+    "crDegree": "15–30° cephalic",
     "crLocation": "Through the axilla to the AC joint",
     "rotation": null
   },
@@ -569,7 +571,7 @@
     "projection": "Lateral",
     "crDegree": "Perpendicular",
     "crLocation": "Mid-medial scapular border",
-    "rotation": "45\u201360\u00b0"
+    "rotation": "45–60°"
   },
   {
     "extremity": "Clavicle",
@@ -581,7 +583,7 @@
   {
     "extremity": "Clavicle",
     "projection": "AP Axial",
-    "crDegree": "15\u201330\u00b0 cephalic",
+    "crDegree": "15–30° cephalic",
     "crLocation": "Midshaft",
     "rotation": null
   },
@@ -595,7 +597,7 @@
   {
     "extremity": "Toes",
     "projection": "AP Axial",
-    "crDegree": "15\u00b0 posteriorly (toward the heel)",
+    "crDegree": "15° posteriorly (toward the heel)",
     "crLocation": "3rd MTP joint",
     "rotation": null
   },
@@ -604,7 +606,7 @@
     "projection": "AP Oblique (Medial Rotation)",
     "crDegree": "Perpendicular",
     "crLocation": "3rd MTP joint",
-    "rotation": "30\u201345\u00b0"
+    "rotation": "30–45°"
   },
   {
     "extremity": "Toes",
@@ -616,7 +618,7 @@
   {
     "extremity": "Foot",
     "projection": "AP Axial",
-    "crDegree": "10\u00b0 toward the heel (posteriorly)",
+    "crDegree": "10° toward the heel (posteriorly)",
     "crLocation": "Base of the third metatarsal",
     "rotation": null
   },
@@ -625,7 +627,7 @@
     "projection": "AP Oblique (Medial Rotation)",
     "crDegree": "Perpendicular",
     "crLocation": "Base of the third metatarsal",
-    "rotation": "30\u00b0"
+    "rotation": "30°"
   },
   {
     "extremity": "Foot",
@@ -637,7 +639,7 @@
   {
     "extremity": "Calcaneus",
     "projection": "Axial (Plantodorsal)",
-    "crDegree": "40\u00b0 cephalic (toward the heel)",
+    "crDegree": "40° cephalic (toward the heel)",
     "crLocation": "Entering the base of the third metatarsal",
     "rotation": null
   },
@@ -660,14 +662,14 @@
     "projection": "AP Oblique (Medial Rotation) Mortise",
     "crDegree": "Perpendicular",
     "crLocation": "Ankle joint, midway between the malleoli",
-    "rotation": "15\u201320\u00b0 internal"
+    "rotation": "15–20° internal"
   },
   {
     "extremity": "Ankle",
     "projection": "AP Oblique (Lateral Rotation)",
     "crDegree": "Perpendicular",
     "crLocation": "Ankle joint, midway between the malleoli",
-    "rotation": "45\u00b0 lateral"
+    "rotation": "45° lateral"
   },
   {
     "extremity": "Ankle",
@@ -693,38 +695,38 @@
   {
     "extremity": "Knee",
     "projection": "AP",
-    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crDegree": "Perpendicular (19–24 cm ASIS tabletop)",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": null,
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic"
   },
   {
     "extremity": "Knee",
     "projection": "AP Oblique (Medial Rotation)",
-    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crDegree": "Perpendicular (19–24 cm ASIS tabletop)",
     "crLocation": "1/2 inch inferior to the patellar apex",
-    "rotation": "45\u00b0 medial",
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+    "rotation": "45° medial",
+    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic"
   },
   {
     "extremity": "Knee",
     "projection": "AP Oblique (Lateral Rotation)",
-    "crDegree": "Perpendicular (19\u201324 cm ASIS tabletop)",
+    "crDegree": "Perpendicular (19–24 cm ASIS tabletop)",
     "crLocation": "1/2 inch inferior to the patellar apex",
-    "rotation": "45\u00b0 lateral",
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3\u20135\u00b0 caudal, 19\u201324 cm = perpendicular, >24 cm = 3\u20135\u00b0 cephalic"
+    "rotation": "45° lateral",
+    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic"
   },
   {
     "extremity": "Knee",
     "projection": "Lateral (Mediolateral)",
-    "crDegree": "5\u20137\u00b0 cephalic",
+    "crDegree": "5–7° cephalic",
     "crLocation": "1 inch distal to the medial femoral epicondyle",
     "rotation": null
   },
   {
     "extremity": "Knee",
     "projection": "Tangential (Settegast/Sunrise Method)",
-    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15\u201320\u00b0",
+    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15–20°",
     "crLocation": "Patellofemoral joint space",
     "rotation": null
   },
@@ -733,7 +735,7 @@
     "projection": "PA",
     "crDegree": "Perpendicular",
     "crLocation": "Mid-popliteal area, exiting the patella",
-    "rotation": "Usually 5\u201310\u00b0 lateral rotation of the heel"
+    "rotation": "Usually 5–10° lateral rotation of the heel"
   },
   {
     "extremity": "Patella",
@@ -745,7 +747,7 @@
   {
     "extremity": "Patella",
     "projection": "Tangential (Settegast/Sunrise Method)",
-    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15\u201320\u00b0",
+    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15–20°",
     "crLocation": "Patellofemoral joint space",
     "rotation": null
   },
@@ -768,22 +770,22 @@
     "projection": "AP",
     "crDegree": "Perpendicular",
     "crLocation": "Midway between the ASIS and pubic symphysis (2 inches inferior to ASIS and 2 inches superior to pubic symphysis) on the midsagittal plane",
-    "rotation": "Medially rotate feet and lower limbs 15\u201320\u00b0"
+    "rotation": "Medially rotate feet and lower limbs 15–20°"
   },
   {
     "extremity": "Pelvis",
-    "projection": "AP Oblique (Modified Cleaves Method / Bilateral Frog Leg) \u2014 Non-Routine",
+    "projection": "AP Oblique (Modified Cleaves Method / Bilateral Frog Leg) — Non-Routine",
     "crDegree": "Perpendicular",
     "crLocation": "on the midsagittal plane, 1 inch superior to the pubic symphysis",
-    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "rotation": "Abduct thighs as much as possible (45° if possible)",
     "note": "Bilateral"
   },
   {
     "extremity": "Pelvis",
-    "projection": "AP Oblique (Modified Cleaves Method / Unilateral Frog Leg) \u2014 Non-Routine",
+    "projection": "AP Oblique (Modified Cleaves Method / Unilateral Frog Leg) — Non-Routine",
     "crDegree": "Perpendicular",
     "crLocation": "femoral neck of the affected side",
-    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "rotation": "Abduct thighs as much as possible (45° if possible)",
     "note": "Unilateral"
   },
   {
@@ -791,14 +793,14 @@
     "projection": "AP Pelvis",
     "crDegree": "Perpendicular",
     "crLocation": "Midway between the ASIS and pubic symphysis (2 inches inferior to ASIS and 2 inches superior to pubic symphysis) on the midsagittal plane",
-    "rotation": "Medially rotate feet and lower limbs 15\u201320\u00b0"
+    "rotation": "Medially rotate feet and lower limbs 15–20°"
   },
   {
     "extremity": "Hip",
     "projection": "AP Oblique (Modified Cleaves Method / Frog Leg)",
     "crDegree": "Perpendicular",
     "crLocation": "on the midsagittal plane, 1 inch superior to the pubic symphysis",
-    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "rotation": "Abduct thighs as much as possible (45° if possible)",
     "note": "Bilateral"
   },
   {
@@ -806,7 +808,7 @@
     "projection": "AP Oblique (Modified Cleaves Method / Frog Leg)",
     "crDegree": "Perpendicular",
     "crLocation": "femoral neck of the affected side",
-    "rotation": "Abduct thighs as much as possible (45\u00b0 if possible)",
+    "rotation": "Abduct thighs as much as possible (45° if possible)",
     "note": "Unilateral"
   },
   {
@@ -814,7 +816,7 @@
     "projection": "AP",
     "crDegree": "Perpendicular",
     "crLocation": "2.5 inches distal on a line drawn perpendicular to the midpoint of a line between the ASIS and pubic symphysis (the femoral neck)",
-    "rotation": "Medially rotate the foot and lower limb 15\u201320\u00b0"
+    "rotation": "Medially rotate the foot and lower limb 15–20°"
   },
   {
     "extremity": "Hip",
@@ -825,15 +827,15 @@
   },
   {
     "extremity": "Hip",
-    "projection": "Axiolateral (Danelius-Miller Method / X-table Lateral / Surgical) \u2014 Trauma",
+    "projection": "Axiolateral (Danelius-Miller Method / X-table Lateral / Surgical) — Trauma",
     "crDegree": "Horizontal; perpendicular to the long axis of the femoral neck",
     "crLocation": "Enters groin area midway between anterior and posterior upper thigh and passes through the femoral neck (2.5 inches below the point of intersection of the localization lines)",
     "rotation": null
   },
   {
     "extremity": "Hip",
-    "projection": "Modified Axiolateral (Clements-Nakayama Modification Method) \u2014 Trauma",
-    "crDegree": "15\u00b0 posteriorly",
+    "projection": "Modified Axiolateral (Clements-Nakayama Modification Method) — Trauma",
+    "crDegree": "15° posteriorly",
     "crLocation": "Perpendicular to the femoral neck",
     "rotation": "Keep affected limb in neutral or external rotation (do not internally rotate)"
   },
@@ -877,7 +879,7 @@
     "projection": "PA Oblique (RAO position)",
     "crDegree": "Perpendicular",
     "crLocation": "Entering the elevated side of the posterior thorax at the level of T7 and approximately 1 inch lateral to the MSP",
-    "rotation": "RAO 15\u201320\u00b0"
+    "rotation": "RAO 15–20°"
   },
   {
     "extremity": "Sternum",
@@ -897,8 +899,8 @@
     "extremity": "Sternoclavicular Articulations",
     "projection": "PA Oblique (RAO or LAO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering at the level of T2\u2013T3 (about 3 inches distal to the vertebral prominens) and 1 to 2 inches lateral to the MSP toward the side up",
-    "rotation": "RAO or LAO 10\u201315\u00b0 toward the affected side"
+    "crLocation": "Entering at the level of T2–T3 (about 3 inches distal to the vertebral prominens) and 1 to 2 inches lateral to the MSP toward the side up",
+    "rotation": "RAO or LAO 10–15° toward the affected side"
   },
   {
     "extremity": "Ribs",
@@ -926,7 +928,7 @@
     "projection": "AP Oblique (RPO or LPO)",
     "crDegree": "Perpendicular",
     "crLocation": "Entering a longitudinal plane halfway between the MSP and the lateral surface of the body side up; T7 for upper ribs or halfway between the xiphoid process and lower rib margin for lower ribs",
-    "rotation": "45\u00b0 (RPO or LPO)"
+    "rotation": "45° (RPO or LPO)"
   },
   {
     "extremity": "Cervical Spine",
@@ -938,7 +940,7 @@
   {
     "extremity": "Cervical Spine",
     "projection": "AP Axial",
-    "crDegree": "15\u201320\u00b0 cephalad",
+    "crDegree": "15–20° cephalad",
     "crLocation": "MSP, directed through C4 (enters at or slightly inferior to the most prominent point of the thyroid cartilage)",
     "rotation": null
   },
@@ -952,15 +954,15 @@
   {
     "extremity": "Cervical Spine",
     "projection": "AP Axial Oblique (RPO and LPO)",
-    "crDegree": "15\u201320\u00b0 cephalic",
+    "crDegree": "15–20° cephalic",
     "crLocation": "Directed to C4",
-    "rotation": "45\u00b0 RPO or LPO"
+    "rotation": "45° RPO or LPO"
   },
   {
     "extremity": "Cervical Spine",
-    "projection": "Lateral (Swimmer\u2019s Technique) \u2014 Cervicothoracic Region",
-    "crDegree": "Perpendicular (or 3\u20135\u00b0 caudal if unable to depress shoulder)",
-    "crLocation": "MCP, entering C7\u2013T1 intervertebral disk space",
+    "projection": "Lateral (Swimmer’s Technique) — Cervicothoracic Region",
+    "crDegree": "Perpendicular (or 3–5° caudal if unable to depress shoulder)",
+    "crLocation": "MCP, entering C7–T1 intervertebral disk space",
     "rotation": null
   },
   {
@@ -987,15 +989,15 @@
   {
     "extremity": "Thoracic Spine",
     "projection": "Lateral (Right or Left)",
-    "crDegree": "Perpendicular (or angled perpendicular to the long axis of the thoracic column if not horizontal: average 10\u00b0 cephalic for females, 15\u00b0 cephalic for males)",
+    "crDegree": "Perpendicular (or angled perpendicular to the long axis of the thoracic column if not horizontal: average 10° cephalic for females, 15° cephalic for males)",
     "crLocation": "Entering the posterior half of the thorax at the level of T7",
     "rotation": null
   },
   {
     "extremity": "Thoracic Spine",
-    "projection": "Lateral (Swimmer\u2019s Technique) \u2014 Cervicothoracic Region",
-    "crDegree": "Perpendicular (or 3\u20135\u00b0 caudal if unable to depress shoulder)",
-    "crLocation": "MCP, entering C7\u2013T1 intervertebral disk space",
+    "projection": "Lateral (Swimmer’s Technique) — Cervicothoracic Region",
+    "crDegree": "Perpendicular (or 3–5° caudal if unable to depress shoulder)",
+    "crLocation": "MCP, entering C7–T1 intervertebral disk space",
     "rotation": null
   },
   {
@@ -1003,7 +1005,7 @@
     "projection": "AP Oblique (RPO and LPO)",
     "crDegree": "Perpendicular",
     "crLocation": "Exiting T7",
-    "rotation": "20\u00b0 posterior (coronal plane forms 70\u00b0 angle from IR)"
+    "rotation": "20° posterior (coronal plane forms 70° angle from IR)"
   },
   {
     "extremity": "Thoracolumbar Spine",
@@ -1029,7 +1031,7 @@
   {
     "extremity": "Lumbar Spine",
     "projection": "Lateral L5-S1 Spot (Lumbosacral Junction)",
-    "crDegree": "Perpendicular if the spine is horizontal; if not horizontal, 8\u00b0 caudal for women or 5\u00b0 caudal for men",
+    "crDegree": "Perpendicular if the spine is horizontal; if not horizontal, 8° caudal for women or 5° caudal for men",
     "crLocation": "Entering a coronal plane 2 inches posterior to the ASIS and 1.5 inches inferior to the iliac crest",
     "rotation": null
   },
@@ -1038,13 +1040,13 @@
     "projection": "AP Oblique (RPO and LPO)",
     "crDegree": "Perpendicular",
     "crLocation": "Lumbar: 2 inches medial to the elevated ASIS and 1.5 inches above the iliac crest (L3); Zygapophyseal joint (L5-S1): 2 inches medial to the elevated ASIS and midway between the iliac crest and ASIS",
-    "rotation": "45\u00b0 RPO or LPO"
+    "rotation": "45° RPO or LPO"
   },
   {
     "extremity": "SI Joints",
     "projection": "AP Axial (Bilateral) Ferguson Method",
-    "crDegree": "30\u00b0 cephalic for males or 35\u00b0 cephalic for females",
-    "crLocation": "MSP, 2\u20132.5 inches inferior to the ASIS",
+    "crDegree": "30° cephalic for males or 35° cephalic for females",
+    "crLocation": "MSP, 2–2.5 inches inferior to the ASIS",
     "rotation": null
   },
   {
@@ -1052,33 +1054,33 @@
     "projection": "AP Oblique",
     "crDegree": "Perpendicular",
     "crLocation": "1 inch medial to the elevated ASIS",
-    "rotation": "RPO or LPO 25\u201330\u00b0"
+    "rotation": "RPO or LPO 25–30°"
   },
   {
     "extremity": "Sacrum",
     "projection": "AP Axial (Supine)",
-    "crDegree": "15\u00b0 cephalic",
+    "crDegree": "15° cephalic",
     "crLocation": "Enters MSP at 2 inches superior to the pubic symphysis",
     "rotation": null
   },
   {
     "extremity": "Sacrum",
     "projection": "AP Axial (Prone)",
-    "crDegree": "15\u00b0 caudal",
+    "crDegree": "15° caudal",
     "crLocation": "Enters MSP at the level of the sacral curve",
     "rotation": null
   },
   {
     "extremity": "Coccyx",
     "projection": "AP Axial (Supine)",
-    "crDegree": "10\u00b0 caudal",
+    "crDegree": "10° caudal",
     "crLocation": "Enters MSP at 2 inches superior to the pubic symphysis",
     "rotation": null
   },
   {
     "extremity": "Coccyx",
     "projection": "AP Axial (Prone)",
-    "crDegree": "10\u00b0 cephalic",
+    "crDegree": "10° cephalic",
     "crLocation": "Enters MSP at the level of the palpable coccyx",
     "rotation": null
   },
@@ -1135,57 +1137,63 @@
     "extremity": "Esophagus (Barium Swallow)",
     "projection": "PA Oblique or AP Oblique Swallow (RAO or LPO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering the elevated side through a plane approximately 2 inches lateral to the MSP at the level of T5\u2013T6",
-    "rotation": "RAO or LPO 35\u201340\u00b0"
+    "crLocation": "Entering the elevated side through a plane approximately 2 inches lateral to the MSP at the level of T5–T6",
+    "rotation": "RAO or LPO 35–40°",
+    "sid": "40\""
   },
   {
     "extremity": "Esophagus (Barium Swallow)",
     "projection": "Lateral Swallow (Right Lateral)",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering MCP at the level of T5\u2013T6",
-    "rotation": null
+    "crLocation": "Entering MCP at the level of T5–T6",
+    "rotation": null,
+    "sid": "40\""
   },
   {
     "extremity": "Esophagus (Barium Swallow)",
-    "projection": "AP or PA Swallow \u2014 Non-Routine",
+    "projection": "AP or PA Swallow — Non-Routine",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering MSP at the level of T5\u2013T6",
+    "crLocation": "Entering MSP at the level of T5–T6",
     "rotation": null
   },
   {
     "extremity": "Stomach Upper GI",
     "projection": "PA/AP",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering 1\u20132 inches above the lower rib margin, midway between the vertebral column and the left lateral border of the abdomen",
-    "rotation": null
+    "crLocation": "Entering 1–2 inches above the lower rib margin, midway between the vertebral column and the left lateral border of the abdomen",
+    "rotation": null,
+    "sid": "40\""
   },
   {
     "extremity": "Stomach Upper GI",
     "projection": "Lateral (Right Lateral)",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering 1\u20132 inches above the lower rib margin, midway between the MCP and the anterior surface of the abdomen",
-    "rotation": null
+    "crLocation": "Entering 1–2 inches above the lower rib margin, midway between the MCP and the anterior surface of the abdomen",
+    "rotation": null,
+    "sid": "40\""
   },
   {
     "extremity": "Stomach Upper GI",
     "projection": "PA Oblique (RAO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Entering 1\u20132 inches above the lower rib margin, midway between the vertebral column and the left lateral border of the elevated side",
-    "rotation": "RAO 40\u201370\u00b0 (based on body habitus)"
+    "crLocation": "Entering 1–2 inches above the lower rib margin, midway between the vertebral column and the left lateral border of the elevated side",
+    "rotation": "RAO 40–70° (based on body habitus)",
+    "sid": "40\""
   },
   {
     "extremity": "Stomach Upper GI",
-    "projection": "AP Oblique (LPO) \u2014 Non-Routine",
+    "projection": "AP Oblique (LPO) — Non-Routine",
     "crDegree": "Perpendicular",
     "crLocation": "Entering midway between the xiphoid process and the lower rib margin, midway between the vertebral column and the left lateral border of the elevated side",
-    "rotation": "LPO 30\u201360\u00b0"
+    "rotation": "LPO 30–60°"
   },
   {
     "extremity": "Small Bowel",
     "projection": "AP or PA (Modified KUB)",
     "crDegree": "Perpendicular",
-    "crLocation": "Immediate/up to 30 min: 1\u20132 in. above lower rib margin on MSP (include stomach); Delayed: iliac crests on MSP",
-    "rotation": "None (supine without rotation)"
+    "crLocation": "Immediate/up to 30 min: 1–2 in. above lower rib margin on MSP (include stomach); Delayed: iliac crests on MSP",
+    "rotation": "None (supine without rotation)",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
@@ -1193,7 +1201,8 @@
     "crDegree": "Perpendicular",
     "crLocation": "Iliac crest on MSP (include pubic symphysis)",
     "rotation": "None (supine or prone)",
-    "bestShows": "Entire large intestine including flexures and rectum"
+    "bestShows": "Entire large intestine including flexures and rectum",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
@@ -1201,43 +1210,48 @@
     "crDegree": "Perpendicular",
     "crLocation": "Halfway between xiphoid process and lower rib margin on MSP; IR bottom at iliac crests, crosswise",
     "rotation": "None",
-    "bestShows": "Transverse colon and both colic flexures (hepatic right, splenic left)"
+    "bestShows": "Transverse colon and both colic flexures (hepatic right, splenic left)",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
     "projection": "PA/AP Axial (Angled Rectum)",
-    "crDegree": "PA: 30\u201340\u00b0 caudad; AP: 30\u201340\u00b0 cephalad",
+    "crDegree": "PA: 30–40° caudad; AP: 30–40° cephalad",
     "crLocation": "PA: level of ASIS on MSP; AP: entering 2 in below ASIS on MSP",
     "rotation": "None",
-    "bestShows": "Rectosigmoid region and sigmoid colon with less loop overlap"
+    "bestShows": "Rectosigmoid region and sigmoid colon with less loop overlap",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
     "projection": "AP Oblique (RPO) / PA Oblique (LAO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Iliac crests, 1\u20132 in lateral to midline on the elevated side",
-    "rotation": "35\u201345\u00b0",
-    "bestShows": "Left colic (splenic) flexure and descending colon (AP oblique shows side up; PA oblique shows side down)"
+    "crLocation": "Iliac crests, 1–2 in lateral to midline on the elevated side",
+    "rotation": "35–45°",
+    "bestShows": "Left colic (splenic) flexure and descending colon (AP oblique shows side up; PA oblique shows side down)",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
     "projection": "AP Oblique (LPO) / PA Oblique (RAO)",
     "crDegree": "Perpendicular",
-    "crLocation": "Iliac crests, 1\u20132 in lateral to midline on the elevated side",
-    "rotation": "35\u201345\u00b0",
-    "bestShows": "Right colic (hepatic) flexure, ascending colon, cecum, and sigmoid (AP oblique shows side up; PA oblique shows side down)"
+    "crLocation": "Iliac crests, 1–2 in lateral to midline on the elevated side",
+    "rotation": "35–45°",
+    "bestShows": "Right colic (hepatic) flexure, ascending colon, cecum, and sigmoid (AP oblique shows side up; PA oblique shows side down)",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
     "projection": "Lateral Rectum (Left Lateral)",
     "crDegree": "Perpendicular",
     "crLocation": "ASIS level on the MCP",
-    "rotation": "True lateral (90\u00b0)",
-    "bestShows": "Rectum and rectosigmoid"
+    "rotation": "True lateral (90°)",
+    "bestShows": "Rectum and rectosigmoid",
+    "sid": "40\""
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
-    "projection": "AP/PA Right Lateral Decubitus \u2014 Additional (air-contrast)",
+    "projection": "AP/PA Right Lateral Decubitus — Additional (air-contrast)",
     "crDegree": "Horizontal and perpendicular",
     "crLocation": "Iliac crests on MSP (or 2 in above iliac crest to include flexures)",
     "rotation": "Right lateral decubitus",
@@ -1245,7 +1259,7 @@
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
-    "projection": "AP/PA Left Lateral Decubitus \u2014 Additional (air-contrast)",
+    "projection": "AP/PA Left Lateral Decubitus — Additional (air-contrast)",
     "crDegree": "Horizontal and perpendicular",
     "crLocation": "Iliac crests on MSP (or 2 in above iliac crest to include flexures)",
     "rotation": "Left lateral decubitus",
@@ -1253,7 +1267,7 @@
   },
   {
     "extremity": "Large Intestine (Barium Enema)",
-    "projection": "Ventral Decubitus (Cross-Table Lateral Rectum) \u2014 Additional (air-contrast)",
+    "projection": "Ventral Decubitus (Cross-Table Lateral Rectum) — Additional (air-contrast)",
     "crDegree": "Horizontal and perpendicular",
     "crLocation": "Perpendicular to MCP at iliac crests, or at ASIS for rectum only",
     "rotation": "Prone",
@@ -1349,9 +1363,10 @@ function matches(p, q) {
 function projectionCardHtml(p) {
   const nr = isNonRoutine(p);
   const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
+  const sid = p.sid ? ' <span class="sid-mark" title="SID ' + String(p.sid).replace(/"/g, '') + ' inches">' + p.sid + ' <span class="sid-lbl">SID</span></span>' : '';
   return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
     '<div class="extremity">' + p.extremity + '</div>' +
-    '<h3>' + p.projection + badge + '</h3>' +
+    '<h3>' + p.projection + badge + sid + '</h3>' +
     '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
     '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>' +
     (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
