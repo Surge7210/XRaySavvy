@@ -130,7 +130,8 @@
   #quiz-mode-bar.hidden { display:none; }
   #quiz-back { background:none; border:none; color:var(--accent); font:inherit; font-size:0.95rem; padding:0.6rem 0.2rem; min-height:44px; cursor:pointer; }
   #quiz-mode-name { color:var(--muted); font-size:0.9rem; font-weight:600; }
-  input[type="search"], input[type="text"] { width:100%; padding:0.7rem 1rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; margin-bottom:0.5rem; }
+  input[type="search"], input[type="text"], textarea.quiz-answer { width:100%; padding:0.7rem 1rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; margin-bottom:0.5rem; font-family:inherit; }
+  textarea.quiz-answer { display:block; resize:none; overflow:hidden; overflow-wrap:anywhere; word-break:break-word; white-space:pre-wrap; line-height:1.4; min-height:2.8rem; field-sizing:content; }
   .filters { display:flex; gap:0.5rem; overflow-x:auto; padding:0.4rem 0 0.6rem; }
   .filters button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.3rem 0.75rem; border-radius:999px; white-space:nowrap; cursor:pointer; font-size:0.8rem; }
   .filters button.active { background:var(--accent); border-color:var(--accent); color:white; }
@@ -319,12 +320,12 @@
       <div class="quiz-question" id="quiz-question">Loading quiz...</div>
       <div id="quiz-typed">
         <label class="quiz-label">CR Degree and Direction</label>
-        <input type="text" id="quiz-degree" placeholder="Type your answer..." autocomplete="off">
+        <textarea class="quiz-answer" id="quiz-degree" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
         <label class="quiz-label">CR Location</label>
-        <input type="text" id="quiz-location" placeholder="Type your answer..." autocomplete="off">
+        <textarea class="quiz-answer" id="quiz-location" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
         <div id="rotation-section" class="hidden">
           <label class="quiz-label">Body Part Rotation</label>
-          <input type="text" id="quiz-rotation" placeholder="Type your answer..." autocomplete="off">
+          <textarea class="quiz-answer" id="quiz-rotation" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
         </div>
       </div>
       <div id="quiz-mc-fields" class="hidden"></div>
@@ -2111,9 +2112,7 @@ function loadQuiz() {
   if (useMc) {
     buildFocusMc(currentQuiz);
   } else {
-    quizDegreeEl.value = '';
-    quizLocationEl.value = '';
-    quizRotationEl.value = '';
+    resetQuizAnswers();
     rotationSection.classList.toggle('hidden', !hasRot);
     quizDegreeEl.focus();
   }
@@ -2659,8 +2658,18 @@ nextBtn.onclick = () => {
     loadQuiz();
   }
 };
-quizDegreeEl.addEventListener('keydown', e => { if (e.key === 'Enter') quizLocationEl.focus(); });
-quizLocationEl.addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
+function fitQuizAnswer(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.max(el.scrollHeight, 44) + 'px';
+}
+function resetQuizAnswers() {
+  [quizDegreeEl, quizLocationEl, quizRotationEl].forEach(el => { el.value = ''; fitQuizAnswer(el); });
+}
+[quizDegreeEl, quizLocationEl, quizRotationEl].forEach(el => {
+  el.addEventListener('input', () => fitQuizAnswer(el));
+  // Enter inserts a newline (default textarea). Do not check the answer or jump fields.
+});
 
 
 // ===================== PROGRESS TAB (optional account) =====================
