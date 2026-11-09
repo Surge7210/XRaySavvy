@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109i -->
+<!-- build:20261109j -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -146,9 +146,12 @@
   .card.non-routine { border-color:#a67c00; background:linear-gradient(180deg, rgba(255,214,10,0.12), var(--card) 42%); box-shadow: inset 4px 0 0 #ffd60a; }
   .card.non-routine h3 { color:#ffe566; }
   .nr-badge { display:inline-block; margin-left:0.4rem; padding:0.12rem 0.5rem; border-radius:999px; font-size:0.72rem; font-weight:700; letter-spacing:0.02em; vertical-align:middle; background:rgba(255,214,10,0.22); color:#ffe566; border:1px solid rgba(255,214,10,0.55); }
-  .sid-mark { display:inline; margin-left:0.45rem; color:#ff5a5a; font-size:0.88rem; font-weight:600; white-space:nowrap; vertical-align:baseline; }
-  .sid-mark .sid-lbl { font-size:0.72rem; font-weight:700; letter-spacing:0.03em; opacity:0.95; }
-  .ir-mark { display:inline; margin-left:0.45rem; color:#a3e635; font-size:0.88rem; font-weight:600; white-space:nowrap; vertical-align:baseline; }
+  /* SID + IR stay on one row; wrap as a unit under the title when needed */
+  .sid-ir { display:inline-flex; align-items:baseline; gap:0.45rem; white-space:nowrap; margin-left:0.45rem; vertical-align:baseline; max-width:100%; }
+  .sid-mark, .ir-mark { display:inline; font-size:0.88rem; font-weight:600; white-space:nowrap; vertical-align:baseline; }
+  .sid-mark { color:#ff5a5a; }
+  .ir-mark { color:#a3e635; }
+  .meta-suf { font-size:0.72rem; font-weight:700; letter-spacing:0.03em; opacity:0.95; }
   #nr-prompt { margin-bottom:1rem; }
   #nr-prompt .quiz-box { border-color:#a67c00; box-shadow: inset 4px 0 0 #ffd60a; }
   #nr-prompt .nr-actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:0.9rem; }
@@ -1386,12 +1389,19 @@ function matches(p, q) {
 function projectionCardHtml(p) {
   const nr = isNonRoutine(p);
   const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
-  const sid = p.sid ? ' <span class="sid-mark" title="SID ' + String(p.sid).replace(/"/g, '') + ' inches">' + p.sid + ' <span class="sid-lbl">SID</span></span>' : '';
+  const sidHtml = p.sid ? '<span class="sid-mark" title="SID ' + String(p.sid).replace(/"/g, '') + ' inches">' + p.sid + ' <span class="meta-suf">SID</span></span>' : '';
   const irOrient = p.ir && /CW/i.test(p.ir) ? 'crosswise' : 'lengthwise';
-  const ir = p.ir ? ' <span class="ir-mark" title="Image receptor size 14 x 17 inches, ' + irOrient + '">' + p.ir + '</span>' : '';
+  let irHtml = '';
+  if (p.ir) {
+    const m = String(p.ir).match(/^(\S+)\s+(\S+)$/);
+    irHtml = m
+      ? '<span class="ir-mark" title="Image receptor size 14 x 17 inches, ' + irOrient + '">' + m[1] + ' <span class="meta-suf">' + m[2] + '</span></span>'
+      : '<span class="ir-mark" title="Image receptor size 14 x 17 inches, ' + irOrient + '">' + p.ir + '</span>';
+  }
+  const meta = (sidHtml || irHtml) ? ' <span class="sid-ir">' + sidHtml + irHtml + '</span>' : '';
   return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
     '<div class="extremity">' + p.extremity + '</div>' +
-    '<h3>' + p.projection + badge + sid + ir + '</h3>' +
+    '<h3>' + p.projection + badge + meta + '</h3>' +
     '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
     '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>' +
     (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
