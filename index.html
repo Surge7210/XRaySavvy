@@ -139,6 +139,13 @@
   .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1rem; margin-bottom:0.8rem; }
   .card h3 { margin:0 0 0.3rem 0; font-size:1.05rem; }
   .card .extremity { color:var(--accent); font-size:0.85rem; font-weight:600; }
+  .card.non-routine { border-color:#a67c00; background:linear-gradient(180deg, rgba(255,214,10,0.12), var(--card) 42%); box-shadow: inset 4px 0 0 #ffd60a; }
+  .card.non-routine h3 { color:#ffe566; }
+  .nr-badge { display:inline-block; margin-left:0.4rem; padding:0.12rem 0.5rem; border-radius:999px; font-size:0.72rem; font-weight:700; letter-spacing:0.02em; vertical-align:middle; background:rgba(255,214,10,0.22); color:#ffe566; border:1px solid rgba(255,214,10,0.55); }
+  #nr-prompt { margin-bottom:1rem; }
+  #nr-prompt .quiz-box { border-color:#a67c00; box-shadow: inset 4px 0 0 #ffd60a; }
+  #nr-prompt .nr-actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:0.9rem; }
+  #nr-prompt .nr-actions button { flex:1 1 10rem; min-height:44px; }
   .card .best-shows { margin-top:0.45rem; font-size:0.85rem; color:var(--muted); }
   .card .best-shows strong { color:var(--text); font-weight:600; }
   .detail { margin:0.25rem 0; font-size:0.95rem; }
@@ -279,6 +286,16 @@
     <div id="results"></div>
   </div>
   <div id="quiz-view" class="hidden">
+    <div id="nr-prompt" class="hidden" role="dialog" aria-labelledby="nr-title">
+      <div class="quiz-box">
+        <h2 class="fp-head" id="nr-title" style="margin-top:0;">Include non-routines?</h2>
+        <p class="fp-hint" id="nr-hint">This quiz includes non-routine, trauma, or additional projections. Lab practicals usually cover routines only.</p>
+        <div class="nr-actions">
+          <button class="btn-primary" id="nr-routine" type="button">Routine only</button>
+          <button class="btn-secondary" id="nr-include" type="button">Include non-routines</button>
+        </div>
+      </div>
+    </div>
     <div id="focus-controls" class="hidden" style="margin-bottom:1rem;">
       <h2 class="fp-head">Pick body parts</h2>
       <p class="fp-hint">Tap them in the order you want to study. Tap again to remove.</p>
@@ -1310,16 +1327,18 @@ function render() {
     resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>';
     return;
   }
-  resultsEl.innerHTML = filtered.map(p => `
-    <div class="card">
-      <div class="extremity">${p.extremity}</div>
-      <h3>${p.projection}</h3>
-      <div class="detail"><strong>CR Degree & Direction:</strong> ${p.crDegree}</div>
-      <div class="detail"><strong>CR Location:</strong> ${p.crLocation}</div>
-      ${p.rotation ? `<div class="detail"><strong>Body Part Rotation:</strong> ${p.rotation}</div>` : ''}
-      ${p.bestShows ? `<div class="best-shows"><strong>Best shows:</strong> ${p.bestShows}</div>` : ''}
-    </div>
-  `).join('');
+  resultsEl.innerHTML = filtered.map(p => {
+    const nr = isNonRoutine(p);
+    const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
+    return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
+      '<div class="extremity">' + p.extremity + '</div>' +
+      '<h3>' + p.projection + badge + '</h3>' +
+      '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
+      '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>' +
+      (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
+      (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
+    '</div>';
+  }).join('');
 }
 
 let quizMode = 'random';
@@ -1332,9 +1351,67 @@ let focusShownIdx = 0;    // index in focusQueue of the question on screen
 let focusCountedSerial = -1; // count each focused question once, even if Check is pressed twice
 
 let weakPool = null; // "Quiz my weak spots" (from the Progress tab)
-function getQuizPool() {
-  return data;
+// Session choice for non-routine / trauma / additional projections (null until asked for this quiz).
+let includeNonRoutines = null;
+let quizPool = null; // active pool for the current quiz session
+let pendingQuizStart = null; // { scope, startFn, groups? }
+function isNonRoutine(p) {
+  return /Non-Routine|\bTrauma\b|\bAdditional\b/i.test(String(p && p.projection || ''));
 }
+function nonRoutineKind(p) {
+  const n = String(p && p.projection || '');
+  if (/Non-Routine/i.test(n)) return 'Non-routine';
+  if (/\bTrauma\b/i.test(n)) return 'Trauma';
+  if (/\bAdditional\b/i.test(n)) return 'Additional';
+  return 'Non-routine';
+}
+function filterNonRoutines(list, include) {
+  return include ? list.slice() : list.filter(p => !isNonRoutine(p));
+}
+function getQuizPool() {
+  return quizPool && quizPool.length ? quizPool : data;
+}
+function setQuizPool(list) { quizPool = list && list.length ? list.slice() : []; return quizPool; }
+function hideNrPrompt() {
+  const el = document.getElementById('nr-prompt');
+  if (el) el.classList.add('hidden');
+  pendingQuizStart = null;
+}
+function askNonRoutinesIfNeeded(scope, startFn, groups) {
+  hideNrPrompt();
+  includeNonRoutines = null;
+  const hasNr = scope.some(isNonRoutine);
+  if (!hasNr) { includeNonRoutines = false; setQuizPool(scope); startFn(scope, groups); return; }
+  pendingQuizStart = { scope, startFn, groups };
+  const el = document.getElementById('nr-prompt');
+  const n = scope.filter(isNonRoutine).length;
+  const hint = document.getElementById('nr-hint');
+  if (hint) hint.textContent = 'This quiz includes ' + n + ' non-routine, trauma, or additional projection' + (n === 1 ? '' : 's') + '. Lab practicals usually cover routines only.';
+  document.getElementById('focus-controls').classList.add('hidden');
+  const fq = document.getElementById('focus-quiz'); if (fq) fq.classList.add('hidden');
+  const fd = document.getElementById('focus-done'); if (fd) fd.classList.add('hidden');
+  const fp = document.getElementById('focus-panel'); if (fp) fp.classList.add('hidden');
+  el.classList.remove('hidden');
+  document.getElementById('nr-routine').focus();
+}
+function finishNrChoice(include) {
+  const pending = pendingQuizStart; if (!pending) return;
+  includeNonRoutines = !!include;
+  let groups = pending.groups;
+  if (groups) {
+    groups = groups.map(g => ({ label: g.label, items: filterNonRoutines(g.items, include) })).filter(g => g.items.length);
+  }
+  const pool = groups ? groups.reduce((a, g) => a.concat(g.items), []) : filterNonRoutines(pending.scope, include);
+  hideNrPrompt();
+  if (!pool.length) {
+    alert('No routine projections in this selection. Try including non-routines, or pick different body parts.');
+    showQuizChooser();
+    return;
+  }
+  setQuizPool(pool);
+  pending.startFn(pool, groups);
+}
+
 
 
 let fwAudioCtx = null;
@@ -1801,9 +1878,11 @@ function generateDistractors(correct, pool) {
 
 function loadMC() {
   clearConfetti();
-  currentMC = data[Math.floor(Math.random() * data.length)];
+  const pool = getQuizPool();
+  if (!pool.length) { mcQuestionEl.textContent = 'No projections available.'; mcOptionsEl.innerHTML = ''; return; }
+  currentMC = pool[Math.floor(Math.random() * pool.length)];
   mcQuestionEl.textContent = `What is the CR Location for a ${currentMC.projection} ${currentMC.extremity}?`;
-  const wrongs = generateDistractors(currentMC, data);
+  const wrongs = generateDistractors(currentMC, pool);
   const options = [currentMC.crLocation, ...wrongs];
   // Shuffle
   for (let i = options.length - 1; i > 0; i--) {
@@ -1924,8 +2003,9 @@ function pickFieldOptions(correctProj, field, want) {
   if (!correct) return [];
   const seen = new Set([optionKey(correct)]);
   const opts = [correct];
-  const same = data.filter(p => p.extremity === correctProj.extremity && p !== correctProj);
-  const rest = data.filter(p => p !== correctProj);
+  const poolAll = getQuizPool();
+  const same = poolAll.filter(p => p.extremity === correctProj.extremity && p !== correctProj);
+  const rest = poolAll.filter(p => p !== correctProj);
   const pools = [same, rest].map(pool => {
     let list = pool;
     if (field === 'rotation') list = pool.filter(hasRotation);
@@ -2464,6 +2544,8 @@ function setActiveTab(active) {
 
 function showQuizChooser() {
   clearConfetti();
+  hideNrPrompt();
+  includeNonRoutines = null; quizPool = null;
   setActiveTab(tabQuiz);
   refView.classList.add('hidden');
   quizView.classList.add('hidden');
@@ -2505,7 +2587,7 @@ tabRandom.onclick = () => {
   mcView.classList.add('hidden');
   refControls.classList.add('hidden');
   focusControls.classList.add('hidden');
-  loadQuiz();
+  askNonRoutinesIfNeeded(data.slice(), () => { setFocusStage(null); loadQuiz(); });
 };
 
 tabFocus.onclick = () => {
@@ -2566,6 +2648,7 @@ function renderFocusPicker() {
 
 function showFocusPicker() {
   clearConfetti();
+  hideNrPrompt();
   setFocusStage('pick');
   renderFocusPicker();
   window.scrollTo(0, 0);
@@ -2614,7 +2697,9 @@ function showFocusDone() {
 fpStart.onclick = () => {
   if (!focusPicked.length) return;
   weakPool = null;
-  startFocus(focusPicked.map(ext => ({ label: ext, items: data.filter(p => p.extremity === ext) })));
+  const groups = focusPicked.map(ext => ({ label: ext, items: data.filter(p => p.extremity === ext) }));
+  const scope = groups.reduce((a, g) => a.concat(g.items), []);
+  askNonRoutinesIfNeeded(scope, (pool, filteredGroups) => startFocus(filteredGroups || groups), groups);
 };
 fpClear.onclick = () => { focusPicked = []; renderFocusPicker(); };
 document.getElementById('fp-style-type').onclick = () => setFocusAnswerStyle('type');
@@ -2627,18 +2712,31 @@ fpnToggle.onclick = () => {
   fpnToggle.textContent = open ? 'Progress ▴' : 'Progress ▾';
 };
 document.getElementById('fpn-new').onclick = showFocusPicker;
-document.getElementById('fd-again').onclick = () => startFocus(focusGroups);
+document.getElementById('fd-again').onclick = () => {
+  const include = includeNonRoutines !== false;
+  const rebuilt = focusGroups.map(g => {
+    const src = (g.label && g.label.indexOf('weak') < 0) ? data.filter(p => p.extremity === g.label) : g.items.slice();
+    return { label: g.label, items: filterNonRoutines(src.length ? src : g.items, include) };
+  }).filter(g => g.items.length);
+  if (!rebuilt.length) { alert('No projections left for this selection.'); return; }
+  setQuizPool(rebuilt.reduce((a, g) => a.concat(g.items), []));
+  startFocus(rebuilt);
+};
 document.getElementById('fd-new').onclick = showFocusPicker;
 
 tabMC.onclick = () => {
   setActiveTab(tabMC);
   quizMode = 'mc';
-  mcView.classList.remove('hidden');
-  quizView.classList.add('hidden');
+  quizView.classList.remove('hidden');
+  mcView.classList.add('hidden');
   refView.classList.add('hidden');
   refControls.classList.add('hidden');
   focusControls.classList.add('hidden');
-  loadMC();
+  askNonRoutinesIfNeeded(data.slice(), () => {
+    quizView.classList.add('hidden');
+    mcView.classList.remove('hidden');
+    loadMC();
+  });
 };
 
 restartBtn.onclick = () => {
@@ -2761,7 +2859,8 @@ function startWeakSpots(list) {
   weakPool = data.filter(p => keys.has(p.extremity + '|' + p.projection));
   if (!weakPool.length) { alert('No weak spots to quiz yet — keep practicing!'); return; }
   tabFocus.onclick();
-  startFocus([{ label: '⭐ My weak spots', items: weakPool }]);
+  const groups = [{ label: '⭐ My weak spots', items: weakPool }];
+  askNonRoutinesIfNeeded(weakPool.slice(), (pool, fg) => startFocus(fg || groups), groups);
 }
 
 function showProgressTab() {
@@ -2789,6 +2888,9 @@ function routeFromHash() {
   else if (h === 'reference' || h === 'ref') tabRef.onclick();
 }
 window.addEventListener('hashchange', routeFromHash);
+
+document.getElementById('nr-routine').onclick = () => finishNrChoice(false);
+document.getElementById('nr-include').onclick = () => finishNrChoice(true);
 
 renderFilters();
 render();
