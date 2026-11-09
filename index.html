@@ -1512,85 +1512,67 @@ function launchBats(testTimeMs) {
 }
 
 
+// Confetti pop: ONE shared animation loop, wall-clock (time-based) physics so dropped frames don't turn into slow motion,
+// a hard ~1.6 s lifetime with fade-out, particle count scaled to screen size, DPR capped at 2.
+// clearConfetti() stops it instantly (called on next question / leaving the quiz / tab hidden).
+const CONFETTI = { pieces: [], raf: 0, last: 0, W: 0, H: 0, ctx: null, canvas: null };
+const CONFETTI_LIFE = 1600, CONFETTI_FADE = 450;
+function clearConfetti() {
+  const C = CONFETTI;
+  if (C.raf) cancelAnimationFrame(C.raf);
+  C.raf = 0; C.pieces.length = 0;
+  if (C.ctx) C.ctx.clearRect(0, 0, C.W, C.H);
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearConfetti(); });
 function launchConfettiPop() {
-  const canvas = document.getElementById('confetti-canvas');
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
+  const C = CONFETTI;
+  C.canvas = C.canvas || document.getElementById('confetti-canvas');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const W = window.innerWidth, H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const reach = Math.max(W, H) * 0.5;
-  // front color + slightly darker back side, like real foil/paper confetti
-  const colors = [
-    ['#ff3b30','#c62a22'], ['#ff9500','#c77400'], ['#ffd60a','#c9a800'],
-    ['#34c759','#24923f'], ['#00c7be','#00918b'], ['#1d9bf0','#1572b0'],
-    ['#5e5ce6','#4442a8'], ['#bf5af2','#8c3fb3'], ['#ff2d92','#c0206d'],
-    ['#ffffff','#cfd4da']
-  ];
-  const pops = [
-    { x: W * 0.5,  y: H * 0.5,  delay: 0 },
-    { x: W * 0.22, y: H * 0.35, delay: 16 },
-    { x: W * 0.78, y: H * 0.35, delay: 32 }
-  ];
-  const pieces = [];
-  function pop(b) {
-    for (let i = 0; i < 160; i++) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.9; // mostly upward and outward
-      const speed = (reach / 22) * (0.25 + Math.random() * 0.75);
-      const c = colors[Math.floor(Math.random() * colors.length)];
-      const kind = Math.random();
-      pieces.push({
-        x: b.x, y: b.y,
-        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        w: kind < 0.15 ? 3 + Math.random() * 2 : 7 + Math.random() * 5,   // thin strips vs squares
-        h: kind < 0.15 ? 14 + Math.random() * 8 : 5 + Math.random() * 5,
-        round: kind > 0.9,
-        rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 0.2,
-        tiltX: Math.random() * Math.PI * 2, vtX: 0.05 + Math.random() * 0.12,
-        tiltY: Math.random() * Math.PI * 2, vtY: 0.04 + Math.random() * 0.1,
-        sway: Math.random() * Math.PI * 2, vs: 0.02 + Math.random() * 0.03,
-        swayAmt: 0.4 + Math.random() * 0.9,
-        fall: 1.4 + Math.random() * 1.4,   // terminal fall speed (paper drifts, not drops)
-        front: c[0], back: c[1]
-      });
-    }
+  const pops = [{ x: W * 0.5, y: H * 0.5, delay: 0 }, { x: W * 0.22, y: H * 0.35, delay: 0.03 }, { x: W * 0.78, y: H * 0.35, delay: 0.06 }];
+  pops.forEach((b, i) => playPop(b.delay, i === 0 ? 0.6 : 0.45));
+  if (reduce) return; // sound only; no motion
+  if (C.W !== W || C.H !== H || !C.ctx) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    C.canvas.width = Math.round(W * dpr); C.canvas.height = Math.round(H * dpr);
+    C.ctx = C.canvas.getContext('2d'); C.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); C.W = W; C.H = H;
   }
-  pops.forEach((b, i) => playPop(b.delay / 60, i === 0 ? 0.6 : 0.45));
-  let frame = 0;
-  function draw() {
-    pops.forEach(b => { if (b.delay === frame) pop(b); });
-    ctx.clearRect(0, 0, W, H);
-    for (let i = pieces.length - 1; i >= 0; i--) {
-      const p = pieces[i];
-      // air drag slows the blast, gravity pulls down, flat paper hits terminal speed quickly
-      p.vx *= 0.93;
-      p.vy = p.vy * 0.93 + 0.18;
-      if (p.vy > p.fall) p.vy = p.vy * 0.9 + p.fall * 0.1;
-      p.sway += p.vs;
-      p.x += p.vx + Math.sin(p.sway) * p.swayAmt;
-      p.y += p.vy;
-      p.rot += p.vr;
-      p.tiltX += p.vtX; p.tiltY += p.vtY;
-      if (p.y > H + 30) { pieces.splice(i, 1); continue; }
-      const sx = Math.cos(p.tiltX), sy = Math.cos(p.tiltY);
-      const facing = sx * sy >= 0;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot);
-      ctx.scale(sx, sy);
-      ctx.fillStyle = facing ? p.front : p.back;
-      if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); }
-      else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-      // subtle highlight as the piece catches the light
-      const shine = Math.abs(sx * sy);
-      if (shine > 0.85) { ctx.fillStyle = 'rgba(255,255,255,' + ((shine - 0.85) * 2).toFixed(2) + ')'; if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); } else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); }
-      ctx.restore();
+  const colors = ['#ff3b30', '#ff9500', '#ffd60a', '#34c759', '#00c7be', '#1d9bf0', '#5e5ce6', '#bf5af2', '#ff2d92', '#ffffff'];
+  const per = Math.round(Math.min(60, Math.max(28, (W * H) / 9000))); // ~36 per pop on a phone, 60 on desktop
+  const reach = Math.max(W, H) * 0.5, now = performance.now();
+  C.pieces = C.pieces.slice(-120); // rapid repeats never pile up
+  pops.forEach(b => {
+    for (let i = 0; i < per; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.9;
+      const speed = reach * 2.6 * (0.3 + Math.random() * 0.7); // px/s
+      const strip = Math.random() < 0.15;
+      C.pieces.push({ x: b.x, y: b.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        w: strip ? 3 + Math.random() * 2 : 7 + Math.random() * 5, h: strip ? 14 + Math.random() * 8 : 5 + Math.random() * 5,
+        rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 12, tilt: Math.random() * 6.28, vt: 4 + Math.random() * 8,
+        c: colors[(Math.random() * colors.length) | 0], born: now + b.delay * 1000 });
     }
-    frame++;
-    if ((frame < 40 || pieces.length) && frame < 1500) requestAnimationFrame(draw);
-    else ctx.clearRect(0, 0, W, H);
+  });
+  if (!C.raf) { C.last = now; C.raf = requestAnimationFrame(confettiFrame); }
+}
+function confettiFrame(t) {
+  const C = CONFETTI, ctx = C.ctx;
+  const dt = Math.min(0.05, Math.max(0, (t - C.last) / 1000)); C.last = t;
+  ctx.clearRect(0, 0, C.W, C.H);
+  const drag = Math.pow(0.02, dt); // strong air drag: fast pop, then gentle fall
+  for (let i = C.pieces.length - 1; i >= 0; i--) {
+    const p = C.pieces[i], age = t - p.born;
+    if (age < 0) continue;
+    if (age > CONFETTI_LIFE || p.y > C.H + 30) { C.pieces.splice(i, 1); continue; }
+    p.vx *= drag; p.vy = p.vy * drag + 1400 * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.tilt += p.vt * dt;
+    ctx.globalAlpha = age > CONFETTI_LIFE - CONFETTI_FADE ? (CONFETTI_LIFE - age) / CONFETTI_FADE : 1;
+    const c = Math.cos(p.rot), s = Math.sin(p.rot), k = Math.cos(p.tilt);
+    ctx.setTransform(c * C.canvas.width / C.W, s * C.canvas.width / C.W, -s * k * C.canvas.width / C.W, c * k * C.canvas.width / C.W, p.x * C.canvas.width / C.W, p.y * C.canvas.width / C.W);
+    ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
   }
-  draw();
+  const r = C.canvas.width / C.W; ctx.setTransform(r, 0, 0, r, 0, 0); ctx.globalAlpha = 1;
+  if (C.pieces.length) C.raf = requestAnimationFrame(confettiFrame);
+  else { C.raf = 0; ctx.clearRect(0, 0, C.W, C.H); }
 }
 
 function launchFireworks() {
@@ -1817,6 +1799,7 @@ function generateDistractors(correct, pool) {
 }
 
 function loadMC() {
+  clearConfetti();
   currentMC = data[Math.floor(Math.random() * data.length)];
   mcQuestionEl.textContent = `What is the CR Location for a ${currentMC.projection} ${currentMC.extremity}?`;
   const wrongs = generateDistractors(currentMC, data);
@@ -2099,6 +2082,7 @@ function hasRotation(p) {
 }
 
 function loadQuiz() {
+  clearConfetti();
   if (quizMode === 'focus') {
     if (focusIndex >= focusQueue.length) {
       showFocusDone();
@@ -2444,6 +2428,7 @@ const quizBack = document.getElementById('quiz-back');
 const tabFlash = document.getElementById('tab-flash');
 const flashView = document.getElementById('flash-view');
 function showFlashTab() {
+  clearConfetti();
   setActiveTab(tabFlash);
   refView.classList.add('hidden'); quizView.classList.add('hidden'); mcView.classList.add('hidden');
   refControls.classList.add('hidden'); focusControls.classList.add('hidden');
@@ -2479,6 +2464,7 @@ function setActiveTab(active) {
 }
 
 function showQuizChooser() {
+  clearConfetti();
   setActiveTab(tabQuiz);
   refView.classList.add('hidden');
   quizView.classList.add('hidden');
@@ -2580,6 +2566,7 @@ function renderFocusPicker() {
 }
 
 function showFocusPicker() {
+  clearConfetti();
   setFocusStage('pick');
   renderFocusPicker();
   window.scrollTo(0, 0);
@@ -2613,6 +2600,7 @@ function renderFocusPanel() {
 }
 
 function showFocusDone() {
+  clearConfetti();
   setFocusStage('done');
   const total = focusQueue.length;
   document.getElementById('fd-score').innerHTML = `<strong>${focusCorrect} of ${total}</strong> fully correct across ${focusGroups.length} body part${focusGroups.length > 1 ? 's' : ''}`;
@@ -2768,6 +2756,7 @@ function startWeakSpots(list) {
 }
 
 function showProgressTab() {
+  clearConfetti();
   setActiveTab(tabProgress);
   quizMode = 'progress';
   quizView.classList.add('hidden');
