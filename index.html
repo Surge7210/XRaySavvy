@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- build:20261109f -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -135,6 +136,9 @@
   .filters { display:flex; gap:0.5rem; overflow-x:auto; padding:0.4rem 0 0.6rem; }
   .filters button { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.3rem 0.75rem; border-radius:999px; white-space:nowrap; cursor:pointer; font-size:0.8rem; }
   .filters button.active { background:var(--accent); border-color:var(--accent); color:white; }
+  .filters button.fluoro-tab { border-color:rgba(29,155,240,0.55); color:#8ecdf8; }
+  .filters button.fluoro-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .fluoro-group { margin:1rem 0 0.45rem; font-size:0.92rem; font-weight:700; color:var(--accent); }
   main { padding:1rem max(1rem, env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); max-width:800px; margin:0 auto; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1rem; margin-bottom:0.8rem; }
   .card h3 { margin:0 0 0.3rem 0; font-size:1.05rem; }
@@ -1291,6 +1295,24 @@ const progressView = document.getElementById('progress-view');
 const progressBody = document.getElementById('progress-body');
 
 const extremities = [...new Set(data.map(p => p.extremity))].sort();
+// Lab Practical Fluoro: routine-only GI fluoro projections (same objects as in data — not copies).
+const FLUORO_TAB = 'Lab Practical Fluoro Projections';
+const FLUORO_ID = '__lab_fluoro__';
+const FLUORO_GROUP_ORDER = [
+  'Esophagus (Barium Swallow)',
+  'Stomach Upper GI',
+  'Small Bowel',
+  'Large Intestine (Barium Enema)'
+];
+function fluoroGroups() {
+  return FLUORO_GROUP_ORDER.map(label => ({
+    label,
+    items: data.filter(p => p.extremity === label && !isNonRoutine(p))
+  })).filter(g => g.items.length);
+}
+function fluoroFlat() {
+  return fluoroGroups().reduce((a, g) => a.concat(g.items), []);
+}
 let activeFilter = 'All';
 let currentQuiz = null;
 let quizSerial = 0, loggedSerial = -1; // log only the first check of each question
@@ -1302,6 +1324,12 @@ function renderFilters() {
   allBtn.className = activeFilter === 'All' ? 'active' : '';
   allBtn.onclick = () => { activeFilter = 'All'; render(); };
   filtersEl.appendChild(allBtn);
+  const fluoroBtn = document.createElement('button');
+  fluoroBtn.type = 'button';
+  fluoroBtn.textContent = FLUORO_TAB;
+  fluoroBtn.className = 'fluoro-tab' + (activeFilter === FLUORO_ID ? ' active' : '');
+  fluoroBtn.onclick = () => { activeFilter = FLUORO_ID; render(); };
+  filtersEl.appendChild(fluoroBtn);
   extremities.forEach(ext => {
     const btn = document.createElement('button');
     btn.textContent = ext;
@@ -1318,8 +1346,28 @@ function matches(p, q) {
   return fields.some(f => String(f).toLowerCase().includes(s));
 }
 
+function projectionCardHtml(p) {
+  const nr = isNonRoutine(p);
+  const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
+  return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
+    '<div class="extremity">' + p.extremity + '</div>' +
+    '<h3>' + p.projection + badge + '</h3>' +
+    '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
+    '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>' +
+    (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
+    (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
+  '</div>';
+}
 function render() {
   const q = searchEl.value.trim();
+  if (activeFilter === FLUORO_ID) {
+    const groups = fluoroGroups().map(g => ({ label: g.label, items: g.items.filter(p => matches(p, q)) })).filter(g => g.items.length);
+    const n = groups.reduce((a, g) => a + g.items.length, 0);
+    countEl.textContent = n + ' projection' + (n === 1 ? '' : 's') + ' · routine fluoro';
+    if (!n) { resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>'; return; }
+    resultsEl.innerHTML = groups.map(g => '<div class="fluoro-group">' + g.label + '</div>' + g.items.map(projectionCardHtml).join('')).join('');
+    return;
+  }
   let filtered = data.filter(p => matches(p, q));
   if (activeFilter !== 'All') filtered = filtered.filter(p => p.extremity === activeFilter);
   countEl.textContent = filtered.length + ' projection' + (filtered.length === 1 ? '' : 's');
@@ -1327,18 +1375,7 @@ function render() {
     resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>';
     return;
   }
-  resultsEl.innerHTML = filtered.map(p => {
-    const nr = isNonRoutine(p);
-    const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
-    return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
-      '<div class="extremity">' + p.extremity + '</div>' +
-      '<h3>' + p.projection + badge + '</h3>' +
-      '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
-      '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>' +
-      (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
-      (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
-    '</div>';
-  }).join('');
+  resultsEl.innerHTML = filtered.map(projectionCardHtml).join('');
 }
 
 let quizMode = 'random';
@@ -2611,7 +2648,9 @@ const fpClear = document.getElementById('fp-clear');
 const fpnToggle = document.getElementById('fpn-toggle');
 const fpnList = document.getElementById('fpn-list');
 const fEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const extCount = ext => data.filter(p => p.extremity === ext).length;
+const extCount = ext => ext === FLUORO_ID ? fluoroFlat().length : data.filter(p => p.extremity === ext).length;
+const focusLabel = ext => ext === FLUORO_ID ? FLUORO_TAB : ext;
+const focusItems = ext => ext === FLUORO_ID ? fluoroFlat() : data.filter(p => p.extremity === ext);
 
 // stage: null (not focused mode) | 'pick' | 'quiz' | 'done'
 function setFocusStage(stage) {
@@ -2624,14 +2663,14 @@ function setFocusStage(stage) {
 
 function renderFocusPicker() {
   fpGrid.innerHTML = '';
-  extremities.forEach(ext => {
+  [FLUORO_ID].concat(extremities).forEach(ext => {
     const idx = focusPicked.indexOf(ext);
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'fp-chip' + (idx >= 0 ? ' sel' : '');
+    b.className = 'fp-chip' + (idx >= 0 ? ' sel' : '') + (ext === FLUORO_ID ? ' fluoro' : '');
     b.dataset.ext = ext;
     b.setAttribute('aria-pressed', idx >= 0 ? 'true' : 'false');
-    b.innerHTML = `<span class="fp-num">${idx >= 0 ? idx + 1 : ''}</span><span class="fp-name">${fEsc(ext)}</span><span class="fp-cnt">${extCount(ext)}</span>`;
+    b.innerHTML = `<span class="fp-num">${idx >= 0 ? idx + 1 : ''}</span><span class="fp-name">${fEsc(focusLabel(ext))}</span><span class="fp-cnt">${extCount(ext)}</span>`;
     b.onclick = () => {
       const i = focusPicked.indexOf(ext);
       if (i >= 0) focusPicked.splice(i, 1); else focusPicked.push(ext);
@@ -2641,7 +2680,7 @@ function renderFocusPicker() {
   });
   const n = focusPicked.length;
   const total = focusPicked.reduce((a, e) => a + extCount(e), 0);
-  fpSum.innerHTML = n ? `<strong>${n} body part${n > 1 ? 's' : ''}</strong> · ${total} projections<br>${focusPicked.map((e, i) => (i + 1) + '. ' + fEsc(e)).join(' → ')}` : 'Nothing picked yet';
+  fpSum.innerHTML = n ? `<strong>${n} body part${n > 1 ? 's' : ''}</strong> · ${total} projections<br>${focusPicked.map((e, i) => (i + 1) + '. ' + fEsc(focusLabel(e))).join(' → ')}` : 'Nothing picked yet';
   fpStart.disabled = n === 0;
   fpClear.disabled = n === 0;
 }
@@ -2697,8 +2736,14 @@ function showFocusDone() {
 fpStart.onclick = () => {
   if (!focusPicked.length) return;
   weakPool = null;
-  const groups = focusPicked.map(ext => ({ label: ext, items: data.filter(p => p.extremity === ext) }));
+  // Fluoro reuses the same projection objects; drop duplicates if fluoro + a GI part are both picked.
+  const seen = new Set();
+  const groups = focusPicked.map(ext => {
+    const items = focusItems(ext).filter(p => { if (seen.has(p)) return false; seen.add(p); return true; });
+    return { label: focusLabel(ext), items };
+  }).filter(g => g.items.length);
   const scope = groups.reduce((a, g) => a.concat(g.items), []);
+  // Fluoro tab is already routine-only; still ask if any other picked part has non-routines.
   askNonRoutinesIfNeeded(scope, (pool, filteredGroups) => startFocus(filteredGroups || groups), groups);
 };
 fpClear.onclick = () => { focusPicked = []; renderFocusPicker(); };
@@ -2715,7 +2760,10 @@ document.getElementById('fpn-new').onclick = showFocusPicker;
 document.getElementById('fd-again').onclick = () => {
   const include = includeNonRoutines !== false;
   const rebuilt = focusGroups.map(g => {
-    const src = (g.label && g.label.indexOf('weak') < 0) ? data.filter(p => p.extremity === g.label) : g.items.slice();
+    let src;
+    if (g.label === FLUORO_TAB) src = fluoroFlat();
+    else if (g.label && g.label.indexOf('weak') < 0) src = data.filter(p => p.extremity === g.label);
+    else src = g.items.slice();
     return { label: g.label, items: filterNonRoutines(src.length ? src : g.items, include) };
   }).filter(g => g.items.length);
   if (!rebuilt.length) { alert('No projections left for this selection.'); return; }
