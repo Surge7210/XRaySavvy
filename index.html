@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109n -->
+<!-- build:20261109o -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -361,7 +361,7 @@
     <div class="quiz-box">
       <div class="quiz-question" id="quiz-question">Loading quiz...</div>
       <div id="quiz-typed">
-        <label class="quiz-label">CR Degree and Direction</label>
+        <label class="quiz-label">CR Degree + Direction</label>
         <textarea class="quiz-answer" id="quiz-degree" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
         <label class="quiz-label" id="quiz-location-label">CR Location</label>
         <textarea class="quiz-answer" id="quiz-location" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
@@ -1480,7 +1480,7 @@ function projectionCardHtml(p) {
   return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
     '<div class="extremity">' + p.extremity + '</div>' +
     '<h3>' + p.projection + badge + meta + '</h3>' +
-    '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
+    '<div class="detail"><strong>CR Degree + Direction:</strong> ' + p.crDegree + '</div>' +
     crLocationCardHtml(p) +
     (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
     (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
@@ -2346,7 +2346,7 @@ function buildFocusMc(p) {
   focusMcCorrect = { degree: null, location: null, location_immediate: null, location_delayed: null, rotation: null };
   focusMcLocked = false;
   const deg = fieldValue(p, 'degree');
-  renderFocusMcField(box, 'degree', 'CR Degree and Direction', pickFieldOptions(p, 'degree'), deg);
+  renderFocusMcField(box, 'degree', 'CR Degree + Direction', pickFieldOptions(p, 'degree'), deg);
   const parts = crLocationParts(p);
   if (parts) {
     parts.forEach(part => {
@@ -2394,10 +2394,10 @@ function checkFocusMc() {
     return { part, result: results[f] };
   });
   let html = '';
-  html += `<div class="feedback ${classes[results.degree]}">CR Degree and Direction: ${labels[results.degree]}</div>`;
+  html += `<div class="feedback ${classes[results.degree]}">CR Degree + Direction: ${labels[results.degree]}</div>`;
   html += locationFeedbackHtml(locScores, classes, labels);
   if (hasRot) html += `<div class="feedback ${classes[results.rotation]}">Body Part Rotation: ${labels[results.rotation]}</div>`;
-  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree & Direction: ${fEsc(focusMcCorrect.degree)}<br>${locationAnswersHtml(locScores)}`;
+  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree + Direction: ${fEsc(focusMcCorrect.degree)}<br>${locationAnswersHtml(locScores)}`;
   if (hasRot) html += `<br>Body Part Rotation: ${fEsc(focusMcCorrect.rotation)}`;
   html += `</div>`;
   quizFeedback.innerHTML = html;
@@ -2461,8 +2461,8 @@ function loadQuiz(opts) {
   quizSerial++;
   const hasRot = hasRotation(currentQuiz);
   quizQuestionEl.textContent = hasRot
-    ? `What is the CR Degree and Direction, CR Location, and Body Part Rotation for a ${currentQuiz.projection} ${currentQuiz.extremity}?`
-    : `What is the CR Degree and Direction, and CR Location for a ${currentQuiz.projection} ${currentQuiz.extremity}?`;
+    ? `What is the CR Degree + Direction, CR Location, and Body Part Rotation for a ${currentQuiz.projection} ${currentQuiz.extremity}?`
+    : `What is the CR Degree + Direction, and CR Location for a ${currentQuiz.projection} ${currentQuiz.extremity}?`;
   quizFeedback.innerHTML = '';
   const useMc = quizMode === 'focus' && focusAnswerStyle === 'mc';
   showQuizAnswerUI(useMc ? 'mc' : 'type');
@@ -2751,14 +2751,14 @@ function checkAnswer() {
   const classes = { correct: 'good', close: 'close', wrong: 'bad' };
 
   let html = '';
-  html += `<div class="feedback ${classes[degreeResult]}">CR Degree and Direction: ${labels[degreeResult]}</div>`;
+  html += `<div class="feedback ${classes[degreeResult]}">CR Degree + Direction: ${labels[degreeResult]}</div>`;
   html += locationFeedbackHtml(locScores, classes, labels);
   if (hasRot) {
     html += `<div class="feedback ${classes[rotResult]}">Body Part Rotation: ${labels[rotResult]}</div>`;
   }
   html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;">
     <strong>Correct answers:</strong><br>
-    CR Degree & Direction: ${currentQuiz.crDegreeFull || currentQuiz.crDegree}<br>
+    CR Degree + Direction: ${currentQuiz.crDegreeFull || currentQuiz.crDegree}<br>
     ${locationAnswersHtml(locScores)}`;
   if (hasRot) {
     html += `<br>Body Part Rotation: ${currentQuiz.rotation}`;
@@ -3090,7 +3090,7 @@ function pgBar(label, pct, sub) {
   const cls = pct >= 80 ? 'pg-good' : pct >= 50 ? 'pg-mid' : 'pg-low';
   return `<div class="pg-row"><div class="t"><span>${pgEsc(label)}</span><span>${Math.round(pct)}%${sub ? ' · ' + pgEsc(sub) : ''}</span></div><div class="pg-bar"><div class="${cls}" style="width:${Math.max(2, Math.min(100, pct))}%"></div></div></div>`;
 }
-const FIELD_NAMES = { cr_angle: 'CR angle (degree & direction)', cr_location: 'CR location', cr_location_immediate: 'CR location (Immediate / up to 30 min)', cr_location_delayed: 'CR location (Delayed)', rotation: 'Body part rotation', mc: 'Multiple choice (CR location)' };
+const FIELD_NAMES = { cr_angle: 'CR Degree + Direction', cr_location: 'CR location', cr_location_immediate: 'CR location (Immediate / up to 30 min)', cr_location_delayed: 'CR location (Delayed)', rotation: 'Body part rotation', mc: 'Multiple choice (CR location)' };
 const PRIVACY_NOTE = 'Accounts store only your email, your decks and your quiz results. Never upload patient info.';
 
 async function renderProgress() {
