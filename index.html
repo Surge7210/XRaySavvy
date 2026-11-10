@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109j -->
+<!-- build:20261109k -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -2044,8 +2044,12 @@ function shuffle(arr) {
 }
 
 // Build the queue: every projection of body part #1 (shuffled, as before), then all of #2, and so on.
+// Lab Practical Fluoro keeps Reference order (Esophagus → Stomach → Small Bowel → BE); not shuffled.
+function keepFocusOrder(g) {
+  return g && g.label === FLUORO_TAB;
+}
 function resetFocusProgress() {
-  focusGroups.forEach(g => { g.items = shuffle(g.items); g.done = 0; g.correct = 0; });
+  focusGroups.forEach(g => { g.items = keepFocusOrder(g) ? g.items.slice() : shuffle(g.items); g.done = 0; g.correct = 0; });
   focusQueue = [];
   focusGroups.forEach((g, gi) => g.items.forEach((p, pos) => focusQueue.push({ p, gi, pos })));
   focusShownIdx = 0;
