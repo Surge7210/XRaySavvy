@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109k -->
+<!-- build:20261109l -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -129,6 +129,12 @@
   .fd-actions button { flex:1; min-width:140px; padding:0 0.6rem; }
   #quiz-mode-bar { display:flex; align-items:center; justify-content:space-between; gap:0.6rem; margin:-0.2rem 0 0.8rem; }
   #quiz-mode-bar.hidden { display:none; }
+  #quiz-resume { margin:0 0 1rem; padding:0.9rem 1rem; background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow: inset 4px 0 0 var(--accent); }
+  #quiz-resume.hidden { display:none; }
+  #quiz-resume .qr-text { margin:0 0 0.7rem; font-size:0.95rem; }
+  #quiz-resume .qr-text strong { display:block; margin-bottom:0.15rem; }
+  #quiz-resume .qr-actions { display:flex; flex-wrap:wrap; gap:0.6rem; }
+  #quiz-resume .qr-actions button { flex:1 1 8rem; min-height:44px; }
   #quiz-back { background:none; border:none; color:var(--accent); font:inherit; font-size:0.95rem; padding:0.6rem 0.2rem; min-height:44px; cursor:pointer; }
   #quiz-mode-name { color:var(--muted); font-size:0.9rem; font-weight:600; }
   input[type="search"], input[type="text"], textarea.quiz-answer { width:100%; padding:0.7rem 1rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:1rem; margin-bottom:0.5rem; font-family:inherit; }
@@ -283,6 +289,13 @@
   <div id="quiz-chooser" class="hidden">
     <h2 class="qc-title">Choose a quiz</h2>
     <p class="qc-sub">Pick how you want to practice.</p>
+    <div id="quiz-resume" class="hidden" role="status">
+      <div class="qr-text"><strong>Resume quiz?</strong> <span id="quiz-resume-detail"></span></div>
+      <div class="qr-actions">
+        <button class="btn-primary" id="quiz-resume-btn" type="button">Resume</button>
+        <button class="btn-secondary" id="quiz-resume-clear" type="button">Start over</button>
+      </div>
+    </div>
     <button class="quiz-option" id="tab-random"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg></span><span class="qo-txt"><span class="qo-name">Random Quiz</span><span class="qo-desc">Type the CR angle and location for a random projection.</span></span><span class="qo-go">&rsaquo;</span></button>
     <button class="quiz-option" id="tab-focus"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></span><span class="qo-txt"><span class="qo-name">Focused Quiz</span><span class="qo-desc">Pick one or more body parts and go through every projection of each, in the order you choose.</span></span><span class="qo-go">&rsaquo;</span></button>
     <button class="quiz-option" id="tab-mc"><span class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1 1 2-2"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></svg></span><span class="qo-txt"><span class="qo-name">Multiple Choice</span><span class="qo-desc">Pick the right answer from four options.</span></span><span class="qo-go">&rsaquo;</span></button>
@@ -1963,11 +1976,11 @@ function generateDistractors(correct, pool) {
   return Array.from(distractors).slice(0, 3);
 }
 
-function loadMC() {
+function loadMC(opts) {
   clearConfetti();
   const pool = getQuizPool();
   if (!pool.length) { mcQuestionEl.textContent = 'No projections available.'; mcOptionsEl.innerHTML = ''; return; }
-  currentMC = pool[Math.floor(Math.random() * pool.length)];
+  if (!(opts && opts.keep && currentMC)) currentMC = pool[Math.floor(Math.random() * pool.length)];
   mcQuestionEl.textContent = `What is the CR Location for a ${currentMC.projection} ${currentMC.extremity}?`;
   const wrongs = generateDistractors(currentMC, pool);
   const options = [currentMC.crLocation, ...wrongs];
@@ -1985,6 +1998,7 @@ function loadMC() {
     btn.onclick = () => selectMC(btn, opt);
     mcOptionsEl.appendChild(btn);
   });
+  saveQuizSession();
 }
 
 function selectMC(btn, selected) {
@@ -2253,7 +2267,7 @@ function hasRotation(p) {
   return true;
 }
 
-function loadQuiz() {
+function loadQuiz(opts) {
   clearConfetti();
   if (quizMode === 'focus') {
     if (focusIndex >= focusQueue.length) {
@@ -2270,7 +2284,7 @@ function loadQuiz() {
       quizQuestionEl.textContent = 'No projections available.';
       return;
     }
-    currentQuiz = pool[Math.floor(Math.random() * pool.length)];
+    if (!(opts && opts.keep && currentQuiz)) currentQuiz = pool[Math.floor(Math.random() * pool.length)];
   }
   quizSerial++;
   const hasRot = hasRotation(currentQuiz);
@@ -2287,6 +2301,7 @@ function loadQuiz() {
     rotationSection.classList.toggle('hidden', !hasRot);
     quizDegreeEl.focus();
   }
+  saveQuizSession();
 }
 
 const ORDINAL_WORDS = { first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' };
@@ -2643,6 +2658,7 @@ function showQuizChooser() {
   mcView.classList.add('hidden');
   refControls.classList.add('hidden');
   focusControls.classList.add('hidden');
+  renderQuizResumeBanner();
 }
 tabQuiz.onclick = showQuizChooser;
 quizBack.onclick = showQuizChooser;
@@ -2776,6 +2792,7 @@ function renderFocusPanel() {
 
 function showFocusDone() {
   clearConfetti();
+  clearQuizSession();
   setFocusStage('done');
   const total = focusQueue.length;
   document.getElementById('fd-score').innerHTML = `<strong>${focusCorrect} of ${total}</strong> fully correct across ${focusGroups.length} body part${focusGroups.length > 1 ? 's' : ''}`;
@@ -2979,6 +2996,245 @@ function showProgressTab() {
 window.showProgressTab = showProgressTab;
 tabProgress.onclick = showProgressTab;
 if (window.XRS) XRS.on(() => { if (tabProgress.classList.contains('active')) { lastProgress = null; renderProgress(); } });
+
+// ---- Quiz save / resume (this device, keyed per signed-in user or guest) ----
+// Survives phone lock / reload. Accounts on a shared device do not share sessions;
+// sign-out or switching accounts never restores someone else's quiz.
+const QS_KEY_PRE = 'xraysavvy.quizResume.v1.';
+const QS_MAX_AGE = 14 * 24 * 60 * 60 * 1000;
+let qsHoldSave = false;
+let qsUid = null;
+function quizSessionUid() {
+  const u = window.XRS && XRS.user;
+  return (u && u.id) ? String(u.id) : 'guest';
+}
+function qsStorageKey(uid) { return QS_KEY_PRE + (uid || quizSessionUid()); }
+function findProjByName(ext, proj) {
+  return data.find(p => p.extremity === ext && p.projection === proj) || null;
+}
+function readQuizSession(uid) {
+  try {
+    const raw = localStorage.getItem(qsStorageKey(uid || quizSessionUid()));
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || s.v !== 1 || (s.t && Date.now() - s.t > QS_MAX_AGE)) {
+      if (s && s.t && Date.now() - s.t > QS_MAX_AGE) clearQuizSession(uid);
+      return null;
+    }
+    if (s.mode !== 'focus' && s.mode !== 'random' && s.mode !== 'mc') return null;
+    return s;
+  } catch (e) { return null; }
+}
+function clearQuizSession(uid) {
+  try { localStorage.removeItem(qsStorageKey(uid || quizSessionUid())); } catch (e) {}
+  renderQuizResumeBanner();
+}
+function snapshotQuizSession() {
+  const pack = p => p ? [p.extremity, p.projection] : null;
+  if (quizMode === 'focus') {
+    if (!focusQueue.length || focusIndex >= focusQueue.length) return null;
+    const pickerOn = focusControls && !focusControls.classList.contains('hidden');
+    const doneOn = focusDoneEl && !focusDoneEl.classList.contains('hidden');
+    if (pickerOn || doneOn) return null;
+    return {
+      v: 1, mode: 'focus', t: Date.now(),
+      includeNonRoutines: includeNonRoutines,
+      focusAnswerStyle: focusAnswerStyle,
+      focusPicked: (focusPicked || []).slice(),
+      focusIndex: focusIndex,
+      focusCorrect: focusCorrect,
+      weak: !!(focusGroups.length === 1 && /weak/i.test(focusGroups[0].label || '')),
+      groups: focusGroups.map(g => ({
+        label: g.label, done: g.done || 0, correct: g.correct || 0,
+        items: (g.items || []).map(pack).filter(Boolean)
+      })),
+      queue: focusQueue.map(e => ({ ext: e.p.extremity, proj: e.p.projection, gi: e.gi, pos: e.pos }))
+    };
+  }
+  if (quizMode === 'random') {
+    if (!currentQuiz || (quizView && quizView.classList.contains('hidden'))) return null;
+    if (document.getElementById('nr-prompt') && !document.getElementById('nr-prompt').classList.contains('hidden')) return null;
+    return {
+      v: 1, mode: 'random', t: Date.now(),
+      includeNonRoutines: includeNonRoutines,
+      pool: (getQuizPool() || []).map(pack).filter(Boolean),
+      current: pack(currentQuiz)
+    };
+  }
+  if (quizMode === 'mc') {
+    if (!currentMC || (mcView && mcView.classList.contains('hidden'))) return null;
+    if (document.getElementById('nr-prompt') && !document.getElementById('nr-prompt').classList.contains('hidden')) return null;
+    return {
+      v: 1, mode: 'mc', t: Date.now(),
+      includeNonRoutines: includeNonRoutines,
+      pool: (getQuizPool() || []).map(pack).filter(Boolean),
+      current: pack(currentMC)
+    };
+  }
+  return null;
+}
+function saveQuizSession() {
+  ensureQuizUser();
+  if (qsHoldSave) return;
+  try {
+    const snap = snapshotQuizSession();
+    if (!snap) return;
+    localStorage.setItem(qsStorageKey(), JSON.stringify(snap));
+  } catch (e) {}
+}
+function quizResumeLabel(s) {
+  if (!s) return '';
+  if (s.mode === 'focus') {
+    const total = (s.queue || []).length;
+    const n = Math.min((s.focusIndex || 0) + 1, total || 1);
+    const name = (s.weak ? 'My weak spots' : (s.groups && s.groups[0] && s.groups[0].label) || 'Focused Quiz');
+    return name + ' · question ' + n + ' of ' + total;
+  }
+  const cur = s.current ? s.current[1] + (s.current[0] ? ' · ' + s.current[0] : '') : '';
+  return (s.mode === 'mc' ? 'Multiple Choice' : 'Random Quiz') + (cur ? ' · ' + cur : '');
+}
+function renderQuizResumeBanner() {
+  const box = document.getElementById('quiz-resume');
+  if (!box) return;
+  const s = !qsHoldSave ? readQuizSession() : null;
+  const detail = document.getElementById('quiz-resume-detail');
+  if (!s) { box.classList.add('hidden'); return; }
+  if (detail) detail.textContent = quizResumeLabel(s);
+  box.classList.remove('hidden');
+}
+function applyQuizViews(mode) {
+  if (mode === 'mc') {
+    setActiveTab(tabMC);
+    quizMode = 'mc';
+    quizView.classList.add('hidden');
+    mcView.classList.remove('hidden');
+    refView.classList.add('hidden');
+    refControls.classList.add('hidden');
+    focusControls.classList.add('hidden');
+  } else {
+    setActiveTab(mode === 'focus' ? tabFocus : tabRandom);
+    quizMode = mode;
+    quizView.classList.remove('hidden');
+    mcView.classList.add('hidden');
+    refView.classList.add('hidden');
+    refControls.classList.add('hidden');
+    if (mode !== 'focus') focusControls.classList.add('hidden');
+  }
+}
+function restoreQuizSession(s) {
+  if (!s) return false;
+  qsHoldSave = true;
+  try {
+    includeNonRoutines = s.includeNonRoutines;
+    const unpack = list => (list || []).map(pair => pair && findProjByName(pair[0], pair[1])).filter(Boolean);
+    if (s.mode === 'focus') {
+      if (s.focusAnswerStyle === 'mc' || s.focusAnswerStyle === 'type') {
+        try { setFocusAnswerStyle(s.focusAnswerStyle); } catch (e) {}
+      }
+      focusPicked = Array.isArray(s.focusPicked) ? s.focusPicked.slice() : [];
+      focusGroups = (s.groups || []).map(g => ({
+        label: g.label,
+        items: unpack(g.items),
+        done: g.done || 0,
+        correct: g.correct || 0
+      })).filter(g => g.items.length);
+      focusQueue = (s.queue || []).map(e => {
+        const p = findProjByName(e.ext, e.proj);
+        return p ? { p, gi: e.gi, pos: e.pos } : null;
+      }).filter(Boolean);
+      if (!focusQueue.length) return false;
+      const maxI = focusQueue.length - 1;
+      focusIndex = Math.min(Math.max(0, s.focusIndex || 0), maxI);
+      focusCorrect = s.focusCorrect || 0;
+      focusShownIdx = focusIndex;
+      focusCountedSerial = -1;
+      weakPool = s.weak ? focusQueue.map(e => e.p) : null;
+      setQuizPool(focusQueue.map(e => e.p));
+      applyQuizViews('focus');
+      setFocusStage('quiz');
+      loadQuiz({ keep: true });
+      return true;
+    }
+    const pool = unpack(s.pool);
+    const cur = s.current ? findProjByName(s.current[0], s.current[1]) : null;
+    if (s.mode === 'random') {
+      if (!cur) return false;
+      setQuizPool(pool.length ? pool : [cur]);
+      currentQuiz = cur;
+      applyQuizViews('random');
+      setFocusStage(null);
+      loadQuiz({ keep: true });
+      return true;
+    }
+    if (s.mode === 'mc') {
+      if (!cur) return false;
+      setQuizPool(pool.length ? pool : [cur]);
+      currentMC = cur;
+      applyQuizViews('mc');
+      setFocusStage(null);
+      loadMC({ keep: true });
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  } finally {
+    qsHoldSave = false;
+  }
+}
+function resumeQuizSessionIfAny() {
+  const h = (location.hash || '').slice(1).toLowerCase();
+  if (h === 'progress' || h === 'flashcards' || h === 'flash' || h === 'reference' || h === 'ref') return false;
+  const s = readQuizSession();
+  if (!s) return false;
+  if (restoreQuizSession(s)) return true;
+  clearQuizSession();
+  return false;
+}
+function handleQuizAuthChange() {
+  const next = quizSessionUid();
+  if (qsUid == null) { qsUid = next; return; }
+  if (next === qsUid) return;
+  // New identity: never write the previous quiz under the new key, and never show the previous user's session.
+  qsHoldSave = true;
+  const prev = qsUid;
+  qsUid = next;
+  try {
+    const inQuiz = (quizView && !quizView.classList.contains('hidden') && quizMode !== 'progress')
+      || (mcView && !mcView.classList.contains('hidden'));
+    const s = readQuizSession(next);
+    qsHoldSave = false;
+    if (s && restoreQuizSession(s)) { /* switched to this user's saved quiz */ }
+    else if (inQuiz) showQuizChooser();
+    else renderQuizResumeBanner();
+  } finally {
+    qsHoldSave = false;
+    qsUid = next;
+  }
+}
+function ensureQuizUser() {
+  if (qsUid == null) qsUid = quizSessionUid();
+  if (quizSessionUid() !== qsUid) handleQuizAuthChange();
+}
+function bindQuizSessionGuards() {
+  qsUid = quizSessionUid();
+  if (window.XRS && XRS.on) XRS.on(handleQuizAuthChange);
+  const onHide = () => { ensureQuizUser(); saveQuizSession(); };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') onHide();
+    else ensureQuizUser();
+  });
+  window.addEventListener('pagehide', onHide);
+  const resumeBtn = document.getElementById('quiz-resume-btn');
+  const clearBtn = document.getElementById('quiz-resume-clear');
+  if (resumeBtn) resumeBtn.onclick = () => {
+    const s = readQuizSession();
+    if (!s || !restoreQuizSession(s)) { clearQuizSession(); showQuizChooser(); }
+  };
+  if (clearBtn) clearBtn.onclick = () => { clearQuizSession(); renderQuizResumeBanner(); };
+  renderQuizResumeBanner();
+}
+
 function routeFromHash() {
   const h = (location.hash || '').slice(1).toLowerCase();
   if (h === 'progress') showProgressTab();
@@ -2996,7 +3252,8 @@ document.getElementById('nr-include').onclick = () => finishNrChoice(true);
 
 renderFilters();
 render();
-routeFromHash();
+if (!resumeQuizSessionIfAny()) routeFromHash();
+bindQuizSessionGuards();
 
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('show-answer')) {
