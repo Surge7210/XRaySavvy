@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109q -->
+<!-- build:20261109r -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -1482,7 +1482,7 @@ function projectionCardHtml(p) {
     '<h3>' + p.projection + badge + meta + '</h3>' +
     '<div class="detail"><strong>CR Degree + Direction:</strong> ' + p.crDegree + '</div>' +
     crLocationCardHtml(p) +
-    (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
+    (hasRotation(p) ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
     (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
   '</div>';
 }
@@ -2429,8 +2429,8 @@ function checkFocusMc() {
 }
 
 function hasRotation(p) {
-  // Quiz only: hide the rotation field when there is no body-part rotation to recall.
-  // "None (supine without rotation)" etc. count as no rotation. Reference cards use p.rotation directly.
+  // Hide Body Part Rotation when there is none to recall (Reference cards and quizzes).
+  // "None (supine without rotation)" etc. count as no rotation; the stored value is kept.
   const r = (p && p.rotation ? String(p.rotation) : '').trim();
   if (!r) return false;
   const low = r.toLowerCase();
