@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109l -->
+<!-- build:20261109m -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -171,6 +171,8 @@
   .quiz-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1.2rem; }
   .quiz-question { font-size:1.1rem; margin-bottom:1rem; }
   .quiz-label { display:block; margin:0.8rem 0 0.3rem; font-size:0.9rem; color:var(--muted); }
+  .loc-part { padding-left:0.15rem; }
+  .mc-split { margin:0.2rem 0 0.3rem; }
   .quiz-actions { display:flex; gap:0.6rem; margin-top:1rem; }
   .quiz-actions button { padding:0.6rem 1rem; border-radius:8px; border:none; cursor:pointer; font-size:0.95rem; }
   .btn-primary { background:var(--accent); color:white; }
@@ -361,8 +363,12 @@
       <div id="quiz-typed">
         <label class="quiz-label">CR Degree and Direction</label>
         <textarea class="quiz-answer" id="quiz-degree" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
-        <label class="quiz-label">CR Location</label>
+        <label class="quiz-label" id="quiz-location-label">CR Location</label>
         <textarea class="quiz-answer" id="quiz-location" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
+        <div id="quiz-location-extra" class="hidden">
+          <label class="quiz-label" id="quiz-location2-label">CR Location — Delayed</label>
+          <textarea class="quiz-answer" id="quiz-location2" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
+        </div>
         <div id="rotation-section" class="hidden">
           <label class="quiz-label">Body Part Rotation</label>
           <textarea class="quiz-answer" id="quiz-rotation" rows="1" placeholder="Type your answer..." autocomplete="off" enterkeyhint="enter"></textarea>
@@ -1338,6 +1344,10 @@ const mcFeedback = document.getElementById('mc-feedback');
 const quizQuestionEl = document.getElementById('quiz-question');
 const quizDegreeEl = document.getElementById('quiz-degree');
 const quizLocationEl = document.getElementById('quiz-location');
+const quizLocation2El = document.getElementById('quiz-location2');
+const quizLocationExtra = document.getElementById('quiz-location-extra');
+const quizLocationLabel = document.getElementById('quiz-location-label');
+const quizLocation2Label = document.getElementById('quiz-location2-label');
 const quizRotationEl = document.getElementById('quiz-rotation');
 const rotationSection = document.getElementById('rotation-section');
 const checkBtn = document.getElementById('check-btn');
@@ -1399,6 +1409,61 @@ function matches(p, q) {
   return fields.some(f => String(f).toLowerCase().includes(s));
 }
 
+function crLocationParts(p) {
+  const raw = String(p && p.crLocation || '');
+  const m = raw.match(/^\s*Immediate\/up to 30 min:\s*(.*?);\s*Delayed:\s*(.*?)\s*$/i);
+  if (!m) return null;
+  return [
+    { id: 'immediate', field: 'cr_location_immediate', label: 'CR Location — Immediate / up to 30 min', short: 'Immediate / up to 30 min', value: m[1].trim() },
+    { id: 'delayed', field: 'cr_location_delayed', label: 'CR Location — Delayed', short: 'Delayed', value: m[2].trim() }
+  ];
+}
+function crLocationCardHtml(p) {
+  const parts = crLocationParts(p);
+  if (!parts) return '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>';
+  return '<div class="detail"><strong>CR Location:</strong></div>' +
+    parts.map(part => '<div class="detail loc-part"><strong>' + part.short + ':</strong> ' + part.value + '</div>').join('');
+}
+function setupLocationFields(p) {
+  const parts = crLocationParts(p);
+  if (parts) {
+    if (quizLocationLabel) quizLocationLabel.textContent = parts[0].label;
+    if (quizLocation2Label) quizLocation2Label.textContent = parts[1].label;
+    if (quizLocationExtra) quizLocationExtra.classList.remove('hidden');
+  } else {
+    if (quizLocationLabel) quizLocationLabel.textContent = 'CR Location';
+    if (quizLocationExtra) quizLocationExtra.classList.add('hidden');
+  }
+}
+function typedLocationValue(part) {
+  if (!part || part.id !== 'delayed') return quizLocationEl ? quizLocationEl.value : '';
+  return quizLocation2El ? quizLocation2El.value : '';
+}
+function scoreLocationFields(p) {
+  const parts = crLocationParts(p);
+  if (parts) return parts.map(part => ({ part, result: scoreMatch(typedLocationValue(part), part.value) }));
+  return [{ part: { id: 'location', field: 'cr_location', label: 'CR Location', value: p.crLocation }, result: scoreMatch(quizLocationEl.value, p.crLocation) }];
+}
+function locationFeedbackHtml(locScores, classes, labels) {
+  return locScores.map(s => '<div class="feedback ' + classes[s.result] + '">' + s.part.label + ': ' + labels[s.result] + '</div>').join('');
+}
+function locationAnswersHtml(locScores) {
+  return locScores.map(s => s.part.label + ': ' + s.part.value).join('<br>');
+}
+function locationLogRows(locScores) {
+  if (locScores.length === 2) {
+    const both = locScores.every(s => s.result === 'correct');
+    const rows = locScores.map(s => ({ field: s.part.field, correct: s.result === 'correct', result: s.result }));
+    const mixed = locScores.some(s => s.result !== 'wrong');
+    rows.push({ field: 'cr_location', correct: both, result: both ? 'correct' : (mixed ? 'close' : 'wrong') });
+    return rows;
+  }
+  return [{ field: 'cr_location', correct: locScores[0].result === 'correct', result: locScores[0].result }];
+}
+function locationsAllCorrect(locScores) {
+  return locScores.every(s => s.result === 'correct');
+}
+
 function projectionCardHtml(p) {
   const nr = isNonRoutine(p);
   const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
@@ -1416,7 +1481,7 @@ function projectionCardHtml(p) {
     '<div class="extremity">' + p.extremity + '</div>' +
     '<h3>' + p.projection + badge + meta + '</h3>' +
     '<div class="detail"><strong>CR Degree & Direction:</strong> ' + p.crDegree + '</div>' +
-    '<div class="detail"><strong>CR Location:</strong> ' + p.crLocation + '</div>' +
+    crLocationCardHtml(p) +
     (p.rotation ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
     (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
   '</div>';
@@ -1982,6 +2047,14 @@ function loadMC(opts) {
   if (!pool.length) { mcQuestionEl.textContent = 'No projections available.'; mcOptionsEl.innerHTML = ''; return; }
   if (!(opts && opts.keep && currentMC)) currentMC = pool[Math.floor(Math.random() * pool.length)];
   mcQuestionEl.textContent = `What is the CR Location for a ${currentMC.projection} ${currentMC.extremity}?`;
+  mcOptionsEl.innerHTML = '';
+  mcFeedback.innerHTML = '';
+  const split = crLocationParts(currentMC);
+  if (split) {
+    renderStandaloneSplitMc(split);
+    saveQuizSession();
+    return;
+  }
   const wrongs = generateDistractors(currentMC, pool);
   const options = [currentMC.crLocation, ...wrongs];
   // Shuffle
@@ -1989,8 +2062,6 @@ function loadMC(opts) {
     const j = Math.floor(Math.random() * (i + 1));
     [options[i], options[j]] = [options[j], options[i]];
   }
-  mcOptionsEl.innerHTML = '';
-  mcFeedback.innerHTML = '';
   options.forEach(opt => {
     const btn = document.createElement('button');
     btn.textContent = opt;
@@ -1999,6 +2070,67 @@ function loadMC(opts) {
     mcOptionsEl.appendChild(btn);
   });
   saveQuizSession();
+}
+function renderStandaloneSplitMc(parts) {
+  const style = 'text-align:left; padding:0.7rem 1rem; border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font-size:0.95rem;';
+  const picks = {};
+  let graded = false;
+  parts.forEach(part => {
+    const wrap = document.createElement('div');
+    wrap.className = 'mc-split';
+    wrap.dataset.part = part.id;
+    const lab = document.createElement('div');
+    lab.className = 'quiz-label';
+    lab.textContent = part.label;
+    wrap.appendChild(lab);
+    const opts = document.createElement('div');
+    opts.style.cssText = 'display:flex; flex-direction:column; gap:0.6rem; margin:0.35rem 0 0.85rem;';
+    pickFieldOptions(currentMC, part.id === 'delayed' ? 'location_delayed' : 'location_immediate').forEach(opt => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = opt;
+      btn.style.cssText = style;
+      btn.onclick = () => {
+        if (graded) return;
+        picks[part.id] = opt;
+        opts.querySelectorAll('button').forEach(b => { b.style.outline = (b === btn) ? '2px solid var(--accent)' : ''; });
+        if (parts.every(x => picks[x.id])) {
+          graded = true;
+          gradeStandaloneSplitMc(parts, picks, wrap.closest('#mc-options') || mcOptionsEl);
+        }
+      };
+      opts.appendChild(btn);
+    });
+    wrap.appendChild(opts);
+    mcOptionsEl.appendChild(wrap);
+  });
+}
+function gradeStandaloneSplitMc(parts, picks, root) {
+  const labels = { correct: 'Correct', wrong: 'Wrong' };
+  const classes = { correct: 'good', wrong: 'bad' };
+  const locScores = parts.map(part => {
+    const ok = optionKey(picks[part.id]) === optionKey(part.value);
+    const wrap = root.querySelector('.mc-split[data-part="' + part.id + '"]');
+    if (wrap) {
+      wrap.querySelectorAll('button').forEach(btn => {
+        btn.disabled = true;
+        if (optionKey(btn.textContent) === optionKey(part.value)) {
+          btn.style.borderColor = '#00ba7c'; btn.style.background = '#0d3d2e';
+        } else if (btn.textContent === picks[part.id] && !ok) {
+          btn.style.borderColor = '#f4212e'; btn.style.background = '#3d1a1c';
+        }
+      });
+    }
+    return { part, result: ok ? 'correct' : 'wrong' };
+  });
+  const both = locationsAllCorrect(locScores);
+  mcFeedback.innerHTML = locationFeedbackHtml(locScores, classes, labels) +
+    '<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>' + locationAnswersHtml(locScores) + '</div>';
+  if (both) launchConfetti(); else wrongAnswerEffect();
+  const rows = locationLogRows(locScores);
+  rows.push({ field: 'mc', correct: both, result: both ? 'correct' : 'wrong' });
+  logResults(rows, currentMC);
+  nudgeOnAnswer(both, mcFeedback);
 }
 
 function selectMC(btn, selected) {
@@ -2098,8 +2230,19 @@ function fieldValue(p, field) {
   if (!p) return null;
   if (field === 'degree') return p.crDegreeFull || p.crDegree || null;
   if (field === 'location') return p.crLocation || null;
+  if (field === 'location_immediate' || field === 'location_delayed') {
+    const parts = crLocationParts(p);
+    const want = field === 'location_immediate' ? 'immediate' : 'delayed';
+    const part = parts && parts.find(x => x.id === want);
+    return part ? part.value : null;
+  }
   if (field === 'rotation') return p.rotation || null;
   return null;
+}
+function locationDistractor(p) {
+  const parts = crLocationParts(p);
+  if (parts) return parts.map(x => x.value);
+  return p && p.crLocation ? [p.crLocation] : [];
 }
 // 1 correct + up to 3 distractors from real projections (same body part first, then all).
 function pickFieldOptions(correctProj, field, want) {
@@ -2111,6 +2254,16 @@ function pickFieldOptions(correctProj, field, want) {
   const poolAll = getQuizPool();
   const same = poolAll.filter(p => p.extremity === correctProj.extremity && p !== correctProj);
   const rest = poolAll.filter(p => p !== correctProj);
+  // For Immediate/Delayed, also offer the sibling answer as a realistic mix-up distractor.
+  if (field === 'location_immediate' || field === 'location_delayed') {
+    (crLocationParts(correctProj) || []).forEach(part => {
+      if (opts.length >= want) return;
+      const k = optionKey(part.value);
+      if (seen.has(k)) return;
+      seen.add(k);
+      opts.push(part.value);
+    });
+  }
   const pools = [same, rest].map(pool => {
     let list = pool;
     if (field === 'rotation') list = pool.filter(hasRotation);
@@ -2119,12 +2272,18 @@ function pickFieldOptions(correctProj, field, want) {
   for (const pool of pools) {
     for (const p of pool) {
       if (opts.length >= want) break;
-      const v = fieldValue(p, field);
-      if (!v) continue;
-      const k = optionKey(v);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      opts.push(v);
+      let vals = [];
+      const direct = fieldValue(p, field);
+      if (direct) vals = [direct];
+      else if (String(field).startsWith('location')) vals = locationDistractor(p);
+      for (const v of vals) {
+        if (opts.length >= want) break;
+        if (!v) continue;
+        const k = optionKey(v);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        opts.push(v);
+      }
     }
   }
   return shuffle(opts);
@@ -2183,13 +2342,20 @@ function buildFocusMc(p) {
   const box = document.getElementById('quiz-mc-fields');
   if (!box) return;
   box.innerHTML = '';
-  focusMcPicks = { degree: null, location: null, rotation: null };
-  focusMcCorrect = { degree: null, location: null, rotation: null };
+  focusMcPicks = { degree: null, location: null, location_immediate: null, location_delayed: null, rotation: null };
+  focusMcCorrect = { degree: null, location: null, location_immediate: null, location_delayed: null, rotation: null };
   focusMcLocked = false;
   const deg = fieldValue(p, 'degree');
-  const loc = fieldValue(p, 'location');
   renderFocusMcField(box, 'degree', 'CR Degree and Direction', pickFieldOptions(p, 'degree'), deg);
-  renderFocusMcField(box, 'location', 'CR Location', pickFieldOptions(p, 'location'), loc);
+  const parts = crLocationParts(p);
+  if (parts) {
+    parts.forEach(part => {
+      const f = part.id === 'delayed' ? 'location_delayed' : 'location_immediate';
+      renderFocusMcField(box, f, part.label, pickFieldOptions(p, f), part.value);
+    });
+  } else {
+    renderFocusMcField(box, 'location', 'CR Location', pickFieldOptions(p, 'location'), fieldValue(p, 'location'));
+  }
   if (hasRotation(p)) {
     renderFocusMcField(box, 'rotation', 'Body Part Rotation', pickFieldOptions(p, 'rotation'), fieldValue(p, 'rotation'));
   }
@@ -2198,7 +2364,9 @@ function buildFocusMc(p) {
 function checkFocusMc() {
   if (!currentQuiz || focusMcLocked) return;
   const hasRot = hasRotation(currentQuiz);
-  const fields = hasRot ? ['degree', 'location', 'rotation'] : ['degree', 'location'];
+  const locParts = crLocationParts(currentQuiz);
+  const locFields = locParts ? locParts.map(part => part.id === 'delayed' ? 'location_delayed' : 'location_immediate') : ['location'];
+  const fields = ['degree'].concat(locFields, hasRot ? ['rotation'] : []);
   const missing = fields.some(f => !focusMcPicks[f]);
   if (missing) {
     quizFeedback.innerHTML = '<div class="feedback close">Pick an answer for each field first.</div>';
@@ -2220,11 +2388,16 @@ function checkFocusMc() {
   });
   const labels = { correct: 'Correct', wrong: 'Wrong' };
   const classes = { correct: 'good', wrong: 'bad' };
+  const locScores = locFields.map(f => {
+    const part = (locParts || []).find(x => (x.id === 'delayed' ? 'location_delayed' : 'location_immediate') === f)
+      || { label: 'CR Location', field: 'cr_location', value: focusMcCorrect[f] };
+    return { part, result: results[f] };
+  });
   let html = '';
   html += `<div class="feedback ${classes[results.degree]}">CR Degree and Direction: ${labels[results.degree]}</div>`;
-  html += `<div class="feedback ${classes[results.location]}">CR Location: ${labels[results.location]}</div>`;
+  html += locationFeedbackHtml(locScores, classes, labels);
   if (hasRot) html += `<div class="feedback ${classes[results.rotation]}">Body Part Rotation: ${labels[results.rotation]}</div>`;
-  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree & Direction: ${fEsc(focusMcCorrect.degree)}<br>CR Location: ${fEsc(focusMcCorrect.location)}`;
+  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree & Direction: ${fEsc(focusMcCorrect.degree)}<br>${locationAnswersHtml(locScores)}`;
   if (hasRot) html += `<br>Body Part Rotation: ${fEsc(focusMcCorrect.rotation)}`;
   html += `</div>`;
   quizFeedback.innerHTML = html;
@@ -2232,9 +2405,8 @@ function checkFocusMc() {
   if (loggedSerial !== quizSerial) {
     loggedSerial = quizSerial;
     const rows = [
-      { field: 'cr_angle', correct: results.degree === 'correct', result: results.degree },
-      { field: 'cr_location', correct: results.location === 'correct', result: results.location }
-    ];
+      { field: 'cr_angle', correct: results.degree === 'correct', result: results.degree }
+    ].concat(locationLogRows(locScores));
     if (hasRot) rows.push({ field: 'rotation', correct: results.rotation === 'correct', result: results.rotation });
     logResults(rows, currentQuiz);
   }
@@ -2298,6 +2470,7 @@ function loadQuiz(opts) {
     buildFocusMc(currentQuiz);
   } else {
     resetQuizAnswers();
+    setupLocationFields(currentQuiz);
     rotationSection.classList.toggle('hidden', !hasRot);
     quizDegreeEl.focus();
   }
@@ -2540,7 +2713,8 @@ function checkAnswer() {
     return;
   }
   const degreeResult = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree');
-  const locResult = scoreMatch(quizLocationEl.value, currentQuiz.crLocation);
+  const locScores = scoreLocationFields(currentQuiz);
+  const locOk = locationsAllCorrect(locScores);
   const hasRot = hasRotation(currentQuiz);
   const rotResult = hasRot ? scoreRotation(quizRotationEl.value, currentQuiz.rotation) : null;
 
@@ -2549,14 +2723,14 @@ function checkAnswer() {
 
   let html = '';
   html += `<div class="feedback ${classes[degreeResult]}">CR Degree and Direction: ${labels[degreeResult]}</div>`;
-  html += `<div class="feedback ${classes[locResult]}">CR Location: ${labels[locResult]}</div>`;
+  html += locationFeedbackHtml(locScores, classes, labels);
   if (hasRot) {
     html += `<div class="feedback ${classes[rotResult]}">Body Part Rotation: ${labels[rotResult]}</div>`;
   }
   html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;">
     <strong>Correct answers:</strong><br>
     CR Degree & Direction: ${currentQuiz.crDegreeFull || currentQuiz.crDegree}<br>
-    CR Location: ${currentQuiz.crLocation}`;
+    ${locationAnswersHtml(locScores)}`;
   if (hasRot) {
     html += `<br>Body Part Rotation: ${currentQuiz.rotation}`;
   }
@@ -2566,19 +2740,14 @@ function checkAnswer() {
   if (loggedSerial !== quizSerial) {
     loggedSerial = quizSerial;
     const rows = [
-      { field: 'cr_angle', correct: degreeResult === 'correct', result: degreeResult },
-      { field: 'cr_location', correct: locResult === 'correct', result: locResult }
-    ];
+      { field: 'cr_angle', correct: degreeResult === 'correct', result: degreeResult }
+    ].concat(locationLogRows(locScores));
     if (hasRot) rows.push({ field: 'rotation', correct: rotResult === 'correct', result: rotResult });
     logResults(rows, currentQuiz);
   }
 
+  const allOk = degreeResult === 'correct' && locOk && (!hasRot || rotResult === 'correct');
   if (quizMode === 'focus' && currentQuiz) {
-    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct';
-    const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
-    const hasRot = hasRotation(currentQuiz);
-    const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
-    const allOk = degreeOk && locOk && rotOk;
     if (allOk) launchConfetti(); else wrongAnswerEffect();
     if (focusCountedSerial !== quizSerial && focusIndex < focusQueue.length) {
       focusCountedSerial = quizSerial;
@@ -2591,16 +2760,11 @@ function checkAnswer() {
     updateProgressDisplay();
   } else if (currentQuiz) {
     // Random Quiz confetti
-    const degreeOk = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct';
-    const locOk = scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct';
-    const hasRot = hasRotation(currentQuiz);
-    const rotOk = !hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct';
-    if (degreeOk && locOk && rotOk) launchConfetti(); else wrongAnswerEffect();
+    if (allOk) launchConfetti(); else wrongAnswerEffect();
   }
   if (nudgeSerial !== quizSerial && currentQuiz) {
     nudgeSerial = quizSerial;
-    const ok = scoreMatch(quizDegreeEl.value, currentQuiz.crDegree, 'degree') === 'correct' && scoreMatch(quizLocationEl.value, currentQuiz.crLocation) === 'correct' && (!hasRot || scoreRotation(quizRotationEl.value, currentQuiz.rotation) === 'correct');
-    nudgeOnAnswer(ok, quizFeedback);
+    nudgeOnAnswer(allOk, quizFeedback);
   }
 }
 
@@ -2881,9 +3045,10 @@ function fitQuizAnswer(el) {
   el.style.height = Math.max(el.scrollHeight, 44) + 'px';
 }
 function resetQuizAnswers() {
-  [quizDegreeEl, quizLocationEl, quizRotationEl].forEach(el => { el.value = ''; fitQuizAnswer(el); });
+  [quizDegreeEl, quizLocationEl, quizLocation2El, quizRotationEl].forEach(el => { if (el) { el.value = ''; fitQuizAnswer(el); } });
 }
-[quizDegreeEl, quizLocationEl, quizRotationEl].forEach(el => {
+[quizDegreeEl, quizLocationEl, quizLocation2El, quizRotationEl].forEach(el => {
+  if (!el) return;
   el.addEventListener('input', () => fitQuizAnswer(el));
   // Enter inserts a newline (default textarea). Do not check the answer or jump fields.
 });
@@ -2896,7 +3061,7 @@ function pgBar(label, pct, sub) {
   const cls = pct >= 80 ? 'pg-good' : pct >= 50 ? 'pg-mid' : 'pg-low';
   return `<div class="pg-row"><div class="t"><span>${pgEsc(label)}</span><span>${Math.round(pct)}%${sub ? ' · ' + pgEsc(sub) : ''}</span></div><div class="pg-bar"><div class="${cls}" style="width:${Math.max(2, Math.min(100, pct))}%"></div></div></div>`;
 }
-const FIELD_NAMES = { cr_angle: 'CR angle (degree & direction)', cr_location: 'CR location', rotation: 'Body part rotation', mc: 'Multiple choice (CR location)' };
+const FIELD_NAMES = { cr_angle: 'CR angle (degree & direction)', cr_location: 'CR location', cr_location_immediate: 'CR location (Immediate / up to 30 min)', cr_location_delayed: 'CR location (Delayed)', rotation: 'Body part rotation', mc: 'Multiple choice (CR location)' };
 const PRIVACY_NOTE = 'Accounts store only your email, your decks and your quiz results. Never upload patient info.';
 
 async function renderProgress() {
