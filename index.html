@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261109m -->
+<!-- build:20261109n -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -2606,6 +2606,32 @@ function applyBetweenConstraint(user, correct, result) {
   return result;
 }
 
+// When the key says "lateral to midline/MSP", require a true midline term
+// (midline / MSP / midsagittal plane). "Vertebral column" / "spine" are not
+// accepted as midline. When the key says "elevated side" or "side up", require
+// that phrasing ("upside" is not accepted). Missing either drops Correct to Close.
+function hasMidlineTerm(uNorm) {
+  return /\bmidline\b/.test(uNorm) || /\bmsp\b/.test(uNorm) ||
+    /\bmidsagittal\b/.test(uNorm) || /\bmid\s+sagittal\b/.test(uNorm);
+}
+function hasElevatedSideTerm(uNorm) {
+  return /\belevated\s+side\b/.test(uNorm) || /\bside\s+up\b/.test(uNorm);
+}
+function applyLocationLandmarkConstraint(user, correct, result) {
+  const uNorm = normalize(user);
+  const cNorm = normalize(correct);
+  let missing = false;
+  if (/\blateral\s+to\s+(the\s+)?(midline|msp|midsagittal|mid\s+sagittal)\b/.test(cNorm)) {
+    if (!hasMidlineTerm(uNorm)) missing = true;
+  }
+  if (/\belevated\s+side\b/.test(cNorm) || /\bside\s+up\b/.test(cNorm)) {
+    if (!hasElevatedSideTerm(uNorm)) missing = true;
+  }
+  if (!missing) return result;
+  if (result === 'correct') return 'close';
+  return result;
+}
+
 function scoreRotation(user, correct) {
   if (!user || !String(user).trim()) return 'wrong';
   const nums = s => (String(s).match(/\d+(?:\.\d+)?/g) || []).map(Number);
@@ -2673,7 +2699,7 @@ function scoreMatch(user, correct, field) {
     if (d) return applyRangeConstraint(user, correct, d);
   } else {
     const n = checkNumberedLocation(user, correct);
-    if (n) return applyRangeConstraint(user, correct, applyBetweenConstraint(user, correct, n));
+    if (n) return applyLocationLandmarkConstraint(user, correct, applyRangeConstraint(user, correct, applyBetweenConstraint(user, correct, n)));
   }
 
   const uNorm = normalize(user);
@@ -2702,7 +2728,10 @@ function scoreMatch(user, correct, field) {
   else if (ratio >= 0.25 || hits >= 1 || numMatch) result = 'close';
 
   result = applyRangeConstraint(user, correct, result);
-  if (field !== 'degree') result = applyBetweenConstraint(user, correct, result);
+  if (field !== 'degree') {
+    result = applyBetweenConstraint(user, correct, result);
+    result = applyLocationLandmarkConstraint(user, correct, result);
+  }
   return result;
 }
 
