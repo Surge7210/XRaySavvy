@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261112n -->
+<!-- build:20261112p -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -1590,6 +1590,7 @@ function fluoroFlat() {
   return fluoroGroups().reduce((a, g) => a.concat(g.items), []);
 }
 let activeFilter = 'All';
+let savedFilter = null; // chip to restore when the search box is cleared
 let currentQuiz = null;
 let quizSerial = 0, loggedSerial = -1; // log only the first check of each question
 
@@ -1615,11 +1616,40 @@ function renderFilters() {
   });
 }
 
+function normalizeSearch(q) {
+  return String(q || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .replace(/[\u2013\u2014\u2212\u00AD]/g, '-')
+    .replace(/['"]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 function matches(p, q) {
   if (!q) return true;
-  const s = q.toLowerCase();
+  const s = normalizeSearch(q).toLowerCase();
   const fields = [p.extremity, p.projection, p.crDegree, p.crLocation, p.rotation || '', p.bestShows || ''];
-  return fields.some(f => String(f).toLowerCase().includes(s));
+  return fields.some(f => normalizeSearch(String(f)).toLowerCase().includes(s));
+}
+function syncFilters() {
+  if (!filtersEl.children.length) renderFilters();
+  Array.from(filtersEl.children).forEach(function (btn) {
+    const id = btn.classList.contains('fluoro-tab') ? FLUORO_ID : btn.textContent;
+    btn.classList.toggle('active', id === activeFilter);
+  });
+  const bar = filtersEl;
+  const btn = bar.querySelector('button.active');
+  if (!bar || !btn) return;
+  const br = bar.getBoundingClientRect();
+  const cr = btn.getBoundingClientRect();
+  const delta = (cr.left + cr.right) / 2 - (br.left + br.right) / 2;
+  const left = Math.max(0, Math.min(bar.scrollWidth - bar.clientWidth, bar.scrollLeft + delta));
+  try {
+    if (bar.scrollTo) bar.scrollTo({ left: left, behavior: 'auto' });
+    else bar.scrollLeft = left;
+  } catch (e) { bar.scrollLeft = left; }
 }
 
 function crLocationParts(p) {
@@ -1703,23 +1733,38 @@ function projectionCardHtml(p) {
   '</div>';
 }
 function render() {
-  const q = searchEl.value.trim();
-  if (activeFilter === FLUORO_ID) {
-    const groups = fluoroGroups().map(g => ({ label: g.label, items: g.items.filter(p => matches(p, q)) })).filter(g => g.items.length);
-    const n = groups.reduce((a, g) => a + g.items.length, 0);
-    countEl.textContent = n + ' projection' + (n === 1 ? '' : 's') + ' · routine fluoro';
-    if (!n) { resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>'; return; }
-    resultsEl.innerHTML = groups.map(g => '<div class="fluoro-group">' + g.label + '</div>' + g.items.map(projectionCardHtml).join('')).join('');
-    return;
+  const q = normalizeSearch(searchEl.value);
+  // Typing searches every body part so a hidden chip cannot zero out results.
+  // Remember the chip and put it back when the box is cleared.
+  if (q) {
+    if (activeFilter !== 'All') {
+      savedFilter = activeFilter;
+      activeFilter = 'All';
+    }
+  } else if (savedFilter != null) {
+    activeFilter = savedFilter;
+    savedFilter = null;
   }
-  let filtered = data.filter(p => matches(p, q));
-  if (activeFilter !== 'All') filtered = filtered.filter(p => p.extremity === activeFilter);
-  countEl.textContent = filtered.length + ' projection' + (filtered.length === 1 ? '' : 's');
-  if (filtered.length === 0) {
-    resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>';
-    return;
+  try {
+    if (activeFilter === FLUORO_ID) {
+      const groups = fluoroGroups().map(g => ({ label: g.label, items: g.items.filter(p => matches(p, q)) })).filter(g => g.items.length);
+      const n = groups.reduce((a, g) => a + g.items.length, 0);
+      countEl.textContent = n + ' projection' + (n === 1 ? '' : 's') + ' · routine fluoro';
+      if (!n) { resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>'; return; }
+      resultsEl.innerHTML = groups.map(g => '<div class="fluoro-group">' + g.label + '</div>' + g.items.map(projectionCardHtml).join('')).join('');
+      return;
+    }
+    let filtered = data.filter(p => matches(p, q));
+    if (activeFilter !== 'All') filtered = filtered.filter(p => p.extremity === activeFilter);
+    countEl.textContent = filtered.length + ' projection' + (filtered.length === 1 ? '' : 's');
+    if (filtered.length === 0) {
+      resultsEl.innerHTML = '<div class="empty">No projections match your search.</div>';
+      return;
+    }
+    resultsEl.innerHTML = filtered.map(projectionCardHtml).join('');
+  } finally {
+    syncFilters();
   }
-  resultsEl.innerHTML = filtered.map(projectionCardHtml).join('');
 }
 
 let quizMode = 'random';
@@ -3272,7 +3317,7 @@ restartBtn.onclick = () => {
   loadQuiz();
 };
 
-searchEl.addEventListener('input', render);
+['input', 'search', 'change'].forEach(function (ev) { searchEl.addEventListener(ev, render); });
 checkBtn.onclick = checkAnswer;
 
 mcNextBtn.onclick = loadMC;
