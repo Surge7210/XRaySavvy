@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- build:20261112n -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Usage · XRaySavvy</title>
 <script src="./auth.js?v=7"></script>
+<script src="./track.js?v=1" defer></script>
 <style>
   :root { --bg:#0f1419; --card:#1a2332; --text:#e7e9ea; --muted:#8b98a5; --accent:#1d9bf0; --border:#38444d; --good:#00ba7c; --warn:#ffd400; --bad:#f4212e; }
   * { box-sizing:border-box; }
@@ -65,6 +67,12 @@
   .chip.ok { color:var(--good); border-color:rgba(0,186,124,0.5); }
   .chip.no { color:var(--warn); border-color:rgba(255,212,0,0.5); }
   .chip.fm { color:#c9a7ff; border-color:rgba(201,167,255,0.5); }
+  .vis-tog { display:flex; align-items:center; gap:0.45rem; color:var(--muted); font-size:0.82rem; margin:0.45rem 0 0.15rem; cursor:pointer; user-select:none; }
+  .vis-tog input { width:1rem; height:1rem; accent-color:var(--accent); }
+  .vis-lists { margin-top:0.75rem; }
+  .vis-lists h3 { margin:0.7rem 0 0; font-size:0.82rem; color:var(--muted); font-weight:600; }
+  .vis-day td, .vis-day th { padding:0.32rem 0.25rem 0.32rem 0; }
+  .vis-name { word-break:break-word; }
 </style>
 </head>
 <body>
@@ -83,6 +91,7 @@
   <div id="dash" class="hidden">
     <p class="sub" id="updated"></p>
     <div id="signups"></div>
+    <div id="visitors"></div>
     <div id="fcmod"></div>
     <div id="fcshared"></div>
     <div id="cards"></div>
@@ -209,6 +218,86 @@
       wk.appendChild(el('div', 'note', 'Counts every call to xraysavvy-ai, including browser pre-flight (OPTIONS) checks and connection checks: ' + fmt(w.todayUtc['req:options']) + ' pre-flight, ' + fmt(w.todayUtc['req:get']) + ' checks, ' + fmt(w.todayUtc['req:usage']) + ' from this page today. Other Workers on the account share the same 100,000.'));
     } else wk.appendChild(el('div', 'err', errs.worker || 'Worker counts unavailable.'));
     cards.appendChild(wk);
+  }
+
+
+  // ---- Visitors (owner-only RPC admin_visitor_stats; days in America/Chicago) ----
+  var includeOwnVisits = false;
+  function fmtDay(d) {
+    var dt = new Date(String(d) + 'T12:00:00');
+    return dt.toLocaleDateString('en-US', { timeZone: CT, weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  function pageLabel(p) {
+    var path = p.path || '/';
+    if (path === '/index.html') path = '/';
+    var tab = p.tab;
+    if (tab) return path + ' · ' + tab;
+    return path;
+  }
+  function renderVisitors(data, err) {
+    var box = $('visitors'); box.textContent = '';
+    var c = el('section', 'card'), head = el('div', 'su-head');
+    head.appendChild(el('h2', '', '👀 Visitors'));
+    var btn = el('button', 'icon-btn', '↻ Refresh'); btn.type = 'button';
+    btn.onclick = function () { btn.disabled = true; btn.textContent = 'Loading…'; loadVisitors(); };
+    head.appendChild(btn); c.appendChild(head);
+    if (!data) { c.appendChild(el('div', 'err', err || 'Visitors unavailable.')); box.appendChild(c); return; }
+    var range = (data.range_start && data.range_end) ? (fmtDay(data.range_start) + ' – ' + fmtDay(data.range_end)) : 'last 14 days';
+    c.appendChild(el('p', 'src', range + ' · Central (CT) · first-party only, no cookies. Your visits are hidden unless you include them.'));
+    var tog = el('label', 'vis-tog');
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = includeOwnVisits;
+    cb.onchange = function () { includeOwnVisits = !!cb.checked; loadVisitors(); };
+    tog.appendChild(cb); tog.appendChild(document.createTextNode('Include my visits'));
+    c.appendChild(tog);
+    var tot = data.totals || {};
+    var s = el('div', 'stats su-stats');
+    [[tot.views, 'Page views'], [tot.unique_visitors, 'Unique visitors'], [tot.guests, 'Guests'], [tot.signed_in, 'Signed-in']].forEach(function (x) {
+      var st = el('div', 'stat'); st.appendChild(el('div', 'n', fmt(x[0]))); st.appendChild(el('div', 'l', x[1])); s.appendChild(st);
+    });
+    c.appendChild(s);
+    var t = el('table', 'vis-day'), hr = el('tr');
+    ['Day (CT)', 'Views', 'Unique', 'Guests', 'Signed-in'].forEach(function (h, i) {
+      hr.appendChild(el('th', i ? 'num' : '', h));
+    });
+    t.appendChild(hr);
+    (data.daily || []).forEach(function (d) {
+      var tr = el('tr');
+      tr.appendChild(el('td', '', fmtDay(d.day)));
+      [d.views, d.unique_visitors, d.guests, d.signed_in].forEach(function (n) { tr.appendChild(el('td', 'num', fmt(n))); });
+      t.appendChild(tr);
+    });
+    c.appendChild(t);
+    function listBlock(title, rows, labelFn) {
+      wrap.appendChild(el('h3', '', title));
+      if (!rows || !rows.length) { wrap.appendChild(el('div', 'raw', 'None yet.')); return; }
+      var tb = el('table'), r0 = el('tr');
+      r0.appendChild(el('th', '', '')); r0.appendChild(el('th', 'num', 'Views')); r0.appendChild(el('th', 'num', 'Unique'));
+      tb.appendChild(r0);
+      rows.forEach(function (row) {
+        var tr = el('tr');
+        tr.appendChild(el('td', 'vis-name', labelFn(row)));
+        tr.appendChild(el('td', 'num', fmt(row.views)));
+        tr.appendChild(el('td', 'num', fmt(row.unique_visitors)));
+        tb.appendChild(tr);
+      });
+      wrap.appendChild(tb);
+    }
+    var wrap = el('div', 'vis-lists');
+    listBlock('Top pages / tabs', data.pages, pageLabel);
+    listBlock('Top referrers', data.referrers, function (r) { return r.domain === 'direct' ? 'Direct / same site' : r.domain; });
+    listBlock('Devices', data.devices, function (r) { return r.device || 'unknown'; });
+    c.appendChild(wrap);
+    c.appendChild(el('div', 'note', 'Tracking started November 12, 2026. There is no history before that. Guests and signed-in visitors share a random browser id, not an email or IP. Each bottom tab is counted once per browser session, plus once on every page load.'));
+    box.appendChild(c);
+  }
+  async function loadVisitors() {
+    if (window.__USAGE_MOCK) { renderVisitors(window.__USAGE_MOCK.visitors || { totals: {}, daily: [], pages: [], referrers: [], devices: [] }, null); return; }
+    try {
+      var sb = await XRS.client();
+      var r = await sb.rpc('admin_visitor_stats', { p_days: 14, p_include_owner: includeOwnVisits });
+      if (r.error) throw r.error;
+      renderVisitors(r.data, null);
+    } catch (e) { renderVisitors(null, 'Visitors unavailable: ' + (e.message || e)); }
   }
 
   // ---- Recent sign-ups (owner-only RPC admin_recent_signups; returns email handles only) ----
@@ -348,7 +437,7 @@
 
   // window.__USAGE_MOCK lets a test render the page without a live session.
   async function load() {
-    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); loadMod(); loadShared(); return; }
+    if (window.__USAGE_MOCK) { show('dash'); render(window.__USAGE_MOCK.worker, window.__USAGE_MOCK.db, {}); loadSignups(); loadVisitors(); loadMod(); loadShared(); return; }
     var sb, session;
     try { sb = await XRS.client(); session = (await sb.auth.getSession()).data.session; } catch (e) { session = null; }
     if (!session || !session.user || session.user.id !== OWNER_ID) { show('private'); return; }
@@ -358,7 +447,7 @@
       .catch(function (e) { errs.worker = 'Worker counts unavailable: ' + e.message; return null; });
     var dP = sb.rpc('admin_usage').then(function (r) { if (r.error) throw r.error; return r.data; })
       .catch(function (e) { errs.db = 'Database stats unavailable: ' + (e.message || e); return null; });
-    var sP = loadSignups(); loadMod(); loadShared();
+    var sP = loadSignups(); loadVisitors(); loadMod(); loadShared();
     var res = await Promise.all([wP, dP]);
     if (!res[0] && !res[1] && /private|not allowed/i.test((errs.worker || '') + (errs.db || ''))) { show('private'); return; }
     show('dash'); render(res[0], res[1], errs);
