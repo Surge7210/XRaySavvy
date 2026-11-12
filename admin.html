@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261112n -->
+<!-- build:20261112o -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
@@ -260,7 +260,7 @@
       hr.appendChild(el('th', i ? 'num' : '', h));
     });
     t.appendChild(hr);
-    (data.daily || []).forEach(function (d) {
+    (data.daily || []).slice().reverse().forEach(function (d) {
       var tr = el('tr');
       tr.appendChild(el('td', '', fmtDay(d.day)));
       [d.views, d.unique_visitors, d.guests, d.signed_in].forEach(function (n) { tr.appendChild(el('td', 'num', fmt(n))); });
