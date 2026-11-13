@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261112p -->
+<!-- build:20261113a -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -846,7 +846,7 @@
   {
     "extremity": "Knee",
     "projection": "Tangential (Settegast/Sunrise Method)",
-    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15–20°",
+    "crDegree": "15–20° Cephalic",
     "crLocation": "Patellofemoral joint space",
     "rotation": null,
     "sid": "40\"",
@@ -873,7 +873,7 @@
   {
     "extremity": "Patella",
     "projection": "Tangential (Settegast/Sunrise Method)",
-    "crDegree": "Perpendicular to the joint space when perpendicular; otherwise typically 15–20°",
+    "crDegree": "15–20° Cephalic",
     "crLocation": "Patellofemoral joint space",
     "rotation": null,
     "sid": "40\"",
@@ -2944,6 +2944,20 @@ function scoreDegreeDirection(user, correct) {
 
 function scoreMatch(user, correct, field) {
   if (!user) return 'wrong';
+
+  // Settegast/Sunrise: 15–20° cephalic (Knee and Patella). Require the direction.
+  if (field === 'degree' && currentQuiz && /settegast|sunrise/i.test(String(currentQuiz.projection || ''))) {
+    const uDirs = directionTokens(user);
+    const u = degreeNumbers(user);
+    const range = [15, 20];
+    if (uDirs.some(d => d !== 'cephalad')) return 'wrong';
+    if (/\bperp(?:endicular)?\b/.test(normalize(user)) && !uDirs.includes('cephalad')) return 'wrong';
+    const exact = userHasExactRange(user, range);
+    const inRange = u.nums.some(n => n >= 15 && n <= 20);
+    if (exact && uDirs.includes('cephalad')) return 'correct';
+    if (exact || inRange || uDirs.includes('cephalad')) return 'close';
+    return 'wrong';
+  }
 
   // Special case: Knee ASIS tabletop projections (CR degree only)
   if (field === 'degree' && currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
