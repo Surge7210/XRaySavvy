@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261113a -->
+<!-- build:20261113b -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -166,6 +166,7 @@
   #nr-prompt .nr-actions { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:0.9rem; }
   #nr-prompt .nr-actions button { flex:1 1 10rem; min-height:44px; }
   .card .best-shows { margin-top:0.45rem; font-size:0.85rem; color:var(--muted); }
+  .card .cr-note, .feedback .cr-note { margin:0.15rem 0 0.1rem; font-size:0.85rem; color:var(--muted); line-height:1.4; }
   .card .best-shows strong { color:var(--text); font-weight:600; }
   .detail { margin:0.25rem 0; font-size:0.95rem; }
   .detail strong { color:var(--muted); font-weight:500; }
@@ -811,6 +812,7 @@
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": null,
     "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
+    "crNote": "ASIS-to-tabletop measurement: <7.48\" = 3–5° caudal; 7.48–9.45\" = perpendicular; >9.45\" = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
   },
@@ -821,6 +823,7 @@
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45° medial",
     "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
+    "crNote": "ASIS-to-tabletop measurement: <7.48\" = 3–5° caudal; 7.48–9.45\" = perpendicular; >9.45\" = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
   },
@@ -831,6 +834,7 @@
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45° lateral",
     "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
+    "crNote": "ASIS-to-tabletop measurement: <7.48\" = 3–5° caudal; 7.48–9.45\" = perpendicular; >9.45\" = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
   },
@@ -1727,6 +1731,7 @@ function projectionCardHtml(p) {
     '<div class="extremity">' + p.extremity + '</div>' +
     '<h3>' + p.projection + badge + meta + '</h3>' +
     '<div class="detail"><strong>CR Degree + Direction:</strong> ' + p.crDegree + '</div>' +
+    (p.crNote ? '<div class="cr-note">' + String(p.crNote).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' : '') +
     crLocationCardHtml(p) +
     (hasRotation(p) ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
     (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
@@ -2658,7 +2663,7 @@ function checkFocusMc() {
   html += `<div class="feedback ${classes[results.degree]}">CR Degree + Direction: ${labels[results.degree]}</div>`;
   html += locationFeedbackHtml(locScores, classes, labels);
   if (hasRot) html += `<div class="feedback ${classes[results.rotation]}">Body Part Rotation: ${labels[results.rotation]}</div>`;
-  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree + Direction: ${fEsc(focusMcCorrect.degree)}<br>${locationAnswersHtml(locScores)}`;
+  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree + Direction: ${fEsc(focusMcCorrect.degree)}<br>${currentQuiz && currentQuiz.crNote ? '<div class="cr-note">' + fEsc(currentQuiz.crNote) + '</div>' : ''}${locationAnswersHtml(locScores)}`;
   if (hasRot) html += `<br>Body Part Rotation: ${fEsc(focusMcCorrect.rotation)}`;
   html += `</div>`;
   quizFeedback.innerHTML = html;
@@ -3034,6 +3039,7 @@ function checkAnswer() {
   html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;">
     <strong>Correct answers:</strong><br>
     CR Degree + Direction: ${currentQuiz.crDegreeFull || currentQuiz.crDegree}<br>
+    ${currentQuiz.crNote ? '<div class="cr-note">' + String(currentQuiz.crNote).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' : ''}
     ${locationAnswersHtml(locScores)}`;
   if (hasRot) {
     html += `<br>Body Part Rotation: ${currentQuiz.rotation}`;
