@@ -57,7 +57,7 @@ const RESPONSE_SCHEMA = {
           choices: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Exactly 4 options for mc; empty array for short' },
           answerIndex: { type: 'INTEGER', description: 'Index (0-3) of the correct choice for mc; -1 for short' },
           answer: { type: 'STRING', description: 'The correct answer in a few words' },
-          explanation: { type: 'STRING', description: '1-2 sentences, based only on the provided text' },
+          explanation: { type: 'STRING', description: '1-3 sentences explaining why the answer is correct (mechanism or reasoning), based only on the provided text; not a restatement of the answer' },
           sourceHint: { type: 'STRING', description: 'Where in the notes this came from, e.g. "Slide 12" or "Page 3"' }
         },
         required: ['type', 'question', 'choices', 'answerIndex', 'answer', 'explanation', 'sourceHint'],
@@ -103,7 +103,7 @@ function buildPrompt(text, count, type, focus) {
     typeRule,
     focusRule,
     'For multiple choice: wrong choices must be plausible but clearly wrong according to the text; vary the position of the correct answer; answer must equal choices[answerIndex].',
-    'Each explanation: 1-2 sentences using the text. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the text if present, otherwise a short topic name.',
+    'Each explanation: 1-3 sentences that explain WHY the answer is correct (the mechanism, cause, or reasoning), not just a restatement of the answer. Use only facts stated in the text (e.g. if the text says the K-shell binding energy of tungsten is 69.5 keV, explain that about 70 kVp is needed so the incoming electron has enough energy to eject a K-shell electron). If the text gives no reason, add the closest supporting context from the text (what it relates to, what it affects, or how it is used) and never invent facts or numbers. Do not include page or slide labels in the explanation. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the text if present, otherwise a short topic name.',
     TERM_LIST_RULE,
     'No duplicate questions. Do not ask about slide numbers, file names, or formatting. Every question must stand on its own: never mention or point to a slide, page, figure, image, or "the notes" (no "on slide 3", "in this image", "as shown"); the student cannot see the source while answering, so name the anatomy or topic directly.',
     '',
@@ -218,7 +218,7 @@ function buildSectionPrompt(text, title, count, type) {
     '- keyPoints: 3-5 short bullet facts worth memorizing (no asterisks).',
     '- questions: exactly ' + count + ' quiz questions covering the most testable facts in THIS section only. ' + typeRule,
     'For multiple choice: wrong choices must be plausible but clearly wrong according to the notes; vary the position of the correct answer; answer must equal choices[answerIndex].',
-    'Each explanation: 1-2 sentences using the notes. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the notes if present.',
+    'Each explanation: 1-3 sentences that explain WHY the answer is correct (the mechanism, cause, or reasoning), not just a restatement of the answer. Use only facts stated in the text (e.g. if the text says the K-shell binding energy of tungsten is 69.5 keV, explain that about 70 kVp is needed so the incoming electron has enough energy to eject a K-shell electron). If the text gives no reason, add the closest supporting context from the text (what it relates to, what it affects, or how it is used) and never invent facts or numbers. Do not include page or slide labels in the explanation. sourceHint: the slide or page label (e.g. "Slide 12", "Page 3") from the markers in the notes if present.',
     TERM_LIST_RULE,
     'Do not ask about slide numbers, file names, or formatting. Every question must stand on its own: never mention or point to a slide, page, figure, image, or "the notes" (no "on slide 3", "in this image", "as shown"); the student cannot see the source while answering, so name the anatomy or topic directly.',
     notesBlock(text, 'SECTION NOTES')
