@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261117b -->
+<!-- build:20261117c -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -167,6 +167,7 @@
   #nr-prompt .nr-actions button { flex:1 1 10rem; min-height:44px; }
   .card .best-shows { margin-top:0.45rem; font-size:0.85rem; color:var(--muted); }
   .card .cr-note, .feedback .cr-note { margin:0.15rem 0 0.1rem; font-size:0.85rem; color:var(--muted); line-height:1.4; }
+  .card .cr-degree-lines, .feedback .cr-degree-lines { display:block; margin-top:0.2rem; white-space:pre-wrap; line-height:1.45; }
   .card .best-shows strong { color:var(--text); font-weight:600; }
   .detail { margin:0.25rem 0; font-size:0.95rem; }
   .detail strong { color:var(--muted); font-weight:500; }
@@ -235,7 +236,7 @@
   .fp-style-btn.active { border-color:var(--accent); background:rgba(29,155,240,0.14); color:var(--accent); }
   .fmc-field { margin:0.85rem 0 0.2rem; }
   .fmc-opts { display:flex; flex-direction:column; gap:0.5rem; margin:0.35rem 0 0.2rem; }
-  .fmc-opt { text-align:left; width:100%; min-height:52px; padding:0.75rem 0.95rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font:inherit; font-size:0.95rem; line-height:1.35; -webkit-tap-highlight-color:transparent; }
+  .fmc-opt { text-align:left; width:100%; min-height:52px; padding:0.75rem 0.95rem; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; font:inherit; font-size:0.95rem; line-height:1.35; white-space:pre-wrap; -webkit-tap-highlight-color:transparent; }
   .fmc-opt.sel { border-color:var(--accent); background:rgba(29,155,240,0.12); }
   .fmc-opt.good { border-color:#00ba7c; background:#0d3d2e; color:#00ba7c; }
   .fmc-opt.bad { border-color:#f4212e; background:#3d1a1c; color:#f4212e; }
@@ -808,10 +809,12 @@
   {
     "extremity": "Knee",
     "projection": "AP",
-    "crDegree": "Perpendicular (19–24 cm ASIS tabletop)",
+    "crDegree": "ASIS-To-Tabletop Measurement:\n< 19 cm = 3-5 degrees Caudal\n19-24 cm = perpendicular\n> 24 cm = 3-5 degrees Cephalic",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": null,
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
+    "crDegreeLegacy": "Perpendicular (19–24 cm ASIS tabletop)",
+    "crDegreeFull": "ASIS-To-Tabletop Measurement:\n< 19 cm = 3-5 degrees Caudal\n19-24 cm = perpendicular\n> 24 cm = 3-5 degrees Cephalic",
+    "crDegreeFullLegacy": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
     "crNote": "ASIS-to-tabletop measurement: <19 cm = 3–5° caudal; 19–24 cm = perpendicular; >24 cm = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
@@ -819,10 +822,12 @@
   {
     "extremity": "Knee",
     "projection": "AP Oblique (Medial Rotation)",
-    "crDegree": "Perpendicular (19–24 cm ASIS tabletop)",
+    "crDegree": "ASIS-To-Tabletop Measurement:\n< 19 cm = 3-5 degrees Caudal\n19-24 cm = perpendicular\n> 24 cm = 3-5 degrees Cephalic",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45° medial",
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
+    "crDegreeLegacy": "Perpendicular (19–24 cm ASIS tabletop)",
+    "crDegreeFull": "ASIS-To-Tabletop Measurement:\n< 19 cm = 3-5 degrees Caudal\n19-24 cm = perpendicular\n> 24 cm = 3-5 degrees Cephalic",
+    "crDegreeFullLegacy": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
     "crNote": "ASIS-to-tabletop measurement: <19 cm = 3–5° caudal; 19–24 cm = perpendicular; >24 cm = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
@@ -830,10 +835,12 @@
   {
     "extremity": "Knee",
     "projection": "AP Oblique (Lateral Rotation)",
-    "crDegree": "Perpendicular (19–24 cm ASIS tabletop)",
+    "crDegree": "ASIS-To-Tabletop Measurement:\n< 19 cm = 3-5 degrees Caudal\n19-24 cm = perpendicular\n> 24 cm = 3-5 degrees Cephalic",
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45° lateral",
-    "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
+    "crDegreeLegacy": "Perpendicular (19–24 cm ASIS tabletop)",
+    "crDegreeFull": "ASIS-To-Tabletop Measurement:\n< 19 cm = 3-5 degrees Caudal\n19-24 cm = perpendicular\n> 24 cm = 3-5 degrees Cephalic",
+    "crDegreeFullLegacy": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
     "crNote": "ASIS-to-tabletop measurement: <19 cm = 3–5° caudal; 19–24 cm = perpendicular; >24 cm = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
@@ -1711,6 +1718,23 @@ function locationsAllCorrect(locScores) {
   return locScores.every(s => s.result === 'correct');
 }
 
+
+function formatMultilineHtml(text) {
+  const raw = String(text == null ? '' : text);
+  const html = fEsc(raw);
+  if (!raw.includes('\n')) return html;
+  return '<div class="cr-degree-lines">' + html + '</div>';
+}
+function shouldShowCrNote(p) {
+  if (!p || !p.crNote) return false;
+  const deg = p.crDegreeFull || p.crDegree || '';
+  // The ASIS guide is now the CR Degree answer itself — don't repeat it as a note.
+  if (/asis/i.test(deg) && /asis/i.test(p.crNote)) return false;
+  return true;
+}
+function crNoteHtml(p) {
+  return shouldShowCrNote(p) ? '<div class="cr-note">' + fEsc(p.crNote) + '</div>' : '';
+}
 function projectionCardHtml(p) {
   const nr = isNonRoutine(p);
   const badge = nr ? ' <span class="nr-badge">' + nonRoutineKind(p) + '</span>' : '';
@@ -1730,8 +1754,8 @@ function projectionCardHtml(p) {
   return '<div class="card' + (nr ? ' non-routine' : '') + '"' + (nr ? ' data-non-routine="1"' : '') + '>' +
     '<div class="extremity">' + p.extremity + '</div>' +
     '<h3>' + p.projection + badge + meta + '</h3>' +
-    '<div class="detail"><strong>CR Degree + Direction:</strong> ' + p.crDegree + '</div>' +
-    (p.crNote ? '<div class="cr-note">' + String(p.crNote).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' : '') +
+    '<div class="detail"><strong>CR Degree + Direction:</strong> ' + formatMultilineHtml(p.crDegree) + '</div>' +
+    crNoteHtml(p) +
     crLocationCardHtml(p) +
     (hasRotation(p) ? '<div class="detail"><strong>Body Part Rotation:</strong> ' + p.rotation + '</div>' : '') +
     (p.bestShows ? '<div class="best-shows"><strong>Best shows:</strong> ' + p.bestShows + '</div>' : '') +
@@ -2663,7 +2687,7 @@ function checkFocusMc() {
   html += `<div class="feedback ${classes[results.degree]}">CR Degree + Direction: ${labels[results.degree]}</div>`;
   html += locationFeedbackHtml(locScores, classes, labels);
   if (hasRot) html += `<div class="feedback ${classes[results.rotation]}">Body Part Rotation: ${labels[results.rotation]}</div>`;
-  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree + Direction: ${fEsc(focusMcCorrect.degree)}<br>${currentQuiz && currentQuiz.crNote ? '<div class="cr-note">' + fEsc(currentQuiz.crNote) + '</div>' : ''}${locationAnswersHtml(locScores)}`;
+  html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;"><strong>Correct answers:</strong><br>CR Degree + Direction: ${formatMultilineHtml(focusMcCorrect.degree)}<br>${currentQuiz ? crNoteHtml(currentQuiz) : ''}${locationAnswersHtml(locScores)}`;
   if (hasRot) html += `<br>Body Part Rotation: ${fEsc(focusMcCorrect.rotation)}`;
   html += `</div>`;
   quizFeedback.innerHTML = html;
@@ -2947,6 +2971,40 @@ function scoreDegreeDirection(user, correct) {
   return null; // leave other cases (e.g. number only) to the general matcher, as before
 }
 
+function scoreKneeAsisDegree(user) {
+  const raw = String(user || '').toLowerCase();
+  // Keep < and > so threshold signs survive; unify dashes and degree words.
+  const u = raw
+    .replace(/°|degrees?|deg\b/g, ' ')
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const n = normalize(user);
+  const hasLow = /(?:<|under|below|less than|lt)\s*19\s*cm/.test(u)
+    || /(?:<|under|below|less than|lt)\s*7\.?48/.test(u)
+    || /(?:under|below|less than)\s*19\s*cm/.test(n)
+    || /(?:under|below|less than)\s*7\s*48/.test(n);
+  const hasMid = /19\s*(?:-|to)\s*24\s*cm/.test(u)
+    || /7\.?48\s*(?:-|to)\s*9\.?45/.test(u)
+    || /19\s*24\s*cm/.test(n)
+    || /7\s*48\s*9\s*45/.test(n);
+  const hasHigh = /(?:>|over|above|greater than|more than|gt)\s*24\s*cm/.test(u)
+    || /(?:>|over|above|greater than|more than|gt)\s*9\.?45/.test(u)
+    || /(?:over|above|greater than|more than)\s*24\s*cm/.test(n)
+    || /(?:over|above|greater than|more than)\s*9\s*45/.test(n);
+  const hasCaudal = /(?:3\s*-\s*5|3\s*5).*caud|caud.*(?:3\s*-\s*5|3\s*5)/.test(u)
+    || /3\s*5.*caudad|caudad.*3\s*5/.test(n);
+  const hasPerp = /perpendicular|\bperp\b/.test(u);
+  const hasCephalic = /(?:3\s*-\s*5|3\s*5).*cephal|cephal.*(?:3\s*-\s*5|3\s*5)/.test(u)
+    || /3\s*5.*cephalad|cephalad.*3\s*5/.test(n);
+  // Full rule, or "perpendicular" plus all three ranges (directions may be implied).
+  if (hasLow && hasMid && hasHigh && hasCaudal && hasPerp && hasCephalic) return 'correct';
+  if (hasLow && hasMid && hasHigh && hasPerp) return 'correct';
+  if (hasLow && hasMid && hasHigh && hasCaudal && hasCephalic) return 'correct';
+  const bits = [hasLow, hasMid, hasHigh, hasCaudal, hasPerp, hasCephalic].filter(Boolean).length;
+  if (bits >= 1 || /\basis\b/.test(u)) return 'close';
+  return 'wrong';
+}
 function scoreMatch(user, correct, field) {
   if (!user) return 'wrong';
 
@@ -2964,16 +3022,11 @@ function scoreMatch(user, correct, field) {
     return 'wrong';
   }
 
-  // Special case: Knee ASIS tabletop projections (CR degree only)
+  // Special case: Knee ASIS tabletop projections (CR degree only).
+  // The answer is the full ASIS-to-tabletop rule. Mark correct when the
+  // response reasonably covers all three branches; accept cm or inch wording.
   if (field === 'degree' && currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
-    const u = normalize(user);
-    const isPerp = /perpendicular|perp/.test(u) || /19.?24\s*cm/.test(u) || /7\.?48.?9\.?45/.test(u);
-    const isCaudal = /3.?5.*caudad|caudad.*3.?5/.test(u)       // normalize() turns caudal -> caudad
-      || /(?:under|<|less than)\s*19\s*cm/.test(u) || /(?:under|<|less than)\s*7\.?48/.test(u);
-    const isCephalic = /3.?5.*cephalad|cephalad.*3.?5/.test(u) // and cephalic -> cephalad
-      || /(?:over|>|greater than|more than)\s*24\s*cm/.test(u) || /(?:over|>|greater than|more than)\s*9\.?45/.test(u);
-    if (isPerp || isCaudal || isCephalic) return 'correct';
-    return 'wrong';
+    return scoreKneeAsisDegree(user);
   }
 
   if (field === 'degree') {
@@ -3040,8 +3093,8 @@ function checkAnswer() {
   }
   html += `<div class="feedback" style="background:#1e2a3a; margin-top:0.8rem;">
     <strong>Correct answers:</strong><br>
-    CR Degree + Direction: ${currentQuiz.crDegreeFull || currentQuiz.crDegree}<br>
-    ${currentQuiz.crNote ? '<div class="cr-note">' + String(currentQuiz.crNote).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' : ''}
+    CR Degree + Direction: ${formatMultilineHtml(currentQuiz.crDegreeFull || currentQuiz.crDegree)}<br>
+    ${crNoteHtml(currentQuiz)}
     ${locationAnswersHtml(locScores)}`;
   if (hasRot) {
     html += `<br>Body Part Rotation: ${currentQuiz.rotation}`;
