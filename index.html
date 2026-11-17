@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261117a -->
+<!-- build:20261117b -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>X-Ray Projections</title>
 <script src="./auth.js?v=7"></script>
@@ -812,7 +812,7 @@
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": null,
     "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
-    "crNote": "ASIS-to-tabletop measurement: <7.48\" = 3–5° caudal; 7.48–9.45\" = perpendicular; >9.45\" = 3–5° cephalic",
+    "crNote": "ASIS-to-tabletop measurement: <19 cm = 3–5° caudal; 19–24 cm = perpendicular; >24 cm = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
   },
@@ -823,7 +823,7 @@
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45° medial",
     "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
-    "crNote": "ASIS-to-tabletop measurement: <7.48\" = 3–5° caudal; 7.48–9.45\" = perpendicular; >9.45\" = 3–5° cephalic",
+    "crNote": "ASIS-to-tabletop measurement: <19 cm = 3–5° caudal; 19–24 cm = perpendicular; >24 cm = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
   },
@@ -834,7 +834,7 @@
     "crLocation": "1/2 inch inferior to the patellar apex",
     "rotation": "45° lateral",
     "crDegreeFull": "ASIS tabletop measurement: <19 cm = 3–5° caudal, 19–24 cm = perpendicular, >24 cm = 3–5° cephalic",
-    "crNote": "ASIS-to-tabletop measurement: <7.48\" = 3–5° caudal; 7.48–9.45\" = perpendicular; >9.45\" = 3–5° cephalic",
+    "crNote": "ASIS-to-tabletop measurement: <19 cm = 3–5° caudal; 19–24 cm = perpendicular; >24 cm = 3–5° cephalic",
     "sid": "40\"",
     "ir": "14x17 LW"
   },
@@ -2967,9 +2967,11 @@ function scoreMatch(user, correct, field) {
   // Special case: Knee ASIS tabletop projections (CR degree only)
   if (field === 'degree' && currentQuiz && currentQuiz.extremity === 'Knee' && currentQuiz.crDegreeFull) {
     const u = normalize(user);
-    const isPerp = /perpendicular|perp/.test(u);
-    const isCaudal = /3.?5.*caudad|caudad.*3.?5/.test(u);       // normalize() turns caudal -> caudad
-    const isCephalic = /3.?5.*cephalad|cephalad.*3.?5/.test(u); // and cephalic -> cephalad
+    const isPerp = /perpendicular|perp/.test(u) || /19.?24\s*cm/.test(u) || /7\.?48.?9\.?45/.test(u);
+    const isCaudal = /3.?5.*caudad|caudad.*3.?5/.test(u)       // normalize() turns caudal -> caudad
+      || /(?:under|<|less than)\s*19\s*cm/.test(u) || /(?:under|<|less than)\s*7\.?48/.test(u);
+    const isCephalic = /3.?5.*cephalad|cephalad.*3.?5/.test(u) // and cephalic -> cephalad
+      || /(?:over|>|greater than|more than)\s*24\s*cm/.test(u) || /(?:over|>|greater than|more than)\s*9\.?45/.test(u);
     if (isPerp || isCaudal || isCephalic) return 'correct';
     return 'wrong';
   }
