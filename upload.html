@@ -2,19 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261116a -->
+<!-- build:20261118a -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload &amp; Quiz – X-Ray Projections</title>
-<meta name="description" content="XRaySavvy: turn your radiography notes into summaries and quizzes. Open a shared deck to study it free, no account needed.">
+<meta name="description" content="XRaySavvy: turn your radiography notes into summaries and quizzes. Preview a shared study deck, then create a free account to keep going.">
 <meta property="og:site_name" content="XRaySavvy">
 <meta property="og:type" content="website">
 <meta property="og:title" content="XRaySavvy: a shared radiography study deck">
-<meta property="og:description" content="Study this deck free: section summaries, key points and quizzes (Learn &amp; Exam Cram). No account needed.">
+<meta property="og:description" content="Preview this shared study deck, then create a free account to see the rest and save it for later.">
 <meta property="og:url" content="https://xraysavvy.com/upload.html">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="XRaySavvy: a shared radiography study deck">
-<meta name="twitter:description" content="Study this deck free: section summaries, key points and quizzes (Learn &amp; Exam Cram). No account needed.">
-<script src="./auth.js?v=7"></script>
+<meta name="twitter:description" content="Preview this shared study deck, then create a free account to see the rest and save it for later.">
+<script src="./auth.js?v=8"></script>
 <script src="./track.js?v=1" defer></script>
 <style>
 :root{--bg:#0f1419;--card:#1a2332;--text:#e7e9ea;--muted:#8b98a5;--accent:#1d9bf0;--border:#38444d;--good:#00ba7c;--bad:#f4212e}
@@ -58,6 +58,16 @@ main{max-width:800px;margin:0 auto;padding:1rem}
 .shr-msg.ok{background:#0d3d2e;color:#00ba7c}.shr-msg.err{background:#3d1a1c;color:#ff8a92}
 #screen-share .sv-title{font-size:1.3rem;font-weight:700;margin:0.4rem 0 0.15rem;overflow-wrap:anywhere}
 #screen-share .mode-btn{margin-top:0.6rem}
+.share-gate{margin-top:1.1rem;padding:1.05rem 1rem 1.15rem;background:#15202b;border:1px solid var(--border);border-radius:14px}
+.share-gate h3{margin:0 0 0.35rem;font-size:1.15rem;line-height:1.3}
+.share-gate p{margin:0 0 0.9rem;color:var(--muted);font-size:0.95rem;line-height:1.45}
+.share-gate .row{gap:0.55rem}
+.share-gate .btn{flex:1 1 8rem;min-height:44px}
+.sv-preview-note{margin-top:0.45rem}
+.sv-saved{margin-top:0.55rem;color:var(--good);font-size:0.9rem}
+.deck-group{margin:1rem 0 0.4rem;font-size:0.92rem;color:var(--muted);font-weight:650}
+#rGate{margin-top:0.9rem}
+
 .btn{padding:0.6rem 1rem;border-radius:8px;border:none;font-size:0.95rem;cursor:pointer;font-family:inherit}
 .btn:disabled{opacity:0.5;cursor:not-allowed}
 .btn-primary{background:var(--accent);color:#fff}
@@ -338,6 +348,7 @@ body.picbox-open{overflow:hidden}
     <div class="muted" style="text-align:center" id="rDeck"></div>
     <div class="score-big" id="rScore"></div>
     <div class="muted" style="text-align:center" id="rPct"></div>
+    <div id="rGate"></div>
     <div class="quiz-actions" style="justify-content:center">
       <button class="btn btn-primary" id="retryMissedBtn">Retry missed</button>
       <button class="btn btn-secondary" id="retakeBtn">Retake all</button>
@@ -954,6 +965,19 @@ function el(tag, attrs, ...kids) {
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 const fmtNum = n => n.toLocaleString('en-US');
 function fmtDate(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } }
+function isSharePreview(deck) { return !!(deck && deck.shared && deck.preview); }
+function shareGateEl(id) {
+  const box = el('div', { class: 'share-gate', id: id || 'shareGate' },
+    el('h3', null, 'Create a free account to see the rest of this file'),
+    el('p', null, 'Shared links will be saved to your account for future use'),
+    el('div', { class: 'row' },
+      el('button', { class: 'btn btn-primary', type: 'button', onclick: () => window.XRS && XRS.openAuth('signup') }, 'Sign up'),
+      el('button', { class: 'btn btn-secondary', type: 'button', onclick: () => window.XRS && XRS.openAuth('login') }, 'Log in')
+    )
+  );
+  return box;
+}
+
 
 let currentScreen = 'upload', histGuard = false;
 // ?share=ID opens a read-only shared deck (see SHARED DECKS below).
@@ -2084,6 +2108,9 @@ function showResults(early) {
   $('rDeck').textContent = quiz.deck.name + (early ? ' (ended early)' : '');
   $('rScore').textContent = quiz.score + ' / ' + total;
   $('rPct').textContent = total ? Math.round(quiz.score / total * 100) + '%' : '';
+  const rGate = $('rGate');
+  if (rGate) { rGate.innerHTML = ''; if (isSharePreview(quiz.deck)) rGate.append(shareGateEl('shareGateResults')); }
+  if (isSharePreview(quiz.deck) && !early) $('rDeck').textContent = quiz.deck.name + ' · preview';
   if (quiz.deck.mode === 'learn') {
     if (total && !quiz.deck.demo && !quiz.deck.unsaved) {
       quiz.deck.attempts.push({ date: new Date().toISOString(), score: quiz.score, total, mode: quiz.mode });
@@ -2096,8 +2123,8 @@ function showResults(early) {
   const missedQs = quiz.items.filter(q => quiz.missed.includes(q.id));
   $('missedCard').classList.toggle('hidden', !missedQs.length);
   $('retryMissedBtn').classList.toggle('hidden', !missedQs.length);
-  $('saveDemoBtn').classList.toggle('hidden', !quiz.deck.demo && !quiz.deck.shared);
-  if (quiz.deck.shared) SharedView.paintSaveBtn($('saveDemoBtn'));
+  $('saveDemoBtn').classList.toggle('hidden', (!quiz.deck.demo && !quiz.deck.shared) || isSharePreview(quiz.deck));
+  if (quiz.deck.shared && !isSharePreview(quiz.deck)) SharedView.paintSaveBtn($('saveDemoBtn'));
   for (const q of missedQs) {
     const d = el('div', { class: 'miss' });
     d.append(el('div', { style: 'font-weight:600' }, q.question));
@@ -2608,7 +2635,8 @@ function finishSection(i, r) {
       r.firstMissed.length ? 'on the first try · ' + (r.stillMissed.length ? r.stillMissed.length + ' still tricky — they\'ll come back in the Final Review' : 'and you got the missed one' + (r.firstMissed.length > 1 ? 's' : '') + ' on the retry ✓') : 'Perfect! 🎉'));
   }
   const last = i + 1 >= deck.learn.sections.length;
-  card.append(el('button', { class: 'btn btn-primary btn-block', id: 'nextSectionBtn', onclick: () => goNext(i) }, last ? 'Final Review →' : 'Next section →'));
+  if (isSharePreview(deck) && last) card.append(shareGateEl('shareGateSection'));
+  else card.append(el('button', { class: 'btn btn-primary btn-block', id: 'nextSectionBtn', onclick: () => goNext(i) }, last ? 'Final Review →' : 'Next section →'));
   card.append(el('div', { class: 'row', style: 'margin-top:0.5rem' },
     el('button', { class: 'btn btn-secondary', onclick: () => { deck.learn.current = i; renderSection(); } }, 'Review summary'),
     el('button', { class: 'btn btn-secondary', onclick: () => { renderMap(); showScreen('map'); } }, 'Sections')));
@@ -2662,6 +2690,7 @@ function renderMap() {
       el('span', { class: 'sc ' + scCls }, scTxt)));
   });
   const fin = $('mapFinal'); fin.innerHTML = '';
+  if (isSharePreview(deck)) { fin.append(shareGateEl('shareGateMap')); return; }
   fin.append(el('h2', null, '🏁 Final Review'));
   const pool = finalPool(deck).length;
   const fl = deck.learn.finalLast;
@@ -2678,7 +2707,7 @@ $('mapBackBtn').addEventListener('click', () => { showScreen('learn'); renderSec
 function renderLearnDeckRow(d, row, list) {
   const n = d.learn.sections.length, done = doneCount(d);
   row.append(el('div', { class: 'name' }, '📖 ' + d.name, typePill(d)));
-  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : ''].filter(Boolean).join(' · ')));
+  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : '', d.sourceShareId ? 'Shared with me' : ''].filter(Boolean).join(' · ')));
   const btns = el('div', { class: 'row' });
   btns.append(el('button', { class: 'btn btn-primary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; const open = x.learn.sections.findIndex(z => z.status !== 'done'); openLearn(x, open >= 0 ? open : x.learn.current); } }, done === n ? 'Review' : 'Resume'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'cram') }, '⚡ Exam Cram'));
@@ -3469,27 +3498,37 @@ window.addEventListener('popstate', () => {
 });
 
 // ===================== MY DECKS UI =====================
+function paintDeckRow(d, list) {
+  const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
+  const row = el('div', { class: 'deck' });
+  if (d.mode === 'learn' && d.learn) { renderLearnDeckRow(d, row, list); return; }
+  row.append(el('div', { class: 'name' }, '⚡ ' + d.name, typePill(d)));
+  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : '', d.sourceShareId ? 'Shared with me' : ''].filter(Boolean).join(' · ')));
+  const btns = el('div', { class: 'row' });
+  btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
+  if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
+  if (d.learnId || (d.src && d.src.parts && !isCramOnly(d))) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
+  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
+  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => ShareUI.open(await DeckStore.get(d.id)) }, '🔗 Share'));
+  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
+  btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+  row.append(ShareUI.statusEl(d));
+  row.append(btns); list.append(row);
+}
 async function renderDecks() {
   exitDeckCtx();
   const list = $('deckList'); list.innerHTML = '';
   const decks = await DeckStore.list();
   if (!decks.length) { list.append(el('div', { class: 'muted' }, 'No saved decks yet. Upload notes to make one.')); return; }
-  for (const d of decks) {
-    const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
-    const row = el('div', { class: 'deck' });
-    if (d.mode === 'learn' && d.learn) { renderLearnDeckRow(d, row, list); continue; }
-    row.append(el('div', { class: 'name' }, '⚡ ' + d.name, typePill(d)));
-    row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : ''].filter(Boolean).join(' · ')));
-    const btns = el('div', { class: 'row' });
-    btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
-    if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
-    if (d.learnId || (d.src && d.src.parts && !isCramOnly(d))) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
-    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
-    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => ShareUI.open(await DeckStore.get(d.id)) }, '🔗 Share'));
-    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
-    btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
-    row.append(ShareUI.statusEl(d));
-    row.append(btns); list.append(row);
+  const shared = decks.filter(d => d.sourceShareId);
+  const mine = decks.filter(d => !d.sourceShareId);
+  if (shared.length) {
+    list.append(el('h3', { class: 'deck-group' }, 'Shared with me'));
+    shared.forEach(d => paintDeckRow(d, list));
+  }
+  if (mine.length) {
+    if (shared.length) list.append(el('h3', { class: 'deck-group' }, 'My decks'));
+    mine.forEach(d => paintDeckRow(d, list));
   }
   ShareUI.refresh();
 }
@@ -3647,8 +3686,11 @@ DeckSync.updateUI();
 // Owner taps Share -> we store an immutable SNAPSHOT (title, section summaries + key points, questions)
 // in Supabase table shared_decks (RLS: owner-only; no public select). Anyone with the link
 // upload.html?share=ID reads it through the SECURITY DEFINER RPC get_shared_deck(share_id), which
-// only returns non-revoked rows and never the owner's id/email. Viewers get in-memory decks flagged
-// shared+unsaved, so nothing they do can change the original. Sharing never calls the AI.
+// only returns non-revoked rows and never the owner's id/email. Signed-out callers get a preview
+// (first 3 Learn questions + covering sections, first 8 Cram questions). Signed-in callers get
+// the full snapshot, which is auto-saved to their account (My Decks → Shared with me) without
+// duplicates. Viewers get in-memory decks flagged shared+unsaved, so nothing they do can change
+// the original. Sharing never calls the AI.
 const SHARE_BASE = 'https://xraysavvy.com/upload.html?share=';
 const SHARE_MAX_BYTES = 1000000;
 const shareUrl = id => SHARE_BASE + id;
@@ -3963,12 +4005,18 @@ const SharedView = (() => {
     const cramQuestions = (Array.isArray(c.cramQuestions) ? c.cramQuestions : []).map(q => cleanQ(q)).filter(Boolean);
     const by = typeof raw.by === 'string' ? raw.by.slice(0, 30) : '';
     const type = c.type === 'cram' ? 'cram' : 'learn';
-    return type === 'cram' ? { type, title, sections: [], learnQuestions: [], cramQuestions, by, updated_at: raw.updated_at }
-      : { type, title, sections, learnQuestions, cramQuestions, by, updated_at: raw.updated_at };
+    const totals = raw.totals && typeof raw.totals === 'object' ? {
+      sections: Number(raw.totals.sections) || 0,
+      learnQuestions: Number(raw.totals.learnQuestions) || 0,
+      cramQuestions: Number(raw.totals.cramQuestions) || 0
+    } : null;
+    const preview = !!raw.preview;
+    return type === 'cram' ? { type, title, sections: [], learnQuestions: [], cramQuestions, by, updated_at: raw.updated_at, preview, totals }
+      : { type, title, sections, learnQuestions, cramQuestions, by, updated_at: raw.updated_at, preview, totals };
   }
   const withIds = (qs, pre) => qs.map((q, i) => Object.assign({ id: pre + i, stats: { right: 0, wrong: 0 } }, q));
   function viewerDecks(id, c) {
-    const base = { shared: true, unsaved: true, shareId: id, name: c.title, createdAt: c.updated_at || new Date().toISOString(), pics: null, missed: [], attempts: [], settings: {} };
+    const base = { shared: true, unsaved: true, shareId: id, preview: !!c.preview, name: c.title, createdAt: c.updated_at || new Date().toISOString(), pics: null, missed: [], attempts: [], settings: {} };
     const learn = c.sections.length ? Object.assign({}, base, { id: 'share_' + id, mode: 'learn', questions: withIds(c.learnQuestions, 'sl' + id + '-'),
       learn: { current: 0, finalLast: null, sections: c.sections.map(s => ({ title: s.title, label: s.label, text: '', status: 'ready', summary: s.summary, keyPoints: s.keyPoints, extras: {}, asks: [], score: null, misses: [] })) } }) : null;
     const cram = c.cramQuestions.length ? Object.assign({}, base, { id: 'share_' + id + '_cram', questions: withIds(c.cramQuestions, 'sc' + id + '-') }) : null;
@@ -3979,17 +4027,14 @@ const SharedView = (() => {
     if (!window.XRS) return { error: true };
     try {
       const sb = await XRS.client();
+      try { await sb.auth.getSession(); } catch (e) { /* still try the rpc */ }
       const r = await sb.rpc('get_shared_deck', { share_id: id });
       if (r.error) return { error: true };
       if (!r.data || typeof r.data !== 'object') return { missing: true };
       return { data: clean(r.data) };
     } catch (e) { return { error: true }; }
   }
-  async function open(id) {
-    state = { id, loading: true };
-    $('shareTab').classList.remove('hidden'); $('shareTab').parentElement.classList.add('has-share');
-    show();
-    const r = await fetchShare(id);
+  async function applyFetched(id, r) {
     state = Object.assign({ id }, r);
     if (r.data) {
       Object.assign(state, viewerDecks(id, r.data));
@@ -3997,11 +4042,21 @@ const SharedView = (() => {
       else document.title = r.data.title + ' · Shared deck · XRaySavvy';
     }
     if (!state.data) document.title = 'Shared deck · XRaySavvy';
-    show();
     if (state.data) {
       const cd = state.cram || (state.learn && state.learn.questions.length ? state.learn : null);
       if (cd) CramSave.offerShared(cd, cd === state.learn ? { label: state.data.title + ' · Exam Cram', cram: true } : {});
     }
+  }
+  async function open(id) {
+    state = { id, loading: true };
+    $('shareTab').classList.remove('hidden'); $('shareTab').parentElement.classList.add('has-share');
+    show();
+    const r = await fetchShare(id);
+    await applyFetched(id, r);
+    if (window.XRS && XRS.user && state.data && !state.data.preview) {
+      state.justSaved = !!(await autoSave(id, state.data));
+    }
+    show();
   }
   function savedMap() { try { const v = JSON.parse(localStorage.getItem(SAVED) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
   async function savedDeckFor(id) {
@@ -4026,59 +4081,127 @@ const SharedView = (() => {
       card.append(row);
       return;
     }
-    const c = state.data, lq = state.learn ? state.learn.questions.length : 0, cq = state.cram ? state.cram.questions.length : 0;
-    card.append(el('span', { class: 'badge shared' }, '🔗 Shared deck'), el('div', { class: 'sv-title', id: 'shareTitle' }, c.title),
+    const c = state.data, preview = !!c.preview, t = c.totals || {};
+    const lq = state.learn ? state.learn.questions.length : 0, cq = state.cram ? state.cram.questions.length : 0;
+    const totalLearn = t.learnQuestions || lq, totalCram = t.cramQuestions || cq, totalSec = t.sections || c.sections.length;
+    card.append(el('span', { class: 'badge shared' }, preview ? '🔗 Shared deck · Preview' : '🔗 Shared deck'), el('div', { class: 'sv-title', id: 'shareTitle' }, c.title),
       el('div', { class: 'muted small' }, [c.by ? 'Shared by ' + c.by : '', c.updated_at ? 'Updated ' + fmtDate(c.updated_at) : ''].filter(Boolean).join(' · ')),
-      el('div', { class: 'muted small' }, [c.sections.length ? c.sections.length + ' sections' : '', (lq + cq) + ' questions'].filter(Boolean).join(' · ')));
+      el('div', { class: 'muted small' }, preview
+        ? [totalSec ? 'Preview · first ' + Math.min(c.sections.length || 1, totalSec) + ' of ' + totalSec + ' section' + (totalSec === 1 ? '' : 's') : '', (totalLearn + totalCram) ? 'try a few of ' + (totalLearn + totalCram) + ' questions' : ''].filter(Boolean).join(' · ')
+        : [c.sections.length ? c.sections.length + ' sections' : '', (lq + cq) + ' questions'].filter(Boolean).join(' · ')));
     if (state.learn) {
       const d = state.learn;
       card.append(el('button', { class: 'mode-btn rec', id: 'svLearn', onclick: () => { L = { deck: d, pending: {} }; openLearn(d, d.learn.current); } },
-        el('div', { class: 't' }, '📖 Learn (' + c.sections.length + ' section' + (c.sections.length === 1 ? '' : 's') + ')'),
-        el('div', { class: 'd' }, 'Short summaries and key points, then a quick quiz on each part.')));
-      if (lq) card.append(el('button', { class: 'mode-btn', id: 'svQuizAll', onclick: () => startQuiz(d, null, 'all') },
+        el('div', { class: 't' }, preview ? '📖 Try Learn (preview)' : '📖 Learn (' + c.sections.length + ' section' + (c.sections.length === 1 ? '' : 's') + ')'),
+        el('div', { class: 'd' }, preview ? 'The first section, then ' + lq + ' quiz question' + (lq === 1 ? '' : 's') + ' you can answer.' : 'Short summaries and key points, then a quick quiz on each part.')));
+      if (lq && !preview) card.append(el('button', { class: 'mode-btn', id: 'svQuizAll', onclick: () => startQuiz(d, null, 'all') },
         el('div', { class: 't' }, '🔀 Quiz all Learn questions (' + lq + ')'), el('div', { class: 'd' }, 'Every section question, shuffled.')));
+      if (lq && preview) card.append(el('button', { class: 'mode-btn', id: 'svQuizAll', onclick: () => startQuiz(d, null, 'all') },
+        el('div', { class: 't' }, '🔀 Try the first ' + lq + ' Learn question' + (lq === 1 ? '' : 's')), el('div', { class: 'd' }, 'Answer a short preview, then create a free account to continue.')));
     }
-    const cramDeck = state.cram || (lq ? state.learn : null), cramN = cramDeck ? cramDeck.questions.length : 0;
+    const cramDeck = state.cram || (lq ? state.learn : null);
+    const cramN = cramDeck ? cramDeck.questions.length : 0;
     if (cramDeck) {
+      const cramLabel = preview
+        ? '⚡ Try Exam Cram (first ' + cramN + ' of ' + (totalCram || cramN) + ' questions)'
+        : '⚡ Exam Cram (' + cramN + ' questions)';
       const cb = el('div', { class: 'mode-btn', id: 'svCram' },
-        el('div', { class: 't' }, '⚡ Exam Cram (' + cramN + ' questions)'), el('div', { class: 'd' }, 'One shuffled quiz on the whole deck. Pick how many:'));
-      const chips = el('div', { class: 'chips', style: 'margin-top:0.4rem' });
-      const counts = [10, 25, 50].filter(n => n < cramN);
-      for (const n of counts.concat(['All'])) chips.append(el('button', { class: 'chip', 'data-count': String(n), onclick: () => {
-        const ids = n === 'All' ? null : shuffle(cramDeck.questions).slice(0, n).map(q => q.id);
-        startQuiz(cramDeck, ids, 'all', cramDeck === state.learn ? { label: c.title + ' · Exam Cram', cram: true } : null);
-      } }, n === 'All' ? 'All ' + cramN : String(n)));
-      cb.append(chips); card.append(cb);
+        el('div', { class: 't' }, cramLabel),
+        el('div', { class: 'd' }, preview ? 'A first section of this cram sheet. Sign up to see the rest.' : 'One shuffled quiz on the whole deck. Pick how many:'));
+      if (preview) {
+        cb.append(el('button', { class: 'btn btn-primary', style: 'margin-top:0.6rem', type: 'button', onclick: ev => { ev.stopPropagation(); startQuiz(cramDeck, null, 'all', cramDeck === state.learn ? { label: c.title + ' · Exam Cram', cram: true } : null); } }, 'Start the preview'));
+      } else {
+        const chips = el('div', { class: 'chips', style: 'margin-top:0.4rem' });
+        const counts = [10, 25, 50].filter(n => n < cramN);
+        for (const n of counts.concat(['All'])) chips.append(el('button', { class: 'chip', 'data-count': String(n), onclick: ev => {
+          ev.stopPropagation();
+          const ids = n === 'All' ? null : shuffle(cramDeck.questions).slice(0, n).map(q => q.id);
+          startQuiz(cramDeck, ids, 'all', cramDeck === state.learn ? { label: c.title + ' · Exam Cram', cram: true } : null);
+        } }, n === 'All' ? 'All ' + cramN : String(n)));
+        cb.append(chips);
+      }
+      card.append(cb);
     }
-    const saveBtn = el('button', { class: 'btn btn-secondary', id: 'svSave', style: 'margin-top:0.9rem' }, 'Save to My Decks');
-    saveBtn.onclick = () => saveCopy(saveBtn);
-    paintSaveBtn(saveBtn);
-    card.append(saveBtn, el('div', { class: 'muted small', style: 'margin-top:0.5rem' },
-      'Read-only: you can study this deck but not change it. Saving makes your own separate copy' + (window.XRS && XRS.user ? '.' : ' (free account).')));
+    if (preview) {
+      card.append(shareGateEl('shareGateLanding'));
+    } else {
+      const saveBtn = el('button', { class: 'btn btn-secondary', id: 'svSave', style: 'margin-top:0.9rem' }, 'Save to My Decks');
+      saveBtn.onclick = () => saveCopy(saveBtn);
+      paintSaveBtn(saveBtn);
+      card.append(saveBtn, el('div', { class: 'muted small', style: 'margin-top:0.5rem' },
+        'Read-only: you can study this deck but not change it. Saving makes your own separate copy' + (window.XRS && XRS.user ? '.' : ' (free account).')));
+      if (state.justSaved || (window.XRS && XRS.user)) {
+        const note = el('div', { class: 'sv-saved', id: 'svSavedNote' }, '');
+        savedDeckFor(state.id).then(d => { if (d && note.isConnected) note.textContent = 'Saved to your account. You can reopen it under My Decks → Shared with me.'; });
+        card.append(note);
+      }
+    }
   }
-  function copyDecks(c) {
+  function copyDecks(c, shareId) {
     const now = new Date().toISOString(), lid = c.sections.length ? DeckStore.newId() : null, cid = c.cramQuestions.length ? DeckStore.newId() : null;
     const q = qs => qs.map(x => Object.assign({}, x, { id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }));
-    const learn = lid ? { id: lid, mode: 'learn', deckType: 'learn', name: c.title, createdAt: now, cramId: cid, sharedFrom: true,
+    const learn = lid ? { id: lid, mode: 'learn', deckType: 'learn', name: c.title, createdAt: now, cramId: cid, sharedFrom: true, sourceShareId: shareId || null,
       source: { fileName: c.title, kind: 'txt', units: c.sections.length }, settings: { type: 'mix' }, pics: null, missed: [], attempts: [],
       questions: q(c.learnQuestions),
       learn: { current: 0, finalLast: null, sections: c.sections.map(s => ({ title: s.title, label: s.label, text: s.summary + (s.keyPoints.length ? '\n\n' + s.keyPoints.join('\n') : ''), status: 'ready', summary: s.summary, keyPoints: s.keyPoints.slice(), extras: {}, asks: [], score: null, misses: [] })) } } : null;
-    const cram = cid ? { id: cid, name: c.title, createdAt: now, learnId: lid, sharedFrom: true, deckType: 'cram', source: { fileName: c.title, kind: 'txt' }, settings: {}, pics: null, missed: [], attempts: [], questions: q(c.cramQuestions) } : null;
+    const cram = cid ? { id: cid, name: c.title, createdAt: now, learnId: lid, sharedFrom: true, sourceShareId: shareId || null, deckType: 'cram', source: { fileName: c.title, kind: 'txt' }, settings: {}, pics: null, missed: [], attempts: [], questions: q(c.cramQuestions) } : null;
     return { learn, cram };
   }
+  function rememberSaved(shareId, deckId) {
+    const m = savedMap(); m[shareId] = deckId; try { localStorage.setItem(SAVED, JSON.stringify(m)); } catch (e) {}
+  }
+  async function findExistingCopy(shareId) {
+    const mapped = await savedDeckFor(shareId);
+    if (mapped) return mapped;
+    const local = (await DeckStore.list()).find(d => d.sourceShareId === shareId);
+    if (local) { rememberSaved(shareId, local.id); return local; }
+    if (!(window.XRS && XRS.user)) return null;
+    try {
+      const sb = await XRS.client();
+      const r = await sb.from('decks').select('client_id,data,updated_at').eq('deleted', false).filter('data->>sourceShareId', 'eq', shareId).limit(8);
+      if (r.error || !r.data || !r.data.length) return null;
+      const all = DeckStore._readAll();
+      let first = null;
+      for (const row of r.data) {
+        const d = row.data;
+        if (!d || !Array.isArray(d.questions)) continue;
+        d.id = row.client_id; d._mod = row.updated_at || d._mod;
+        const i = all.findIndex(x => x.id === d.id);
+        if (i >= 0) { if (!all[i].sourceShareId) all[i].sourceShareId = shareId; }
+        else all.push(d);
+        if (!first) first = d;
+      }
+      DeckStore._writeAll(all);
+      if (first) rememberSaved(shareId, first.id);
+      return first ? ((await DeckStore.get(first.id)) || first) : null;
+    } catch (e) { return null; }
+  }
   async function doSave(id, c) {
-    const existing = await savedDeckFor(id); if (existing) return existing;
-    const b = copyDecks(c);
+    if (!c || c.preview) return null; // never persist a trimmed preview as the user's copy
+    const existing = await findExistingCopy(id); if (existing) return existing;
+    const b = copyDecks(c, id);
     if (b.cram) await saveDeckSafe(b.cram);
     if (b.learn) await saveDeckSafe(b.learn);
     const first = b.learn || b.cram;
-    const m = savedMap(); m[id] = first.id; try { localStorage.setItem(SAVED, JSON.stringify(m)); } catch (e) {}
+    if (first) rememberSaved(id, first.id);
     return first;
+  }
+  // Auto-save a full shared file to the signed-in user's account (My Decks / Shared with me).
+  async function autoSave(id, c) {
+    if (!(window.XRS && XRS.user) || !c || c.preview) return null;
+    const already = await findExistingCopy(id);
+    if (already) return already;
+    try { return await doSave(id, c); } catch (e) { return null; }
   }
   async function saveCopy(btn) {
     if (!state || !state.data) return;
-    const existing = await savedDeckFor(state.id);
+    const existing = await findExistingCopy(state.id);
     if (existing) { renderDecks(); showScreen('decks'); return; }
+    if (state.data.preview) {
+      try { localStorage.setItem(PENDING, JSON.stringify({ id: state.id, at: Date.now() })); } catch (e) {}
+      if (window.XRS) XRS.openAuth('signup');
+      return;
+    }
     if (!window.XRS || !XRS.user) {
       try { localStorage.setItem(PENDING, JSON.stringify({ id: state.id, at: Date.now() })); } catch (e) {}
       if (window.XRS) XRS.openAuth('signup');
@@ -4098,14 +4221,27 @@ const SharedView = (() => {
     if (Date.now() - (p.at || 0) > 2 * 86400000) return;
     resuming = true;
     try {
-      let c = state && state.id === p.id && state.data ? state.data : null;
+      let c = state && state.id === p.id && state.data && !state.data.preview ? state.data : null;
       if (!c) { const r = await fetchShare(p.id); c = r.data || null; }
-      if (!c) return;
+      if (!c || c.preview) return;
       await doSave(p.id, c);
       if (currentScreen === 'share') show(); else if (currentScreen === 'decks' || currentScreen === 'upload') { await renderDecks(); showScreen('decks'); $('deckMsg').textContent = 'Saved “' + c.title + '” to My Decks.'; }
     } catch (e) { /* ignore */ } finally { resuming = false; }
   }
-  if (window.XRS) XRS.on(u => { if (u) resumePendingSave(); if (currentScreen === 'share' && state && state.data) show(); });
+  if (window.XRS) XRS.on(async u => {
+    if (u && state && state.id) {
+      if (!state.data || state.data.preview) {
+        const r = await fetchShare(state.id);
+        if (r.data) await applyFetched(state.id, r);
+      }
+      if (state.data && !state.data.preview) {
+        const saved = await autoSave(state.id, state.data);
+        if (saved) state.justSaved = true;
+      }
+      resumePendingSave();
+    }
+    if (currentScreen === 'share' && state && state.data) show();
+  });
   return { open, show, saveCopy, paintSaveBtn, resumePendingSave };
 })();
 

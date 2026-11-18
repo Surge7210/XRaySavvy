@@ -303,7 +303,12 @@
   }
   var ov = null;
   function closeSheet() { if (ov) { ov.remove(); ov = null; document.body.style.overflow = ''; } }
-  function pageUrl() { return location.origin + location.pathname; }
+  function pageUrl() {
+    var u = location.origin + location.pathname;
+    var m = String(location.search || '').match(/[?&]share=([A-Za-z0-9]{10,32})/);
+    if (m) u += '?share=' + m[1];
+    return u;
+  }
   function friendly(err) {
     var m = (err && (err.message || err.error_description)) || String(err || 'Something went wrong');
     var code = err && err.code;
