@@ -277,6 +277,20 @@
     '.xrs-nudge .xrs-f100{margin:-0.3rem 0 0.65rem;font-size:0.85rem}' +
     '.xrs-badge{margin-top:0.8rem;padding:0.65rem 0.8rem;border-radius:12px;background:linear-gradient(135deg,rgba(29,155,240,.18),rgba(0,186,124,.12));border:1px solid rgba(29,155,240,.45)}' +
     '.xrs-badge b{display:block;font-size:1rem}.xrs-badge span{display:block;color:var(--muted,#8b98a5);font-size:0.85rem;margin-top:0.15rem}' +
+    '.xrs-shares-h{margin:1.1rem 0 0.25rem;font-size:0.95rem;color:var(--muted,#8b98a5)}' +
+    '.xrs-share{margin-top:0.55rem;padding:0.75rem 0.8rem;border:1px solid var(--border,#38444d);border-radius:12px;background:var(--bg,#0f1419)}' +
+    '.xrs-share-name{font-weight:650;overflow-wrap:anywhere}' +
+    '.xrs-share-orig{color:var(--muted,#8b98a5);font-size:0.8rem;margin-top:0.15rem}' +
+    '.xrs-share-actions{display:flex;gap:0.45rem;margin-top:0.65rem;flex-wrap:wrap}' +
+    '.xrs-share-btn{flex:1 1 5.5rem;min-height:44px;border-radius:10px;border:1px solid var(--border,#38444d);background:var(--card,#1a2332);color:var(--text,#e7e9ea);font:inherit;font-size:0.95rem;font-weight:600;cursor:pointer}' +
+    '.xrs-share-btn.danger{background:#3d1a1c;border-color:#5a2428;color:#f4212e}' +
+    '.xrs-dlg-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10050;display:flex;align-items:flex-end;justify-content:center}' +
+    '.xrs-dlg{width:100%;max-width:480px;background:var(--card,#1a2332);color:var(--text,#e7e9ea);border-radius:16px 16px 0 0;border:1px solid var(--border,#38444d);padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));box-sizing:border-box}' +
+    '@media(min-width:600px){.xrs-dlg-ov{align-items:center;padding:1rem}.xrs-dlg{border-radius:16px}}' +
+    '.xrs-dlg h3{margin:0 0 0.4rem;font-size:1.12rem;line-height:1.3}' +
+    '.xrs-dlg p{margin:0 0 0.75rem;color:var(--muted,#8b98a5);font-size:0.95rem}' +
+    '.xrs-dlg-row{display:flex;gap:0.5rem;margin-top:0.85rem}' +
+    '.xrs-dlg-row button{flex:1;min-height:46px;margin-top:0}' +
     '@keyframes xrs-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}' +
     '@media (prefers-reduced-motion:reduce){.xrs-nudge{animation:none}}';
   function addCss() { if (document.getElementById('xrs-css')) return; var s = document.createElement('style'); s.id = 'xrs-css'; s.textContent = css; document.head.appendChild(s); }
@@ -332,6 +346,141 @@
     if (window.showMyDecks) window.showMyDecks(); // only upload.html defines it
     else location.href = './upload.html#decks';
   }
+
+  // Saved copies of shared links live on THIS user's `decks` rows (own-user RLS).
+  // Rename/delete never write to shared_decks (the owner's original file).
+  var DECKS_KEY = 'xraysavvy.decks.v1', TOMBS_KEY = 'xraysavvy.deckTombs.v1', SAVED_SHARES_KEY = 'xraysavvy.savedShares';
+  function readUserDecks() { try { var v = JSON.parse(localStorage.getItem(DECKS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function writeUserDecks(all) { try { localStorage.setItem(DECKS_KEY, JSON.stringify(all)); } catch (e) { } }
+  function listSavedShares() {
+    var map = {};
+    readUserDecks().forEach(function (d) {
+      if (!d || !d.sourceShareId) return;
+      (map[d.sourceShareId] = map[d.sourceShareId] || []).push(d);
+    });
+    return Object.keys(map).map(function (id) {
+      var rows = map[id];
+      var name = String(rows[0].shareDisplayName || rows[0].name || 'Shared deck').slice(0, 120);
+      var orig = rows[0].sourceTitle ? String(rows[0].sourceTitle).slice(0, 200) : '';
+      return { shareId: id, name: name, sourceTitle: orig && orig !== name ? orig : '', decks: rows };
+    }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+  function touchSaved(d) { var now = new Date().toISOString(); d._mod = now; d.updatedAt = now; }
+  async function pushSavedDeckRows(rows, deleting) {
+    if (!XRS.user || !rows || !rows.length) return;
+    try {
+      var sb = await loadClient();
+      var now = new Date().toISOString();
+      for (var i = 0; i < rows.length; i++) {
+        var d = rows[i], res;
+        if (deleting) res = await sb.from('decks').update({ deleted: true, data: {}, updated_at: now }).eq('client_id', d.id);
+        else res = await sb.from('decks').update({ name: String(d.name || '').slice(0, 200), kind: d.mode === 'learn' ? 'learn' : 'cram', data: d, updated_at: d._mod || now, deleted: false }).eq('client_id', d.id);
+        if (res && res.error) throw res.error;
+      }
+    } catch (e) { console.warn('[XRS] saved-share sync later', e); }
+  }
+  async function renameSavedShare(shareId, name) {
+    name = String(name || '').trim().slice(0, 120);
+    if (!shareId || !name) return null;
+    var all = readUserDecks(), changed = [];
+    all.forEach(function (d) {
+      if (!d || d.sourceShareId !== shareId) return;
+      if (!d.sourceTitle) d.sourceTitle = d.name;
+      d.shareDisplayName = name;
+      d.name = name;
+      touchSaved(d);
+      changed.push(d);
+    });
+    if (!changed.length) return null;
+    writeUserDecks(all);
+    if (window.DeckSync) DeckSync.schedule(200);
+    else await pushSavedDeckRows(changed, false);
+    return name;
+  }
+  async function removeSavedShare(shareId) {
+    if (!shareId) return;
+    var all = readUserDecks();
+    var gone = all.filter(function (d) { return d && d.sourceShareId === shareId; });
+    if (!gone.length) return;
+    writeUserDecks(all.filter(function (d) { return !d || d.sourceShareId !== shareId; }));
+    var when = new Date().toISOString(), tombs = {};
+    try { tombs = JSON.parse(localStorage.getItem(TOMBS_KEY) || '{}') || {}; } catch (e) { tombs = {}; }
+    gone.forEach(function (d) {
+      tombs[d.id] = when;
+      if (window.DeckSync && DeckSync.tombstone) DeckSync.tombstone(d.id);
+    });
+    try { localStorage.setItem(TOMBS_KEY, JSON.stringify(tombs)); } catch (e) { }
+    try {
+      var m = JSON.parse(localStorage.getItem(SAVED_SHARES_KEY) || '{}') || {};
+      delete m[shareId];
+      gone.forEach(function (d) { Object.keys(m).forEach(function (k) { if (m[k] === d.id) delete m[k]; }); });
+      localStorage.setItem(SAVED_SHARES_KEY, JSON.stringify(m));
+    } catch (e) { }
+    if (window.DeckSync) DeckSync.schedule(200);
+    else await pushSavedDeckRows(gone, true);
+  }
+  var shareDlg = null;
+  function closeShareDlg() { if (shareDlg) { shareDlg.remove(); shareDlg = null; } }
+  function openShareDlg(title, bodyKids, actions) {
+    closeShareDlg();
+    shareDlg = h('div', { class: 'xrs-dlg-ov', role: 'dialog', 'aria-modal': 'true' });
+    shareDlg.addEventListener('click', function (e) { if (e.target === shareDlg) closeShareDlg(); });
+    var box = h('div', { class: 'xrs-dlg' }, [h('h3', { text: title })].concat(bodyKids || []).concat([h('div', { class: 'xrs-dlg-row' }, actions)]));
+    shareDlg.appendChild(box);
+    document.body.appendChild(shareDlg);
+    return box;
+  }
+  function promptRenameShare(shareId, onDone) {
+    var g = listSavedShares().filter(function (x) { return x.shareId === shareId; })[0];
+    var inp = h('input', { type: 'text', id: 'xrs-share-rename', maxlength: '120', value: (g && g.name) || '' });
+    inp.value = (g && g.name) || '';
+    var save = h('button', { type: 'button', class: 'xrs-go', text: 'Save' });
+    var cancel = h('button', { type: 'button', class: 'xrs-go sec', text: 'Cancel', onclick: closeShareDlg });
+    save.onclick = async function () {
+      save.disabled = true;
+      try { await renameSavedShare(shareId, inp.value); closeShareDlg(); if (onDone) onDone(); } finally { save.disabled = false; }
+    };
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); save.click(); } });
+    openShareDlg('Rename saved link', [
+      h('p', { text: 'Only you will see this name. The original shared file is unchanged.' }),
+      inp
+    ], [cancel, save]);
+    setTimeout(function () { inp.focus(); inp.select(); }, 50);
+  }
+  function promptDeleteShare(shareId, onDone) {
+    var g = listSavedShares().filter(function (x) { return x.shareId === shareId; })[0];
+    var label = (g && g.name) || 'this saved link';
+    var extra = g && g.decks && g.decks.length > 1 ? ' This includes your Learn and Cram copies.' : '';
+    var go = h('button', { type: 'button', class: 'xrs-go', style: 'background:#c62828', text: 'Remove' });
+    var cancel = h('button', { type: 'button', class: 'xrs-go sec', text: 'Cancel', onclick: closeShareDlg });
+    go.onclick = async function () {
+      go.disabled = true;
+      try { await removeSavedShare(shareId); closeShareDlg(); if (onDone) onDone(); } finally { go.disabled = false; }
+    };
+    openShareDlg('Remove from your account?', [
+      h('p', { text: 'Remove “' + label + '” from your account?' + extra + ' This only deletes your saved copy. The original shared file is not changed.' })
+    ], [cancel, go]);
+  }
+  function renderSavedShareList(sheet, onChange) {
+    var shares = listSavedShares();
+    if (!shares.length) return;
+    sheet.appendChild(h('h3', { class: 'xrs-shares-h', text: 'Shared with me' }));
+    sheet.appendChild(h('div', { class: 'xrs-note', style: 'margin-top:0.2rem', text: 'Files you opened from a shared link. Rename or remove them here — the original stays with the owner.' }));
+    shares.forEach(function (g) {
+      var openBtn = h('button', { type: 'button', class: 'xrs-share-btn', text: 'Open' });
+      openBtn.onclick = function () { closeShareDlg(); closeSheet(); if (window.showMyDecks) window.showMyDecks(); else location.href = './upload.html#decks'; };
+      var ren = h('button', { type: 'button', class: 'xrs-share-btn', text: 'Rename' });
+      ren.onclick = function () { promptRenameShare(g.shareId, function () { if (onChange) onChange(); else openSheet('account'); }); };
+      var del = h('button', { type: 'button', class: 'xrs-share-btn danger', text: 'Delete' });
+      del.onclick = function () { promptDeleteShare(g.shareId, function () { if (onChange) onChange(); else openSheet('account'); }); };
+      var kids = [h('div', { class: 'xrs-share-name', text: g.name })];
+      if (g.sourceTitle) kids.push(h('div', { class: 'xrs-share-orig', text: 'Original: ' + g.sourceTitle }));
+      kids.push(h('div', { class: 'xrs-share-actions' }, [openBtn, ren, del]));
+      sheet.appendChild(h('div', { class: 'xrs-share' }, kids));
+    });
+  }
+  XRS.savedShares = { list: listSavedShares, rename: renameSavedShare, remove: removeSavedShare, promptRename: promptRenameShare, promptDelete: promptDeleteShare };
+
   function notice(title, text, ok, offerReset) { openSheet('notice', { title: title, text: text, ok: ok, offerReset: offerReset }); }
   function openSheet(view, opts) {
     addCss(); closeSheet();
@@ -444,6 +593,7 @@
       sheet.appendChild(h('button', { class: 'xrs-go', onclick: function () { closeSheet(); if (onIndex && window.showProgressTab) window.showProgressTab(); else location.href = './index.html#progress'; }, text: '📊 See my progress' }));
       var dc = deckCount();
       sheet.appendChild(h('button', { class: 'xrs-go alt', id: 'xrs-mydecks', onclick: openMyDecks, text: '📚 My Decks' + (dc ? ' (' + dc + ')' : '') }));
+      renderSavedShareList(sheet);
       var out = h('button', { class: 'xrs-go sec', id: 'xrs-logout', text: 'Log out' });
       out.onclick = async function () {
         out.disabled = true;

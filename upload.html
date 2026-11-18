@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261118a -->
+<!-- build:20261118b -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload &amp; Quiz – X-Ray Projections</title>
 <meta name="description" content="XRaySavvy: turn your radiography notes into summaries and quizzes. Preview a shared study deck, then create a free account to keep going.">
@@ -14,7 +14,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="XRaySavvy: a shared radiography study deck">
 <meta name="twitter:description" content="Preview this shared study deck, then create a free account to see the rest and save it for later.">
-<script src="./auth.js?v=8"></script>
+<script src="./auth.js?v=9"></script>
 <script src="./track.js?v=1" defer></script>
 <style>
 :root{--bg:#0f1419;--card:#1a2332;--text:#e7e9ea;--muted:#8b98a5;--accent:#1d9bf0;--border:#38444d;--good:#00ba7c;--bad:#f4212e}
@@ -2707,15 +2707,19 @@ $('mapBackBtn').addEventListener('click', () => { showScreen('learn'); renderSec
 function renderLearnDeckRow(d, row, list) {
   const n = d.learn.sections.length, done = doneCount(d);
   row.append(el('div', { class: 'name' }, '📖 ' + d.name, typePill(d)));
-  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : '', d.sourceShareId ? 'Shared with me' : ''].filter(Boolean).join(' · ')));
+  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), done + ' of ' + n + ' sections done', d.questions.length ? d.questions.length + ' questions' : '', d.missed.length ? d.missed.length + ' missed' : '', d.sample ? 'Sample' : '', d.sourceShareId ? 'Shared with me' : '', (d.sourceTitle && d.shareDisplayName && d.sourceTitle !== d.name) ? 'Original: ' + d.sourceTitle : ''].filter(Boolean).join(' · ')));
   const btns = el('div', { class: 'row' });
   btns.append(el('button', { class: 'btn btn-primary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; const open = x.learn.sections.findIndex(z => z.status !== 'done'); openLearn(x, open >= 0 ? open : x.learn.current); } }, done === n ? 'Review' : 'Resume'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'cram') }, '⚡ Exam Cram'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); L = { deck: x, pending: {} }; renderMap(); showScreen('map'); } }, 'Sections'));
   if (d.questions.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Quiz all (' + d.questions.length + ')'));
   if (!d.sample) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => ShareUI.open(await DeckStore.get(d.id)) }, '🔗 Share'));
-  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const nm = prompt('Rename deck', d.name); if (nm && nm.trim()) { await DeckStore.rename(d.id, nm.trim()); renderDecks(); } } }, 'Rename'));
-  btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+  const sharedBtns = sharedRenameDeleteBtns(d, () => renderDecks());
+  if (sharedBtns) sharedBtns.forEach(b => btns.append(b));
+  else {
+    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const nm = prompt('Rename deck', d.name); if (nm && nm.trim()) { await DeckStore.rename(d.id, nm.trim()); renderDecks(); } } }, 'Rename'));
+    btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+  }
   if (!d.sample) row.append(ShareUI.statusEl(d));
   row.append(btns); list.append(row);
 }
@@ -3498,20 +3502,32 @@ window.addEventListener('popstate', () => {
 });
 
 // ===================== MY DECKS UI =====================
+function sharedRenameDeleteBtns(d, after) {
+  if (!d.sourceShareId) return false;
+  const run = fn => { if (window.XRS && XRS.savedShares && XRS.savedShares[fn]) XRS.savedShares[fn](d.sourceShareId, after); };
+  return [
+    el('button', { class: 'btn btn-secondary', type: 'button', onclick: () => run('promptRename') }, 'Rename'),
+    el('button', { class: 'btn btn-danger', type: 'button', onclick: () => run('promptDelete') }, 'Delete')
+  ];
+}
 function paintDeckRow(d, list) {
   const last = d.attempts && d.attempts.length ? d.attempts[d.attempts.length - 1] : null;
   const row = el('div', { class: 'deck' });
   if (d.mode === 'learn' && d.learn) { renderLearnDeckRow(d, row, list); return; }
   row.append(el('div', { class: 'name' }, '⚡ ' + d.name, typePill(d)));
-  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : '', d.sourceShareId ? 'Shared with me' : ''].filter(Boolean).join(' · ')));
+  row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : '', d.sourceShareId ? 'Shared with me' : '', (d.sourceTitle && d.shareDisplayName && d.sourceTitle !== d.name) ? 'Original: ' + d.sourceTitle : ''].filter(Boolean).join(' · ')));
   const btns = el('div', { class: 'row' });
   btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
   if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
   if (d.learnId || (d.src && d.src.parts && !isCramOnly(d))) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => ShareUI.open(await DeckStore.get(d.id)) }, '🔗 Share'));
-  btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
-  btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+  const sharedBtns = sharedRenameDeleteBtns(d, () => renderDecks());
+  if (sharedBtns) sharedBtns.forEach(b => btns.append(b));
+  else {
+    btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const n = prompt('Rename deck', d.name); if (n && n.trim()) { await DeckStore.rename(d.id, n.trim()); renderDecks(); } } }, 'Rename'));
+    btns.append(el('button', { class: 'btn btn-danger', onclick: async () => { if (confirm('Delete "' + d.name + '"?')) { await DeckStore.remove(d.id); renderDecks(); } } }, 'Delete'));
+  }
   row.append(ShareUI.statusEl(d));
   row.append(btns); list.append(row);
 }
@@ -3524,6 +3540,7 @@ async function renderDecks() {
   const mine = decks.filter(d => !d.sourceShareId);
   if (shared.length) {
     list.append(el('h3', { class: 'deck-group' }, 'Shared with me'));
+    list.append(el('div', { class: 'muted small', style: 'margin:-0.15rem 0 0.55rem' }, 'Copies saved to your account. Rename or delete them here — the original file stays with the owner.'));
     shared.forEach(d => paintDeckRow(d, list));
   }
   if (mine.length) {
@@ -4140,11 +4157,11 @@ const SharedView = (() => {
   function copyDecks(c, shareId) {
     const now = new Date().toISOString(), lid = c.sections.length ? DeckStore.newId() : null, cid = c.cramQuestions.length ? DeckStore.newId() : null;
     const q = qs => qs.map(x => Object.assign({}, x, { id: DeckStore.newId(), stats: { right: 0, wrong: 0 } }));
-    const learn = lid ? { id: lid, mode: 'learn', deckType: 'learn', name: c.title, createdAt: now, cramId: cid, sharedFrom: true, sourceShareId: shareId || null,
+    const learn = lid ? { id: lid, mode: 'learn', deckType: 'learn', name: c.title, createdAt: now, cramId: cid, sharedFrom: true, sourceShareId: shareId || null, sourceTitle: c.title,
       source: { fileName: c.title, kind: 'txt', units: c.sections.length }, settings: { type: 'mix' }, pics: null, missed: [], attempts: [],
       questions: q(c.learnQuestions),
       learn: { current: 0, finalLast: null, sections: c.sections.map(s => ({ title: s.title, label: s.label, text: s.summary + (s.keyPoints.length ? '\n\n' + s.keyPoints.join('\n') : ''), status: 'ready', summary: s.summary, keyPoints: s.keyPoints.slice(), extras: {}, asks: [], score: null, misses: [] })) } } : null;
-    const cram = cid ? { id: cid, name: c.title, createdAt: now, learnId: lid, sharedFrom: true, sourceShareId: shareId || null, deckType: 'cram', source: { fileName: c.title, kind: 'txt' }, settings: {}, pics: null, missed: [], attempts: [], questions: q(c.cramQuestions) } : null;
+    const cram = cid ? { id: cid, name: c.title, createdAt: now, learnId: lid, sharedFrom: true, sourceShareId: shareId || null, sourceTitle: c.title, deckType: 'cram', source: { fileName: c.title, kind: 'txt' }, settings: {}, pics: null, missed: [], attempts: [], questions: q(c.cramQuestions) } : null;
     return { learn, cram };
   }
   function rememberSaved(shareId, deckId) {
