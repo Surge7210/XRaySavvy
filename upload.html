@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- build:20261118b -->
+<!-- build:20261118c -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload &amp; Quiz – X-Ray Projections</title>
 <meta name="description" content="XRaySavvy: turn your radiography notes into summaries and quizzes. Preview a shared study deck, then create a free account to keep going.">
@@ -981,7 +981,11 @@ function shareGateEl(id) {
 
 let currentScreen = 'upload', histGuard = false;
 // ?share=ID opens a read-only shared deck (see SHARED DECKS below).
-const SHARE_PARAM = (() => { const m = location.search.match(/[?&]share=([^&#]*)/); return m ? decodeURIComponent(m[1]) : null; })();
+function shareIdFromUrl() {
+  const m = String(location.search || '').match(/[?&]share=([A-Za-z0-9]{10,32})/);
+  return m ? m[1] : null;
+}
+const SHARE_PARAM = shareIdFromUrl();
 function isRootScreen(name) { return name === 'decks' || name === 'share' || (name === 'upload' && !studyCtx); }
 function showScreen(name) {
   currentScreen = name;
@@ -1797,6 +1801,9 @@ let quiz = null; // {deck, items, i, score, missed:[], answered, mode}
 // save on this device. Newest copy wins; finishing or "Start over" leaves a small 'cleared' marker.
 const CramSave = (() => {
   const PRE = 'xraysavvy.cram.', MAX_AGE = 30 * 86400000;
+  // Auto "Unfinished Exam Cram" popup on load / when starting a quiz is off.
+  // Saved progress is kept; Resume from My Decks or the mode picker continues the session.
+  const SHOW_CRAM_RESUME_POPUP = false;
   let deckTimer = null, pendingDeck = null, offered = false;
   const ms = t => { const n = Date.parse(t || ''); return isNaN(n) ? 0 : n; };
   const owned = deck => !deck.shared && !deck.unsaved && !deck.demo;
@@ -1859,6 +1866,8 @@ const CramSave = (() => {
   function close() { if (ov) { ov.remove(); ov = null; } }
   // The choice sheet. startOver() runs the quiz the student originally asked for, from scratch.
   function prompt(deck, s, startOver, notNow) {
+    if (!SHOW_CRAM_RESUME_POPUP) return;
+    if (shareIdFromUrl()) return;
     close();
     const n = Math.min(s.i + 1, s.order.length), tot = s.order.length, wrong = Math.max(0, s.i - s.score);
     ov = el('div', { class: 'shr-ov', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Resume Exam Cram', id: 'cramResume' });
@@ -1883,6 +1892,8 @@ const CramSave = (() => {
   }
   // Page (re)load: offer the most recent unfinished Exam Cram right away (reload / app switch mid-cram).
   async function offerOnLoad() {
+    if (!SHOW_CRAM_RESUME_POPUP) return;
+    if (shareIdFromUrl()) return;
     if (offered) return; offered = true;
     try {
       const decks = (await DeckStore.list()).filter(d => eligible(d, {}));
@@ -1892,8 +1903,9 @@ const CramSave = (() => {
         prompt(best.d, best.s, () => startQuiz(best.d, null, 'all', null, true), () => {});
     } catch (e) { /* never block the page */ }
   }
-  // Shared link opened: if this viewer has an unfinished cram for it, offer it.
+  // Shared link opened: if this viewer has an unfinished cram for it, offer it (disabled while the auto-popup is off).
   function offerShared(deck, opts) {
+    if (!SHOW_CRAM_RESUME_POPUP) return;
     if (!eligible(deck, opts)) return;
     const s = load(deck);
     if (s && currentScreen === 'share' && !document.getElementById('cramResume'))
@@ -1902,14 +1914,15 @@ const CramSave = (() => {
   const onHide = () => { save(true); flush(); };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide(); });
   window.addEventListener('pagehide', onHide);
-  return { eligible, keyFor, load, save, clear, prompt, offerOnLoad, offerShared, flush };
+  return { eligible, keyFor, load, save, clear, prompt, offerOnLoad, offerShared, flush, close, SHOW_CRAM_RESUME_POPUP };
 })();
 
 // opts (Learn mode): {label, onComplete(result), onQuit(), retryMissed}
 function startQuiz(deck, onlyIds, mode, opts, fresh) {
   opts = opts || {};
-  // Exam Cram: an unfinished saved session for this deck -> ask Resume vs Start over first.
-  if (!fresh && CramSave.eligible(deck, opts)) {
+  // Exam Cram: an unfinished saved session used to prompt Resume vs Start over first.
+  // The auto-popup is off; callers that want to continue a session use resumeQuiz().
+  if (CramSave.SHOW_CRAM_RESUME_POPUP && !fresh && CramSave.eligible(deck, opts) && !shareIdFromUrl()) {
     const saved = CramSave.load(deck);
     if (saved) { CramSave.prompt(deck, saved, () => startQuiz(deck, onlyIds, mode, opts, true)); return; }
   }
@@ -3442,9 +3455,9 @@ function renderDeckCtx() {
   ShareUI.paintStatus($('ctxShareStatus'), shareSrc);
   if (cr && cr.questions.length) {
     const crSaved = CramSave.load(cr);
-    if (crSaved) ex.append(el('button', { class: 'btn btn-primary', id: 'ctxCramResume', onclick: async () => { const x = (await DeckStore.get(cr.id)) || cr, s = CramSave.load(x); if (s) CramSave.prompt(x, s, () => startQuiz(x, null, 'all', null, true)); else startQuiz(x, null, 'all'); } },
+    if (crSaved) ex.append(el('button', { class: 'btn btn-primary', id: 'ctxCramResume', onclick: async () => { const x = (await DeckStore.get(cr.id)) || cr, s = CramSave.load(x); if (s) resumeQuiz(x, s); else startQuiz(x, null, 'all', null, true); } },
       '▶ Resume my Exam Cram (Question ' + Math.min(crSaved.i + 1, crSaved.order.length) + ' of ' + crSaved.order.length + ')'));
-    ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz((await DeckStore.get(cr.id)) || cr, null, 'all') }, '↻ Retake my Exam Cram quiz (' + cr.questions.length + ' questions)'));
+    ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => startQuiz((await DeckStore.get(cr.id)) || cr, null, 'all', null, true) }, '↻ Retake my Exam Cram quiz (' + cr.questions.length + ' questions)'));
     if (cr.missed && cr.missed.length) ex.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = (await DeckStore.get(cr.id)) || cr; startQuiz(x, x.missed, 'missed'); } }, '✗ Just the ones I missed (' + cr.missed.length + ')'));
   }
   if (lr && lr.questions.length) ex.append(el('button', { class: 'btn btn-secondary', onclick: () => { L = L && L.deck === lr ? L : { deck: lr, pending: {} }; startQuiz(lr, null, 'all'); } }, '🔀 Quiz me on all Learn questions so far (' + lr.questions.length + ')'));
@@ -3517,8 +3530,10 @@ function paintDeckRow(d, list) {
   row.append(el('div', { class: 'name' }, '⚡ ' + d.name, typePill(d)));
   row.append(el('div', { class: 'muted small' }, [fmtDate(d.createdAt), d.questions.length + ' questions', d.missed.length ? d.missed.length + ' missed' : '', last ? 'last ' + last.score + '/' + last.total : '', d.sourceShareId ? 'Shared with me' : '', (d.sourceTitle && d.shareDisplayName && d.sourceTitle !== d.name) ? 'Original: ' + d.sourceTitle : ''].filter(Boolean).join(' · ')));
   const btns = el('div', { class: 'row' });
-  btns.append(el('button', { class: 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all') }, 'Retake'));
-  if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed'); } }, 'Missed (' + d.missed.length + ')'));
+  const cramSess = CramSave.load(d);
+  if (cramSess) btns.append(el('button', { class: 'btn btn-primary', id: 'deckCramResume', onclick: async () => { const x = await DeckStore.get(d.id); const s = CramSave.load(x); if (s) resumeQuiz(x, s); else startQuiz(x, null, 'all', null, true); } }, 'Resume'));
+  btns.append(el('button', { class: cramSess ? 'btn btn-secondary' : 'btn btn-primary', onclick: async () => startQuiz(await DeckStore.get(d.id), null, 'all', null, true) }, 'Retake'));
+  if (d.missed.length) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => { const x = await DeckStore.get(d.id); startQuiz(x, x.missed, 'missed', null, true); } }, 'Missed (' + d.missed.length + ')'));
   if (d.learnId || (d.src && d.src.parts && !isCramOnly(d))) btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id), 'learn') }, '📖 Learn'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => openModes(await DeckStore.get(d.id)) }, '⇄ Modes'));
   btns.append(el('button', { class: 'btn btn-secondary', onclick: async () => ShareUI.open(await DeckStore.get(d.id)) }, '🔗 Share'));
@@ -4065,6 +4080,7 @@ const SharedView = (() => {
     }
   }
   async function open(id) {
+    if (CramSave.close) CramSave.close();
     state = { id, loading: true };
     $('shareTab').classList.remove('hidden'); $('shareTab').parentElement.classList.add('has-share');
     show();
@@ -4265,11 +4281,26 @@ const SharedView = (() => {
 updateGenBtn();
 // upload.html#decks (from the account sheet) opens straight on My Decks; auth.js calls showMyDecks() when already here.
 window.showMyDecks = () => { exitDeckCtx(); renderDecks(); showScreen('decks'); };
-if (SHARE_PARAM != null) SharedView.open(SHARE_PARAM);
-else if (location.hash === '#decks') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } window.showMyDecks(); }
-else if (/[?&]demo=1/.test(location.search)) startDemo();
-else if (/[?&]demo=learn/.test(location.search)) startDemoLearn();
-else CramSave.offerOnLoad();
+function bootFromUrl() {
+  const shareId = shareIdFromUrl();
+  if (shareId) {
+    // Never let a leftover Exam Cram resume sheet cover a shared link.
+    if (CramSave.close) CramSave.close();
+    SharedView.open(shareId);
+    return;
+  }
+  if (location.hash === '#decks') { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } window.showMyDecks(); return; }
+  if (/[?&]demo=1/.test(location.search)) { startDemo(); return; }
+  if (/[?&]demo=learn/.test(location.search)) { startDemoLearn(); return; }
+  CramSave.offerOnLoad();
+}
+bootFromUrl();
+window.addEventListener('pageshow', ev => {
+  if (shareIdFromUrl()) {
+    if (CramSave.close) CramSave.close();
+    if (ev.persisted || currentScreen !== 'share') SharedView.open(shareIdFromUrl());
+  }
+});
 SharedView.resumePendingSave();
 </script>
 <!-- Reserved (disabled): <script src="./upload-flashcards.js?v=3"></script> -->
